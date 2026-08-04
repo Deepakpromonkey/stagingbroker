@@ -2,7 +2,7 @@ import { clearSessionStorage } from "../utils/Auth";
 
 
 // export const API_BASE = "https://qs233r41-8000.inc1.devtunnels.ms/api/v1";
-export const API_BASE = "http://192.168.20.28:8000/api/v1";
+export const API_BASE = "https://brokerapi.dollartraq.com/api/v1";
 // export const API_BASE = "https://qs233r41-8000.inc1.devtunnels.ms/api/v1";
  
 export const SOCKET_BASE = API_BASE.replace(/^http/, "ws");
