@@ -19,12 +19,23 @@ jobs:
           script_stop: true
           script: |
             set -e
-
+          
+            echo "PROJECT_PATH=${{ secrets.PROJECT_PATH }}"
+          
             cd ${{ secrets.PROJECT_PATH }}
-
+          
+            echo "Current directory:"
+            pwd
+          
+            echo "Git remote:"
+            git remote -v
+          
+            echo "Git status:"
+            git status
+          
             git fetch origin
             git reset --hard origin/main
             git clean -fd
-
+          
             npm install
             npm run build
