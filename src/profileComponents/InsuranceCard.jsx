@@ -48,7 +48,7 @@ function extractCoverages(rows) {
 }
 
 function InsuranceCard(props) {
-
+    const [coiDocument, setCoiDocument] = useState(null);
     const dotNumber = props.data?.dot_number;
 
     const insuranceFilings = Array.isArray(
@@ -77,6 +77,7 @@ function InsuranceCard(props) {
             .then(function (result) {
                 if (cancelled) return;
                 setOcrCoverages(extractCoverages(result?.data));
+                 setCoiDocument(result?.coiDocument || null);
             })
             .catch(function (err) {
                 if (cancelled) return;
@@ -99,7 +100,12 @@ function InsuranceCard(props) {
         };
 
     }, [dotNumber]);
-
+const coiUrl = coiDocument?.document_url
+    ? coiDocument.document_url.replace(
+        's3://dollartraq/',
+        'https://dollartraq.s3.us-east-2.amazonaws.com/'
+      )
+    : null;
     const coverageRows = useMemo(function () {
 
         return ocrCoverages.map(function (coverage, index) {
@@ -237,7 +243,7 @@ function InsuranceCard(props) {
             </div>
 
         <a
-    href="https://dollartraq.s3.us-east-2.amazonaws.com/coi/2560697_DOT++Cert+20240517054028.pdf"
+  href={coiUrl || "#"}
     target="_blank"
     rel="noopener noreferrer"
     className="mt-[18px] flex w-full items-center justify-center rounded-[10px] bg-white py-[14px] text-[14px] font-[700] text-[#334155] shadow-sm transition-all hover:underline xl:mt-[20px] xl:py-[16px] xl:text-[15px]"
