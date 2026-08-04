@@ -1,0 +1,72 @@
+
+.data-table{}
+
+.datatable{}
+.datatable .toolbar{display:flex; align-items:center; justify-content:space-between;}
+
+.tabbed-filters{display:flex; justify-content:space-between; align-items:center;}
+
+.tabbed-filters-list{display:flex; flex-direction:column;}
+.tabbed-filters-list ul{list-style-type:none;}
+.tabbed-filters-list > ul{display:flex; margin:10px 0 5px 0; padding:0}
+.tabbed-filters-list > ul ul{display:flex; margin:0 10px 0 0; padding:0}
+.tabbed-filters-list > ul > li{align-items:center; display:flex; justify-content:center;}
+.tabbed-filters-list > ul > li strong{font-size:12px; margin-right:10px;}
+
+.datatable .toolbar .toolbar-paging{display:flex; align-items:center; justify-content:center;}
+.datatable .toolbar .search-button{margin-left:25px}
+
+.datatable .toolbar .primary{display:flex; align-items:center; justify-content:flex-start;}
+
+.datatable .MuiTableContainer-root{}
+
+.data-table thead{}
+.data-table thead:after{content:''; display:block;}
+.data-table thead tr.card{}
+.data-table thead tr.card th{border-bottom:0 none; font-weight:bold; color:rgba(255,255,255,1); font-size:12px; line-height:1.3; vertical-align:top; padding:12px 12px; background-color:#2b80e0;}
+.data-table thead tr.card th:hover{color:#fff}
+
+.data-table thead tr.card th:first-child{border-radius:30px 0 0 30px}
+.data-table thead tr.card th:last-child{border-radius:0px 30px 30px 0px}
+
+.data-table tbody tr.data-table-row-spacer td{padding:2px}
+
+.MuiTableRow-root.data-table-row-spacer{}
+.data-table tbody td{border:0 none; font-size:13px; padding:8px 8px; vertical-align:top;}
+.data-table tbody td:first-child{border-left:0 none}
+.data-table tbody .card{transition:.2s all ease-in-out; border-top:1px solid rgba(0,0,0,.3)}
+.data-table tbody .card:hover{background-color:#f7f7f7;}
+
+.data-table tbody .card.active-row{background:rgb(42,35,108, .2); background:linear-gradient(270deg, rgba(42,35,108, .2) 0%, rgba(211,71,71, .2) 100%);}
+
+.data-table-row-spacer td{padding:5px; border:0 none}
+
+.data-table tbody .card.row_0{border-top:0 none}
+
+.data-table-row-search{border-bottom:1px solid #2b80e0}
+.data-table-row-search td{}
+.data-table-row-search td input,
+.data-table-row-search td select{width:calc(100% - 12px); font-size:12px; padding:6px; border:1px solid transparent; transition:.2s all ease-in-out; background-color:transparent;}
+.data-table-row-search td input:hover{border:1px solid rgba(0,0,0,.1); background-color:rgba(0,0,0,.01);}
+.data-table-row-search td input:focus,
+.data-table-row-search td input:visited,
+.data-table-row-search td input:active,
+.data-table-row-search td select:hover,
+.data-table-row-search td select:focus{outline:none; border:1px solid rgba(0,0,0,.1); background-color:rgba(0,0,0,.01);}
+
+.data-table-row-search td input,
+.data-table-row-search td select{padding:10px 6px}
+
+
+.data-table-row-search td .MuiInputBase-root{}
+.data-table-row-search td .MuiInputBase-root input{width:70px}
+.data-table-row-search td .MuiInput-underline::after{border-bottom:0 none}
+.data-table-row-search td .MuiInput-underline::before{border-bottom:0 none}
+.data-table-row-search td .MuiInput-underline:hover:not(.Mui-disabled)::before{border-bottom:0 none}
+
+.MuiTableRow-root.card{background-color:#fff;}
+
+.col-cell{position:relative;}
+.col-cell:hover .col-cell-edit-action{opacity:1}
+.col-cell-edit-action{opacity:.2; transition:.2s all ease-in-out; position:absolute; bottom:0; right:0}
+

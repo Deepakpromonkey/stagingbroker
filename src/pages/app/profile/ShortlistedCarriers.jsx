@@ -1,0 +1,181 @@
+import React, { useState, useEffect } from 'react';
+import Skeleton from '@mui/material/Skeleton';
+import { useNavigate } from 'react-router-dom';
+import CarrierCard from '../../../components/CarrierCards';
+import { apiFetch } from '../../../lib/api';
+
+function CarrierCardSkeleton() {
+    return (
+        <div className="bg-white rounded-xl border border-gray-200 p-5 flex flex-col gap-4">
+            <div className="flex items-start justify-between">
+                <div className="flex flex-col gap-2">
+                    <Skeleton variant="text" width={180} height={22} />
+                    <div className="flex gap-2">
+                        <Skeleton variant="rounded" width={90} height={22} />
+                        <Skeleton variant="rounded" width={110} height={22} />
+                    </div>
+                </div>
+                <div className="flex flex-col gap-1.5 items-end">
+                    <Skeleton variant="rounded" width={140} height={22} />
+                    <Skeleton variant="rounded" width={120} height={22} />
+                    <Skeleton variant="rounded" width={70} height={22} />
+                </div>
+            </div>
+            <Skeleton variant="rounded" height={64} />
+            <Skeleton variant="text" width="50%" height={18} />
+        </div>
+    );
+}
+
+function ShortlistedCarriers() {
+    const navigate = useNavigate();
+    const [successMessage, setSuccessMessage] = useState('');
+    const [errorMessage, setErrorMessage] = useState('');
+    const [loading, setLoading] = useState(true);
+    const [carriers, setCarriers] = useState([]);
+    const [total, setTotal] = useState(0);
+
+    useEffect(() => {
+        loadShortlistedCarriers();
+    }, []);
+
+    function handleCarrierClick(carrier) {
+        navigate('/carriers/' + carrier.carrier_id);
+    }
+
+    function loadShortlistedCarriers() {
+        setLoading(true);
+
+        apiFetch('/shortlist', {
+            method: 'GET'
+        })
+            .then(response => {
+                const rawData = response.data || [];
+
+                const mappedCarriers = rawData.map(item => ({
+                    carrier_id: item.row_id,
+                    company_name: item.legal_name || item.dba_name || '-',
+                    mc_number: item.mc_number || '-',
+                    dot_number: item.dot_number || '-',
+                    vin: item.vin || '-',
+                    duns: item.duns || '-',
+                    address: [item.phy_city, item.phy_state].filter(Boolean).join(', ') || '-',
+                    phone: item.telephone || '-',
+                    email: item.email_address || '-',
+                    mileage: item.mcs150_mileage || item.recent_mileage || null,
+                    fleet_size: item.nbr_power_unit || item.driver_total || null,
+                    carrier_operation: item.carrier_operation || 'A',
+                    active_authority: "A",
+                    authority_verified: true,
+                    insurance_current: true,
+                    risk_level: "low"
+                }));
+
+                setCarriers(mappedCarriers);
+                setTotal(mappedCarriers.length);
+            })
+            .catch(err => {
+                setErrorMessage(err.message || 'Failed to load shortlisted carriers.');
+                setTimeout(() => setErrorMessage(''), 4000);
+            })
+            .finally(() => setLoading(false));
+    }
+
+    function removeFromShortlist(carrier_id) {
+        setSuccessMessage('');
+        setErrorMessage('');
+
+        apiFetch('/shortlist', {
+            method: 'DELETE',
+            body: JSON.stringify({ row_id: carrier_id })
+        })
+            .then(data => {
+                setCarriers(prev => prev.filter(c => c.carrier_id !== carrier_id));
+                setTotal(prev => Math.max(prev - 1, 0));
+                setSuccessMessage(data?.message || 'Carrier removed successfully');
+                setTimeout(() => setSuccessMessage(''), 4000);
+            })
+            .catch(err => {
+                setErrorMessage(err.message || 'Something went wrong');
+                setTimeout(() => setErrorMessage(''), 4000);
+            });
+    }
+
+    const shortlistedHeader = (
+        <div className="flex justify-end mb-5 w-full">
+            <div className="flex items-center gap-3.5 rounded-xl border border-gray-200 bg-white px-5 py-3.5">
+                <div className="flex h-11 w-11 items-center justify-center rounded-[10px] bg-blue-50 shrink-0">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600">
+                        <path d="M3 7h11v8H3z" />
+                        <path d="M14 10h4l3 3v2h-7z" />
+                        <circle cx="6" cy="19" r="1.5" />
+                        <circle cx="17" cy="19" r="1.5" />
+                    </svg>
+                </div>
+                <div>
+                    <div className="text-xl font-semibold text-gray-900 leading-tight tabular-nums">
+                        {loading ? '–' : total}
+                    </div>
+                    <div className="text-xs text-gray-500 leading-tight mt-0.5">Total shortlisted</div>
+                </div>
+            </div>
+        </div>
+    );
+
+return (
+    <div className="min-h-screen bg-[#F4F5F1] px-8 py-5 md:px-14">
+
+        <div className="mb-8">
+            <h1 className="text-[40px] font-semibold tracking-tight text-slate-900">
+                Shortlisted carriers
+            </h1>
+            <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-slate-500">
+                Carriers you've saved for quick access and comparison.
+            </p>
+        </div>
+
+        <div className="max-w-5xl mx-auto flex flex-col gap-6">
+
+            {successMessage && (
+                <div className="w-full p-3 bg-green-50 text-green-700 border border-green-200 rounded-lg text-sm font-medium">
+                    ✓ {successMessage}
+                </div>
+            )}
+
+            {errorMessage && (
+                <div className="w-full p-3 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm font-medium">
+                    ✕ {errorMessage}
+                </div>
+            )}
+
+            {shortlistedHeader}
+
+            <div className="flex flex-col gap-3 w-full">
+                {loading &&
+                    [...Array(3)].map((_, i) => (
+                        <CarrierCardSkeleton key={i} />
+                    ))
+                }
+
+                {!loading && carriers.length === 0 && (
+                    <div className="text-center py-16 px-6 border border-dashed border-gray-200 rounded-xl text-sm text-gray-500 bg-white">
+                        No shortlisted carriers found — carriers you save will show up here.
+                    </div>
+                )}
+
+                {carriers.map(carrier => (
+                    <CarrierCard
+                        key={carrier.carrier_id}
+                        carrier={carrier}
+                        showRemove
+                        onRemove={removeFromShortlist}
+                        onClick={handleCarrierClick}
+                    />
+                ))}
+            </div>
+        </div>
+    </div>
+);
+}
+
+export default ShortlistedCarriers;
