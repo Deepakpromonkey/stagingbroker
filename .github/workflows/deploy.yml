@@ -10,25 +10,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Debug secrets
-        run: |
-          echo "HOST=${{ secrets.EC2_HOST }}"
-          echo "USER=${{ secrets.EC2_USER }}"
-          echo "PATH=${{ secrets.PROJECT_PATH }}"
-          if [ -n "${{ secrets.EC2_SSH_KEY }}" ]; then
-            echo "SSH_KEY=FOUND"
-          else
-            echo "SSH_KEY=MISSING"
-          fi
-
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          script_stop: true
           script: |
+            set -e
+
             cd ${{ secrets.PROJECT_PATH }}
-            git pull origin main
+
+            git fetch origin
+            git reset --hard origin/main
+            git clean -fd
+
             npm install
             npm run build
