@@ -79,7 +79,7 @@ class Dashboard extends Component {
 
         if (account_token) {
             this.setState({ account_token, logged_in: true }, () => {
-                this.init();
+                // this.init();
                 this.loadShipmentTotals();
                 this.loadActiveShipmentCount();
                 this.loadShipments();

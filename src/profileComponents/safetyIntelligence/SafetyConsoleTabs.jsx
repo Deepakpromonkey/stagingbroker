@@ -1,11 +1,11 @@
 import React from 'react';
 
 function SafetyConsoleTabs({ activeTab, onTabChange }) {
-    const tabs = ['OVERVIEW', 'BASICS', 'INSPECTIONS', 'CRASHES'];
+    const tabs = [ 'BASICS', 'INSPECTIONS', 'CRASHES'];
 
     return (
         <div className='border-b border-[#d9e1ee] bg-[#F1F7FF] px-35.5'>
-            <div className='flex gap-42.5'> 
+            <div className='flex gap-62.5'> 
                 {tabs.map((tab) => (
                     <button
                         key={tab}

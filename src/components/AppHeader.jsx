@@ -131,17 +131,17 @@ export default function AppHeader() {
         return () => window.removeEventListener('crm-user-updated', onUserUpdated);
     }, []);
 
-    useEffect(() => {
-        if (!user) return;
-        let cancelled = false;
-        apiFetch('/notifications/count')
-            .then((data) => {
-                if (!cancelled) setNotificationsCount(data?.counts ?? data?.data?.total ?? 0);
-            })
-            .catch(() => {
-            });
-        return () => { cancelled = true; };
-    }, [user]);
+    // useEffect(() => {
+    //     if (!user) return;
+    //     let cancelled = false;
+    //     apiFetch('/notifications/count')
+    //         .then((data) => {
+    //             if (!cancelled) setNotificationsCount(data?.counts ?? data?.data?.total ?? 0);
+    //         })
+    //         .catch(() => {
+    //         });
+    //     return () => { cancelled = true; };
+    // }, [user]);
 
 const handleLogout = () => {
     logout(navigate);

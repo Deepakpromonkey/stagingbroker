@@ -99,15 +99,15 @@ function useShipments(pageIndex, pageSize) {
         if (!cancelled) setLoading(false);
       });
 
-    apiFetch(TOTALS_ENDPOINT)
-      .then((totalsRes) => {
-        if (cancelled) return;
-        if (totalsRes && totalsRes.status) {
-          setTotal(Number(totalsRes.all_shipment) || 0);
-        }
-      })
-      .catch(() => {
-      });
+    // apiFetch(TOTALS_ENDPOINT)
+    //   .then((totalsRes) => {
+    //     if (cancelled) return;
+    //     if (totalsRes && totalsRes.status) {
+    //       setTotal(Number(totalsRes.all_shipment) || 0);
+    //     }
+    //   })
+    //   .catch(() => {
+    //   });
 
     return () => {
       cancelled = true;
