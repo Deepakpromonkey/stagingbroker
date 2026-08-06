@@ -12,7 +12,7 @@ class SafetyIntelligenceConsole extends React.Component {
         super(props);
         
         this.state = {
-            activeTab: 'OVERVIEW'
+            activeTab: 'BASICS'
         };
 
         this.handleTabChange = this.handleTabChange.bind(this);
