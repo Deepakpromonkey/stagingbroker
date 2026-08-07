@@ -61,6 +61,51 @@ function StatusBadge(props) {
     );
 }
 
+
+function DTScoreRing(props) {
+    const size = 16;
+    const strokeWidth = 2;
+    const radius = (size - strokeWidth) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const progress = Math.max(0, Math.min(100, Number(props.score) || 0));
+    const offset = circumference - (progress / 100) * circumference;
+
+    return (
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className='shrink-0'>
+            <circle
+                cx={size / 2} cy={size / 2} r={radius}
+                fill='none' stroke='#e5e7eb' strokeWidth={strokeWidth}
+            />
+            <circle
+                cx={size / 2} cy={size / 2} r={radius}
+                fill='none' stroke='#2563eb' strokeWidth={strokeWidth}
+                strokeDasharray={circumference}
+                strokeDashoffset={offset}
+                strokeLinecap='round'
+                transform={`rotate(-90 ${size / 2} ${size / 2})`}
+            />
+        </svg>
+    );
+}
+
+function DTScoreValue(props) {
+    const value = props.value;
+
+    if (value === undefined || value === null || value === '') {
+        return <div className='text-[13px] font-[600] text-[#374151]'>-</div>;
+    }
+
+    return (
+        <div className='flex items-center gap-[6px]'>
+            <span className='text-[13px] font-[700] text-[#2563eb]'>
+                {value}
+                <span className='text-[11px] font-[400] text-[#6b7280]'>/100</span>
+            </span>
+            <DTScoreRing score={value} />
+        </div>
+    );
+}
+
 function CarrierOperationTag(props) {
 
     const value = (props.value || '').toUpperCase();
@@ -229,12 +274,12 @@ function CarrierCard(props) {
     const showRemove = props.showRemove;
     const onRemove = props.onRemove;
 
-    const idFields = [
-        { label: 'MC NUMBER', value: carrier.mc_number },
-        { label: 'DOT NUMBER', value: carrier.dot_number },
-        { label: 'VIN', value: carrier.vin },
-        { label: 'DUNS', value: carrier.duns }
-    ];
+const idFields = [
+    { key: 'mc', label: 'MC NUMBER', value: carrier.mc_number },
+    { key: 'dot', label: 'DOT NUMBER', value: carrier.dot_number },
+    { key: 'dt_score', label: 'DT SCORE', value: carrier.dt_score },
+    { key: 'duns', label: 'DUNS', value: carrier.duns }
+];
 
     const contactItems = [
         {
@@ -367,18 +412,25 @@ function CarrierCard(props) {
 
                     <div className='grid grid-cols-4 gap-y-[12px] gap-x-[24px] mb-[18px] px-[14px] py-[16px] rounded-[12px] border border-[#edf0f3] bg-[#fafafa] w-full'>
 
-                        {idFields.map(function (field) {
-                            return (
-                                <div key={field.label}>
-                                    <div className='text-[9px] font-[700] text-[#9ca3af] uppercase tracking-[0.08em] mb-[4px]'>
-                                        {field.label}
-                                    </div>
-                                    <div className='text-[13px] font-[600] text-[#374151]'>
-                                        {field.value || '-'}
-                                    </div>
-                                </div>
-                            );
-                        })}
+           {idFields.map(function (field) {
+
+    return (
+        <div key={field.label}>
+            <div className='text-[9px] font-[700] text-[#9ca3af] uppercase tracking-[0.08em] mb-[4px]'>
+                {field.label}
+            </div>
+
+            {field.key === 'dt_score'
+                ? <DTScoreValue value={field.value} />
+                : (
+                    <div className='text-[13px] font-[600] text-[#374151]'>
+                        {field.value || '-'}
+                    </div>
+                )
+            }
+        </div>
+    );
+})}
 
                     </div>
 

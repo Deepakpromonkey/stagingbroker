@@ -3,9 +3,13 @@ import React, { useState, useEffect } from 'react';
 import Grid from '@mui/material/Grid';
 import Skeleton from '@mui/material/Skeleton';
 
+import LocationOn from '@mui/icons-material/LocationOn';
+import Phone from '@mui/icons-material/Phone';
+import Email from '@mui/icons-material/Email';
+import WarningAmberRounded from '@mui/icons-material/WarningAmberRounded';
+import CheckCircle from '@mui/icons-material/CheckCircle';
 import ChevronLeft from '@mui/icons-material/ChevronLeft';
 import ChevronRight from '@mui/icons-material/ChevronRight';
-import FiberManualRecordIcon from '@mui/icons-material/FiberManualRecord';
 
 import CarrierCard from '../../../components/CarrierCards';
 import SearchOverlay from '../../../components/SearchOverlay';
@@ -30,9 +34,6 @@ const DEFAULT_FILTERS = {
 
 const SEARCH_TYPES = ['mc', 'dot', 'company', 'phone', 'address', 'email', 'ein'];
 
-// Maps a search type to the query param the search API expects.
-// e.g. mc -> mc_number, dot -> dot_number, company -> legal_name
-// Anything not in this map (free-text search) falls back to `legal_name`.
 const SEARCH_PARAM_MAP = {
     mc: 'mc_number',
     dot: 'dot_number',
@@ -44,6 +45,19 @@ const SEARCH_PARAM_MAP = {
 };
 
 const SEARCH_ENDPOINT = '/carrier/search';
+
+const HOW_TO_USE_ROWS = [
+    [
+        { label: 'MC', desc: "Search by the carrier's MC number." },
+        { label: 'DOT', desc: "Search by the carrier's USDOT number." },
+        { label: 'Company', desc: 'Search using the company name.' }
+    ],
+    [
+        { label: 'Phone', desc: 'Search using the registered phone number.' },
+        { label: 'Address', desc: 'Search using the registered address.' },
+        { label: 'Email', desc: 'Search using the registered email address.' }
+    ]
+];
 
 function CarrierCardSkeleton() {
 
@@ -60,6 +74,125 @@ function CarrierCardSkeleton() {
 
                 <Skeleton variant="text" width="20%" />
                 <Skeleton variant="text" width="20%" />
+
+            </div>
+
+        </div>
+    );
+}
+
+function Pagination(props) {
+
+    const currentPage = props.currentPage;
+    const lastPage = props.lastPage;
+    const onPrev = props.onPrev;
+    const onNext = props.onNext;
+
+    if (lastPage <= 1) return null;
+
+    const iconButtonClass =
+        'w-[36px] h-[36px] flex items-center justify-center rounded-full text-[#4b5563] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#f1f5f9] transition-colors';
+
+    return (
+
+        <div className='flex items-center justify-center gap-[18px] py-[6px]'>
+
+            <button
+                onClick={onPrev}
+                disabled={currentPage === 1}
+                aria-label='Previous page'
+                className={iconButtonClass}
+            >
+                <ChevronLeft className='!text-[20px]' />
+            </button>
+
+            <span className='text-[13px] text-[#6b7280] font-[500]'>
+                Page <span className='text-[#111827] font-[700]'>{currentPage}</span> of {lastPage.toLocaleString()}
+            </span>
+
+            <button
+                onClick={onNext}
+                disabled={currentPage === lastPage}
+                aria-label='Next page'
+                className={iconButtonClass}
+            >
+                <ChevronRight className='!text-[20px]' />
+            </button>
+
+        </div>
+    );
+}
+function ResultsFooter(props) {
+
+    const currentPage = props.currentPage;
+    const lastPage = props.lastPage;
+    const onPrev = props.onPrev;
+    const onNext = props.onNext;
+    const onPageSelect = props.onPageSelect;
+
+    return (
+
+        <div className='flex flex-col gap-4 mt-1'>
+
+            <Pagination
+                currentPage={currentPage}
+                lastPage={lastPage}
+                onPrev={onPrev}
+                onNext={onNext}
+                onPageSelect={onPageSelect}
+            />
+
+            <div className='bg-white rounded-[14px] px-[22px] py-[18px] shadow-[0_1px_3px_rgba(0,0,0,0.06)]'>
+
+                <div className='flex items-center gap-2 mb-[14px]'>
+
+                    <WarningAmberRounded className='!text-[16px] text-[#ef4444]' />
+
+                    <span className='text-[12px] font-[700] text-[#111827] tracking-[0.02em] uppercase'>
+                        How To Use
+                    </span>
+
+                </div>
+
+                <div className='flex flex-col'>
+
+                    {HOW_TO_USE_ROWS.map(function (row, rowIndex) {
+
+                        const isLastRow = rowIndex === HOW_TO_USE_ROWS.length - 1;
+
+                        return (
+
+                            <div
+                                key={rowIndex}
+                                className={`grid grid-cols-1 sm:grid-cols-3 gap-x-[24px] gap-y-[10px] ${
+                                    isLastRow ? '' : 'pb-[12px] mb-[12px] border-b border-[#f1f5f9]'
+                                }`}
+                            >
+
+                                {row.map(function (item, itemIndex) {
+
+                                    return (
+
+                                        <div
+                                            key={itemIndex}
+                                            className='flex items-start gap-[8px] text-[12px] text-[#4b5563]'
+                                        >
+
+                                            <CheckCircle className='!text-[14px] text-[#15924c] mt-[1px] shrink-0' />
+
+                                            <span>
+                                                <strong className='text-[#111827] font-[600]'>{item.label}</strong> – {item.desc}
+                                            </span>
+
+                                        </div>
+                                    );
+                                })}
+
+                            </div>
+                        );
+                    })}
+
+                </div>
 
             </div>
 
@@ -251,6 +384,14 @@ function CarrierSearch() {
         }
     }
 
+    function handlePageSelect(page) {
+
+        if (page !== currentPage) {
+
+            runSearch(query, page, sortBy, searchType);
+        }
+    }
+
     function handleSortChange(event) {
         const value = event.target.value;
 
@@ -301,39 +442,6 @@ function CarrierSearch() {
 
                         <div className='max-w-[1100px] mx-auto'>
 
-                           <div className='flex justify-between items-center mb-10 max-md:flex-col max-md:items-start max-md:gap-4'>
-
-
-                                <div className='text-sm text-gray-500'>
-
-                                    <span className='text-sm mr-2 inline-flex items-center gap-1 font-semibold mb-2 text-[#8B93A7]'>
-
-                                        <FiberManualRecordIcon sx={{ fontSize: 8, color: '#2563EB' }} />
-
-                                        Search Results
-                                    </span>
-
-                                    <br />
-
-                                    <span style={{ color: '#4B5563', fontSize: '16px', fontWeight: 400 }}>
-                                        We found{' '}
-                                    </span>
-
-                                    <strong className='text-gray-900 text-[16px]'>
-                                        {total.toLocaleString()} results
-                                    </strong>
-
-                                </div>
-
-                                <div className='flex flex-wrap items-center gap-3'>
-
-                                    {/* Risk / Verified dropdowns and Sort select unchanged */}
-
-                                </div>
-
-                            </div>
-
-
                             <div className='flex flex-col gap-4 mt-9'>
 
                                 {loading && (
@@ -376,28 +484,13 @@ function CarrierSearch() {
                                             );
                                         })}
 
-
-                                        <div className='flex flex-wrap justify-center items-center gap-4 mt-1'>
-
-                                            <button disabled={currentPage === 1} onClick={handlePrevPage}>
-
-                                                <ChevronLeft />
-
-                                            </button>
-
-                                            <div className='text-sm mt-1 font-medium'>
-
-                                                Page {currentPage} of {lastPage}
-
-                                            </div>
-
-                                            <button disabled={currentPage === lastPage} onClick={handleNextPage}>
-
-                                                <ChevronRight />
-
-                                            </button>
-
-                                        </div>
+                                        <ResultsFooter
+                                            currentPage={currentPage}
+                                            lastPage={lastPage}
+                                            onPrev={handlePrevPage}
+                                            onNext={handleNextPage}
+                                            onPageSelect={handlePageSelect}
+                                        />
 
                                     </>
 
