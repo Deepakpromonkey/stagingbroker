@@ -49,6 +49,7 @@ function extractCoverages(rows) {
 
 function InsuranceCard(props) {
     const [coiDocument, setCoiDocument] = useState(null);
+    
     const dotNumber = props.data?.dot_number;
 
     const insuranceFilings = Array.isArray(
