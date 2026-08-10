@@ -31,6 +31,7 @@ import ReportProblemOutlined from "@mui/icons-material/ReportProblemOutlined";
 import Skeleton from "@mui/material/Skeleton";
 
 import ReportCarrierModal from "./ReportCarrierModal";
+import ConnectCarrierModal from "./ConnectCarrierModal";
 
 // import Api from '../../api/Api';
 import { apiFetch } from "../../../lib/api";
@@ -67,7 +68,7 @@ function CarrierProfile() {
 
   const [isShortlisted, setIsShortlisted] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
-  const [connecting, setConnecting] = useState(false);
+  const [connectModalOpen, setConnectModalOpen] = useState(false);
   const [shortlisting, setShortlisting] = useState(false);
   const [shortlistRowId, setShortlistRowId] = useState(null);
   const [removingShortlist, setRemovingShortlist] = useState(false);
@@ -409,41 +410,37 @@ function CarrierProfile() {
     );
   }
 
-  const handleConnect = async () => {
-    if (!carrier?.row_id || connecting) return;
+  /*
+  | The invitation is sent by ConnectCarrierModal, which first asks where it
+  | should go. Posting straight from here would send `row_id` alone, and the API
+  | treats a missing `email_option` as "the FMCSA-registered address" — so an
+  | alternate address could never be requested at all.
+  |
+  | An alternate produces no invitation until the carrier approves it from their
+  | registered inbox, so that case is reported as pending rather than sent.
+  */
+  function handleConnectSubmitted(res, { usingAlternate, email }) {
+    setConnectRequest(res?.data || null);
 
-    setConnecting(true);
+    setIsConnected(true);
 
-    try {
-      const res = await apiFetch("/carrier-connect", {
-        method: "POST",
-        body: JSON.stringify({ row_id: carrier.row_id }),
-      });
-
-      setConnectRequest(res?.data || null);
-
-      setIsConnected(true);
-
+    if (usingAlternate) {
       showToast(
         "success",
-        "Invitation sent",
-        "The carrier has been emailed an onboarding link.",
+        "Approval requested",
+        `We've emailed the carrier's FMCSA-registered address to approve sending the onboarding link to ${email}.`,
+        8000,
       );
-    } catch (err) {
-      console.error("Connect request error:", err);
 
-      showToast(
-        "error",
-        "Couldn't send invitation",
-        err?.message || "Something went wrong. Please try again.",
-      );
-    } finally {
-      setConnecting(false);
+      return;
     }
-  };
 
-  // Re-clicking Connect resends the invitation and pushes the expiry out.
-  const handleResendConnect = handleConnect;
+    showToast(
+      "success",
+      "Invitation sent",
+      `The carrier has been emailed an onboarding link at ${email}.`,
+    );
+  }
 
   useEffect(
     function () {
@@ -898,9 +895,7 @@ function CarrierProfile() {
                       label: "Connect",
                       icon: <Bolt className="!text-[18px]" />,
                       variant: "primary",
-                      onClick: () => handleConnect(),
-                      disabled: connecting,
-                      loading: connecting,
+                      onClick: () => setConnectModalOpen(true),
                     }
                   : connectRequest?.completed
                     ? {
@@ -913,14 +908,12 @@ function CarrierProfile() {
                     : {
                         // The carrier has been invited but hasn't finished the
                         // wizard. Resending refreshes the link's expiry.
-                        label: connecting
-                          ? "Resending..."
+                        label: connectRequest?.pending_email_approval
+                          ? "Awaiting Email Approval"
                           : "Resend Invitation",
                         icon: <Bolt className="!text-[18px]" />,
                         variant: "secondary",
-                        onClick: () => handleResendConnect(),
-                        disabled: connecting,
-                        loading: connecting,
+                        onClick: () => setConnectModalOpen(true),
                       }),
             ].filter(Boolean)}
           />
@@ -1171,6 +1164,15 @@ function CarrierProfile() {
           </div>
         </div>
       </div>
+
+      <ConnectCarrierModal
+        isOpen={connectModalOpen}
+        onClose={() => setConnectModalOpen(false)}
+        carrier={carrier}
+        isResend={isConnected}
+        connectRequest={connectRequest}
+        onSubmitted={handleConnectSubmitted}
+      />
 
       <ReportCarrierModal
         isOpen={reportModalOpen}

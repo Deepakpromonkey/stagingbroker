@@ -10,7 +10,14 @@ const AUTH_USER_KEY = "crm_user";
 // account here at all, so it can't be gated on a session. These need prefix
 // matching rather than the exact-match PUBLIC_PATHS list, because the connect
 // URL carries the invitation token as a path segment.
-const PUBLIC_PATH_PREFIXES = ["/carrier/connect/", "/carrier/invalid-access"];
+// `/carrier/email-approval` is the same situation: the API redirects the
+// carrier here after they approve an alternate address from their FMCSA inbox,
+// and they have no session either.
+const PUBLIC_PATH_PREFIXES = [
+  "/carrier/connect/",
+  "/carrier/invalid-access",
+  "/carrier/email-approval",
+];
 
 function isPublicPath(pathname) {
   return (

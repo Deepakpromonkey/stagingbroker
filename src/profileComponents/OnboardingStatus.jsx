@@ -4,6 +4,7 @@ import HandshakeOutlined from "@mui/icons-material/HandshakeOutlined";
 import WarningAmber from "@mui/icons-material/WarningAmber";
 import AccountBalanceOutlined from "@mui/icons-material/AccountBalanceOutlined";
 import PersonOutline from "@mui/icons-material/PersonOutlined";
+import ShieldOutlined from "@mui/icons-material/ShieldOutlined";
 
 // Mirrors the `stage` the API derives, so the wording is identical to the
 // Connected Carriers list.
@@ -13,6 +14,7 @@ const STAGE_STYLES = {
   invited: "bg-blue-50 text-blue-700 border-blue-200",
   declined: "bg-red-50 text-red-700 border-red-200",
   expired: "bg-gray-100 text-gray-600 border-gray-200",
+  pending_approval: "bg-amber-50 text-amber-700 border-amber-200",
 };
 
 function formatDate(value) {
@@ -121,6 +123,31 @@ export default function OnboardingStatus({ request }) {
             </div>
           ))}
         </div>
+
+        {/* An alternate address waiting on the carrier's approval. Until they
+            approve from their FMCSA inbox no onboarding link has gone out — the
+            broker needs to see that rather than assume the carrier is sitting
+            on an invitation. */}
+        {request.pending_email_approval && (
+          <div className="mt-5 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3">
+            <ShieldOutlined
+              sx={{ fontSize: 18 }}
+              className="mt-0.5 text-amber-600"
+            />
+
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-amber-800">
+                Waiting on the carrier to approve a different email
+              </p>
+
+              <p className="mt-0.5 text-xs break-words text-amber-700">
+                {request.pending_email
+                  ? `The onboarding link will go to ${request.pending_email} once the carrier approves it from their FMCSA-registered address.`
+                  : "The onboarding link will be sent once the carrier approves the address from their FMCSA-registered inbox."}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Risk flag */}
         {request.identity_risk_flagged && (

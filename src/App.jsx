@@ -32,6 +32,7 @@ import ScoringWeights from './pages/app/scoringweight/ScoringWeight'
 
 import CarrierOnboard from './pages/app/connect'
 import CarrierNoData from './pages/app/connect/CarrierNoData'
+import EmailApproval from './pages/app/connect/EmailApproval'
 
 function App() {
   return (
@@ -54,6 +55,7 @@ function App() {
                 the URL, not by a session. */}
             <Route path="/carrier/connect/:token" element={<CarrierOnboard />} />
             <Route path="/carrier/invalid-access" element={<CarrierNoData />} />
+            <Route path="/carrier/email-approval" element={<EmailApproval />} />
 
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/trackshipment/step1" element={<TrackShipmentStep1 />} />

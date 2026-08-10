@@ -1,0 +1,32 @@
+# Dependencies. Reinstalled from package-lock.json, never committed — the
+# deploy already runs `npm install` on the server.
+node_modules/
+
+# Build output.
+dist/
+dist-ssr/
+*.local
+
+# Environment. Server state, not repo state.
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editors / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
