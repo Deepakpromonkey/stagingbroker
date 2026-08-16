@@ -34,6 +34,27 @@ import CarrierOnboard from './pages/app/connect'
 import CarrierNoData from './pages/app/connect/CarrierNoData'
 import EmailApproval from './pages/app/connect/EmailApproval'
 
+/*
+DTPay
+*/
+import DtPayFundingControl from './pages/app/DtPay/profile/DtPayFundingControl';
+
+import PaymentsDashbaord from './pages/app/DtPay/PaymentsDashbaord';
+import PaymentInit from './pages/app/DtPay/payment-flow/PaymentInit';
+
+import PaymentAuto from './pages/app/DtPay/payment-flow/Auto/PaymentAuto';
+import PaymentManual from './pages/app/DtPay/payment-flow/Manual/PaymentManual';
+
+import DtPayTransactions from './pages/app/DtPay/transactions/DtPayTransactions';
+import DtPayTransactionView from './pages/app/DtPay/transactions/DtPayTransactionView';
+
+import RaiseDispute from './pages/app/DtPay/dispute/RaiseDispute';
+
+/*
+DTPay Guest Pay
+*/
+import DtPayGuestPay from 'pages/app/DtPayGuestPay';
+
 function App() {
   return (
     <BrowserRouter>
@@ -80,6 +101,41 @@ function App() {
             <Route path="/carriers/:row_id" element={<CarrierProfile />} />
 
             <Route path ="/profile/scoring-weights" element={<ScoringWeights />}/>
+
+            {/* DTPay Payments module */}
+            <Route exact={true} path='/dt-pay/funding-controls' element={<DtPayFundingControl />} />
+
+            <Route exact={true} path='/dt-pay' element={<PaymentsDashbaord />} />
+            
+            <Route exact={true} path='/dt-pay/init' element={<PaymentInit />} />
+            
+            <Route exact={true} path='/dt-pay/payment/auto' element={<PaymentAuto />}>
+                <Route exact={true} path=':step' element={<PaymentAuto />}>
+                    <Route exact={true} path=':transaction_id' element={<PaymentAuto />} />
+                </Route>
+            </Route>
+
+            <Route exact={true} path='/dt-pay/payment/manual' element={<PaymentManual />}>
+                <Route exact={true} path=':step' element={<PaymentManual />}>
+                    <Route exact={true} path=':transaction_id' element={<PaymentManual />} />
+                </Route>
+            </Route>
+
+            <Route exact={true} path='/dt-pay/transactions' element={<DtPayTransactions />} />
+
+            <Route exact={true} path='/dt-pay/transactions/view' element={<DtPayTransactionView />}>
+                <Route exact={true} path=':transaction_id' element={<DtPayTransactionView />} />
+            </Route>
+
+            <Route exact={true} path='/dt-pay/raise-a-dispute' element={<RaiseDispute />}>
+                <Route exact={true} path=':transaction_id' element={<RaiseDispute />} />
+            </Route>
+
+            <Route exact={true} path='/guest-pay' element={<DtPayGuestPay />}>
+                <Route exact={true} path=':step' element={<DtPayGuestPay />}>
+                    <Route exact={true} path=':transaction_id' element={<DtPayGuestPay />} />
+                </Route>
+            </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

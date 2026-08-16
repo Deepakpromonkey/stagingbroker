@@ -16,12 +16,15 @@
     "@mui/material": "^9.2.0",
     "@mui/x-date-pickers": "^9.10.0",
     "@react-google-maps/api": "^2.20.8",
+    "@stripe/react-stripe-js": "^6.8.0",
+    "@stripe/stripe-js": "^9.13.0",
     "@syncfusion/ej2-react-calendars": "^34.1.29",
     "@tailwindcss/vite": "^4.3.2",
     "@tanstack/react-table": "^8.21.3",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "dayjs": "^1.11.21",
+    "formik": "^2.4.9",
     "jodit": "^4.13.10",
     "jodit-react": "^5.3.21",
     "react": "^19.2.7",
@@ -32,6 +35,7 @@
     "recharts": "^3.10.1",
     "tailwindcss": "^4.3.2",
     "uuid": "^14.0.1",
+    "yup": "^1.7.1",
     "zustand": "^5.0.14"
   },
   "devDependencies": {

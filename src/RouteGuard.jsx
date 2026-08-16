@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "./components/ui/Toaster";
 
 const LOGIN_PATH = "/";
-const PUBLIC_PATHS = [LOGIN_PATH, "/signup"];
+const PUBLIC_PATHS = [LOGIN_PATH, "/signup", "/guest-pay"];
 const AUTH_USER_KEY = "crm_user";
 
 // Carrier onboarding is reached from an invitation email by someone who has no
@@ -17,6 +17,7 @@ const PUBLIC_PATH_PREFIXES = [
   "/carrier/connect/",
   "/carrier/invalid-access",
   "/carrier/email-approval",
+  '/guest-pay'
 ];
 
 function isPublicPath(pathname) {
