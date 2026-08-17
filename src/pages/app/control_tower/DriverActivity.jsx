@@ -107,6 +107,17 @@ function ImageLightbox({ image, onClose }) {
 }
 
 /** A recorded coordinate, clickable straight through to the map. */
+/** 300 -> "every 5 min", 3600 -> "every 1 hr". */
+function formatInterval(seconds) {
+    const value = Number(seconds);
+    if (!value) return null;
+
+    if (value < 3600) return `every ${Math.round(value / 60)} min`;
+
+    const hours = value / 3600;
+    return `every ${Number.isInteger(hours) ? hours : hours.toFixed(1)} hr`;
+}
+
 function CoordButton({ lat, lng, label, onFocus }) {
     if (lat == null || lng == null || lat === '' || lng === '') return null;
 
@@ -346,8 +357,12 @@ function DriverActivity({ shipment, onFocusLocation }) {
                             <Field label="CDL Number">{driver.cdl_number}</Field>
                             <Field label="CDL State">{driver.cdl_state}</Field>
                             <Field label="CDL Expires">{driver.cdl_expiration}</Field>
+                            {/* The load's interval, not the driver's: the
+                                app_drivers column is a leftover that nothing
+                                writes, so showing it would report 5 minutes on
+                                every load whatever the broker chose. */}
                             <Field label="Ping Interval">
-                                {driver.tracking_interval_seconds ? `${driver.tracking_interval_seconds}s` : null}
+                                {formatInterval(shipment?.tracking_interval_seconds)}
                             </Field>
                             <Field label="Date of Birth">{driver.dob}</Field>
                             <Field label="Address">

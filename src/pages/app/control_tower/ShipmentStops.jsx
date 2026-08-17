@@ -8,13 +8,52 @@ import {
 
 const columnHelper = createColumnHelper();
 
-// The API doesn't return a per-stop status field yet, so this is inferred
-// from the shipment's overall status: delivered -> every stop is done,
-// in_transit -> every stop except the last is done, otherwise pending.
+/*
+| A stop's status comes from what the driver actually did at it.
+|
+| This used to be inferred from `shipment.status`, which cannot work: nothing
+| ever moves a shipment off 'draft' — the driver app computes an Active/Past
+| label for its own screens but never writes the column back — so every stop
+| reported "Pending" forever. The driver app does record each arrival, code
+| check and completion in shipment_stop_progress, and the API returns that as
+| `stop.progress`, so the answer is read from there instead.
+*/
 function getStopStatus(stop) {
-    if (stop.progress?.completed_at) return 'Completed';
-    if (stop.progress?.arrived_at) return 'In Progress';
-    return 'Pending';
+    const progress = stop?.progress;
+
+    if (progress?.completed_at) {
+        return {
+            label: 'Completed',
+            at: progress.completed_at,
+            dot: 'bg-[#15803D]',
+            pill: 'bg-[#DCFCE7] text-[#15803D]',
+        };
+    }
+
+    if (progress?.otp_verified_at) {
+        return {
+            label: 'Verified',
+            at: progress.otp_verified_at,
+            dot: 'bg-[#2563EB]',
+            pill: 'bg-[#DBEAFE] text-[#1D4ED8]',
+        };
+    }
+
+    if (progress?.arrived_at) {
+        return {
+            label: 'Arrived',
+            at: progress.arrived_at,
+            dot: 'bg-[#B45309]',
+            pill: 'bg-[#FEF3C7] text-[#B45309]',
+        };
+    }
+
+    return {
+        label: 'Pending',
+        at: null,
+        dot: 'bg-[#94A3B8]',
+        pill: 'bg-[#F1F5F9] text-[#475569]',
+    };
 }
 
 function ShipmentStops({ shipment }) {
@@ -71,6 +110,14 @@ function ShipmentStops({ shipment }) {
                                 {stop.start_timezone ? ` (${stop.start_timezone})` : ''}
                             </span>
                         )}
+                        {/* The arrival window's end — Pickup has none, so it stays hidden there. */}
+                        {stop.end_date && (
+                            <span className="mt-1 text-xs text-[#94A3B8]">
+                                until {stop.end_date}
+                                {stop.end_time ? ` ${stop.end_time}` : ''}
+                                {stop.end_timezone ? ` (${stop.end_timezone})` : ''}
+                            </span>
+                        )}
                     </div>
                 );
             },
@@ -100,25 +147,28 @@ function ShipmentStops({ shipment }) {
                 );
             },
         }),
-columnHelper.display({
-    id: 'status',
-    header: 'Status',
-    cell: (info) => {
-        const status = getStopStatus(info.row.original);
-        const styles = {
-            Completed: 'bg-[#DCFCE7] text-[#15803D]',
-            'In Progress': 'bg-[#EEF2FF] text-[#3730A3]',
-            Pending: 'bg-[#F1F5F9] text-[#64748B]',
-        };
-        return (
-            <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold ${styles[status]}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${status === 'Completed' ? 'bg-[#15803D]' : status === 'In Progress' ? 'bg-[#3730A3]' : 'bg-[#64748B]'}`} />
-                {status}
-            </span>
-        );
-    },
-}),
-    ]), [shipment, sortedStops.length]);
+        columnHelper.display({
+            id: 'status',
+            header: 'Status',
+            cell: (info) => {
+                const status = getStopStatus(info.row.original);
+
+                return (
+                    <div className="flex flex-col gap-1">
+                        <span
+                            className={`inline-flex w-fit items-center gap-2 px-3 py-1 rounded-full text-xs font-bold ${status.pill}`}
+                        >
+                            <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
+                            {status.label}
+                        </span>
+                        {status.at && (
+                            <span className="text-[11px] text-[#94A3B8] font-medium">{status.at}</span>
+                        )}
+                    </div>
+                );
+            },
+        }),
+    ]), []);
 
     const table = useReactTable({
         data: sortedStops,
