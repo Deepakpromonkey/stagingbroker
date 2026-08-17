@@ -36,10 +36,17 @@ const PAYWALL_EXEMPT_PATHS = [SUBSCRIBE_PATH, "/billing/success", "/billing/plan
 */
 let cachedPlanAccess = "unknown";
 
+// Guards mounted right now, so clearing the cache can make them re-ask rather
+// than sit on the answer they already have. Without this the guard keeps its
+// stale "not subscribed" for the life of the page, and the redirect to the
+// dashboard straight after checkout lands back on the pricing table.
+const planAccessListeners = new Set();
+
 // Call after anything that changes subscription state — finishing checkout,
-// syncing a Stripe session — so the next navigation re-asks the API.
+// syncing a Stripe session — so the API is asked again.
 export function refreshPlanAccess() {
   cachedPlanAccess = "unknown";
+  planAccessListeners.forEach((notify) => notify());
 }
 
 // Carrier onboarding is reached from an invitation email by someone who has no
@@ -154,6 +161,15 @@ export default function RouteGuard({ children }) {
   const token = getToken();
   const [planAccess, setPlanAccess] = useState(cachedPlanAccess);
 
+  // Re-run the check whenever refreshPlanAccess() clears the cache.
+  const [planAccessNonce, setPlanAccessNonce] = useState(0);
+
+  useEffect(() => {
+    const notify = () => setPlanAccessNonce((n) => n + 1);
+    planAccessListeners.add(notify);
+    return () => planAccessListeners.delete(notify);
+  }, []);
+
   // Ask the API once whether this account is subscribed, and keep the
   // localStorage flag in step with the answer so the rest of the app (which
   // still reads it for display) cannot drift from the server.
@@ -162,6 +178,11 @@ export default function RouteGuard({ children }) {
       setPlanAccess(cachedPlanAccess);
       return;
     }
+
+    // Held open while the answer is refetched. Leaving the previous "none" in
+    // place would redirect the user away mid-check — which is precisely what
+    // happens on the hop from the checkout success screen to the dashboard.
+    setPlanAccess("unknown");
 
     let cancelled = false;
 
@@ -190,7 +211,7 @@ export default function RouteGuard({ children }) {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, planAccessNonce]);
 
   useEffect(() => {
     const isPublic = isPublicPath(pathname);
