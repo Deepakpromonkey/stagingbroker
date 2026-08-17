@@ -193,14 +193,14 @@ export default function LoadSearch() {
   const rangeEnd = Math.min(total, (pageIndex + 1) * pageSize);
 
   return (
-    <div className="min-h-screen bg-[#F4F5F1] px-8 py-5 md:px-14 ">
-   <div className="mb-8 flex items-start justify-between">
+    <div className="min-h-screen bg-[#F4F5F1] px-4 sm:px-6 md:px-10 lg:px-14 py-4 lg:py-5 ">
+   <div className="mb-6 lg:mb-8 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
   <div>
-    <h1 className="text-[40px] font-semibold tracking-tight text-slate-900">
+    <h1 className="text-[26px] sm:text-[32px] lg:text-[40px] font-semibold tracking-tight text-slate-900">
       Load Search
     </h1>
 
-    <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-slate-500">
+    <p className="mt-2 max-w-2xl text-sm lg:text-[15px] leading-relaxed text-slate-500">
       Monitor and manage all active shipment lifecycles with real-time driver authorization and status tracking.
     </p>
   </div>
@@ -208,19 +208,19 @@ export default function LoadSearch() {
   {/* Right Side */}
 <button
   onClick={() => navigate("/trackshipment/step1")}
-  className="mt-6 flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-6 py-4 text-[15px] font-semibold text-slate-900 shadow-sm hover:bg-slate-50"
+  className="sm:mt-6 inline-flex self-start sm:self-auto items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 sm:px-6 py-3 sm:py-4 text-sm sm:text-[15px] font-semibold text-slate-900 shadow-sm hover:bg-slate-50 w-auto shrink-0"
 >
   <Add sx={{ fontSize: 20 }} />
   New Tracking
 </button>
 </div>
 
-      <div className="mb-6 flex flex-wrap items-center justify-end gap-4">
+      <div className="mb-6 flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-end gap-4">
 
 
 
         <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 shrink-0">
             <FormatListBulletedIcon sx={{ fontSize: 18 }} />
           </span>
           <div>
@@ -229,7 +229,7 @@ export default function LoadSearch() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
           <span className="text-xs font-bold uppercase tracking-wide text-slate-400">Display:</span>
           <select
             value={pageSize}
@@ -243,7 +243,7 @@ export default function LoadSearch() {
               <option key={size} value={size}>{size}</option>
             ))}
           </select>
-          <span className="text-sm text-slate-400">
+          <span className="text-sm text-slate-400 whitespace-nowrap">
             {rangeStart}-{rangeEnd} of {total}
           </span>
           <IconButton
@@ -267,7 +267,7 @@ export default function LoadSearch() {
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
+          <table className="w-full min-w-[900px] border-collapse">
             <thead>
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id} className="border-b border-slate-100 bg-slate-50">

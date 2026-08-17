@@ -143,12 +143,12 @@ if (search) {
     };
 
     return (
-        <div className="px-[26px] py-[26px] bg-white">
+        <div className="px-[16px] sm:px-[20px] lg:px-[26px] py-[18px] sm:py-[22px] lg:py-[26px] bg-white">
 
-            <div className="grid grid-cols-4 gap-5 mb-9">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5 mb-6 lg:mb-9">
 
                 {!crashes?.summaryCards || crashes.summaryCards.length === 0 ? (
-                    <div className="col-span-4 bg-white border border-[#e7edf5] rounded-[20px] py-10 text-center text-[13px] font-[500] text-[#64748b]">
+                    <div className="col-span-2 lg:col-span-4 bg-white border border-[#e7edf5] rounded-[20px] py-10 text-center text-[13px] font-[500] text-[#64748b]">
                         No summary snapshot data available.
                     </div>
                 ) : (
@@ -159,24 +159,24 @@ if (search) {
                         return (
                             <div
                                 key={card.id}
-                                className="bg-white border border-[#e7edf5] rounded-[20px] px-7 py-6"
+                                className="bg-white border border-[#e7edf5] rounded-[16px] sm:rounded-[18px] lg:rounded-[20px] px-4 sm:px-5 lg:px-7 py-4 sm:py-5 lg:py-6"
                             >
 
                                 <div className="flex items-start justify-between">
 
-                                    <div>
-                                        <p className="text-[10px] tracking-[1.3px] font-[800] text-[#64748b] uppercase">
+                                    <div className="min-w-0">
+                                        <p className="text-[9px] sm:text-[9.5px] lg:text-[10px] tracking-[1px] lg:tracking-[1.3px] font-[800] text-[#64748b] uppercase truncate">
                                             {card.title}
                                         </p>
 
-                                        <div className="flex items-end gap-2 mt-2">
+                                        <div className="flex items-end gap-2 mt-2 flex-wrap">
 
-                                            <h2 className="text-[30px] mb-5 mt-5 leading-none font-[800] text-[#0f172a]">
+                                            <h2 className="text-[22px] sm:text-[26px] lg:text-[30px] mb-3 lg:mb-5 mt-3 lg:mt-5 leading-none font-[800] text-[#0f172a]">
                                                 {card.value}
                                             </h2>
 
                                             {card.badge && (
-                                                <span className={`h-[22px] px-2 rounded-full flex items-center text-[10px] font-[800] ${styles.badge}`}>
+                                                <span className={`h-[20px] lg:h-[22px] px-2 rounded-full flex items-center text-[9px] lg:text-[10px] font-[800] whitespace-nowrap ${styles.badge}`}>
                                                     {card.badge}
                                                 </span>
                                             )}
@@ -184,16 +184,16 @@ if (search) {
                                     </div>
                                 </div>
 
-                                <div className="mt-5 h-[3px] rounded-full overflow-hidden bg-[#e2e8f0]">
+                                <div className="mt-4 lg:mt-5 h-[3px] rounded-full overflow-hidden bg-[#e2e8f0]">
                                     <div className={`h-full w-[58%] ${styles.line}`} />
                                 </div>
 
-                                <div className="mt-4 flex items-center justify-between">
-                                    <span className="text-[10px] font-[700] text-[#94a3b8] uppercase">
+                                <div className="mt-3 lg:mt-4 flex items-center justify-between gap-2">
+                                    <span className="text-[9px] lg:text-[10px] font-[700] text-[#94a3b8] uppercase truncate">
                                         {card.footer}
                                     </span>
 
-                                    <span className={`text-[10px] font-[800] ${styles.footer}`}>
+                                    <span className={`text-[9px] lg:text-[10px] font-[800] whitespace-nowrap ${styles.footer}`}>
                                         {card.footerValue}
                                     </span>
                                 </div>
@@ -203,43 +203,43 @@ if (search) {
                 )}
             </div>
 
-            <div className="bg-white border border-[#e7edf5] rounded-[22px] px-7 py-7 mb-8">
+            <div className="bg-white border border-[#e7edf5] rounded-[18px] lg:rounded-[22px] px-4 sm:px-5 lg:px-7 py-5 sm:py-6 lg:py-7 mb-6 lg:mb-8">
 
-                <div className="flex items-start justify-between mb-6">
+                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-5 lg:mb-6">
 
                     <div>
-                        <h3 className="text-[19px] font-[800] text-[#0f172a]">
+                        <h3 className="text-[16px] sm:text-[17.5px] lg:text-[19px] font-[800] text-[#0f172a]">
                             Incident Velocity & Severity
                         </h3>
 
-                        <p className="text-[12px] text-[#64748b] mt-1">
+                        <p className="text-[11.5px] lg:text-[12px] text-[#64748b] mt-1">
                             Advanced tracking of crash count (bars) vs weighted rate (line)
                         </p>
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 lg:gap-4">
 
                         {/* LEGENDS */}
 
-                        <div className="flex items-center gap-5 bg-white border border-[#e2e8f0] rounded-[14px] px-4 py-2">
+                        <div className="flex items-center justify-between sm:justify-start gap-3 sm:gap-5 bg-white border border-[#e2e8f0] rounded-[14px] px-3 sm:px-4 py-2 overflow-x-auto">
 
-                            <div className="flex items-center gap-2">
-                                <div className="h-[10px] w-[10px] rounded-full bg-[#dbe4f3]" />
-                                <span className="text-[12px] text-[#475569]">
+                            <div className="flex items-center gap-2 shrink-0">
+                                <div className="h-[10px] w-[10px] rounded-full bg-[#dbe4f3] shrink-0" />
+                                <span className="text-[11px] lg:text-[12px] text-[#475569] whitespace-nowrap">
                                     Count
                                 </span>
                             </div>
 
-                            <div className="flex items-center gap-2">
-                                <div className="h-[3px] w-[14px] rounded-full bg-[#2563eb]" />
-                                <span className="text-[12px] text-[#475569]">
+                            <div className="flex items-center gap-2 shrink-0">
+                                <div className="h-[3px] w-[14px] rounded-full bg-[#2563eb] shrink-0" />
+                                <span className="text-[11px] lg:text-[12px] text-[#475569] whitespace-nowrap">
                                     Rate
                                 </span>
                             </div>
 
-                            <div className="flex items-center gap-2">
-                                <div className="h-[1px] w-[14px] border-t border-dashed border-red-400" />
-                                <span className="text-[12px] text-[#475569]">
+                            <div className="flex items-center gap-2 shrink-0">
+                                <div className="h-[1px] w-[14px] border-t border-dashed border-red-400 shrink-0" />
+                                <span className="text-[11px] lg:text-[12px] text-[#475569] whitespace-nowrap">
                                     Benchmark
                                 </span>
                             </div>
@@ -247,13 +247,13 @@ if (search) {
 
                         {/* TABS */}
 
-                        <div className="flex items-center border border-[#e2e8f0] rounded-[14px] p-1">
+                        <div className="flex items-center border border-[#e2e8f0] rounded-[14px] p-1 self-start sm:self-auto">
 
                             {['12M', 'YTD', 'ALL'].map(tab => (
                                 <button
                                     key={tab}
                                     onClick={() => setActiveRange(tab)}
-                                    className={`px-4 h-[32px] rounded-[10px] text-[11px] font-[800]
+                                    className={`px-3 sm:px-4 h-[30px] lg:h-[32px] rounded-[10px] text-[10.5px] lg:text-[11px] font-[800]
                                     ${activeRange === tab
                                             ? 'bg-[#edf4ff] text-[#2563eb]'
                                             : 'text-[#64748b]'
@@ -266,7 +266,7 @@ if (search) {
                     </div>
                 </div>
 
-                <div className="h-[330px]">
+                <div className="h-[240px] sm:h-[280px] lg:h-[330px]">
 
                     <ResponsiveContainer width="100%" height="100%">
 
@@ -360,9 +360,9 @@ if (search) {
             </div>
 
 
-            <div className="flex items-center justify-between mb-5">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-5">
 
-                <div className="relative w-[420px] mb-4">
+                <div className="relative w-full lg:w-[420px] lg:mb-4">
 
                     <Search
                         className="absolute left-4 top-1/2 -translate-y-1/2 text-[#94a3b8]"
@@ -376,11 +376,11 @@ if (search) {
                             setPage(1);
                         }}
                         placeholder="Search by DOT#, driver, or incident location..."
-                        className="w-full h-[46px] rounded-[15px] border border-[#e2e8f0] bg-white pl-12 pr-4 text-[13px] outline-none"
+                        className="w-full h-[44px] lg:h-[46px] rounded-[14px] lg:rounded-[15px] border border-[#e2e8f0] bg-white pl-12 pr-4 text-[13px] outline-none"
                     />
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
 
                     {['FATAL', 'INJURY', 'TOW-AWAY'].map(item => (
 
@@ -395,7 +395,7 @@ if (search) {
 
                                 setPage(1);
                             }}
-                            className={`h-[38px] px-3 rounded-full border text-[10px] font-[800]
+                            className={`h-[34px] lg:h-[38px] px-2.5 sm:px-3 rounded-full border text-[9.5px] lg:text-[10px] font-[800] whitespace-nowrap
                             ${severityFilter === item
                                     ? 'bg-[#4165c9] text-white border-[#0f172a]'
                                     : 'bg-white text-[#475569] border-[#e2e8f0]'
@@ -418,38 +418,39 @@ if (search) {
                             }}
                         />
 
-                        <span className="text-[12px] text-[#475569]">
+                        <span className="text-[11.5px] lg:text-[12px] text-[#475569] whitespace-nowrap">
                             Hazmat Only
                         </span>
                     </label>
                 </div>
             </div>
 
-            <div className="bg-white border border-[#e7edf5] rounded-[22px] overflow-hidden">
+            <div className="bg-white border border-[#e7edf5] rounded-[18px] lg:rounded-[22px] overflow-hidden">
 
-                <table className="w-full">
+                <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px]">
 
                     <thead className="bg-[#f8fafc] border-b border-[#eef2f7]">
 
                         <tr>
 
-                            <th className="px-6 py-5 text-left text-[10px] tracking-[1px] font-[800] text-[#94a3b8] uppercase">
+                            <th className="px-4 sm:px-5 lg:px-6 py-4 sm:py-4.5 lg:py-5 text-left text-[9.5px] lg:text-[10px] tracking-[0.8px] lg:tracking-[1px] font-[800] text-[#94a3b8] uppercase">
                                 Date
                             </th>
 
-                            <th className="px-6 py-5 text-left text-[10px] tracking-[1px] font-[800] text-[#94a3b8] uppercase">
+                            <th className="px-4 sm:px-5 lg:px-6 py-4 sm:py-4.5 lg:py-5 text-left text-[9.5px] lg:text-[10px] tracking-[0.8px] lg:tracking-[1px] font-[800] text-[#94a3b8] uppercase">
                                 Severity
                             </th>
 
-                            <th className="px-6 py-5 text-left text-[10px] tracking-[1px] font-[800] text-[#94a3b8] uppercase">
+                            <th className="px-4 sm:px-5 lg:px-6 py-4 sm:py-4.5 lg:py-5 text-left text-[9.5px] lg:text-[10px] tracking-[0.8px] lg:tracking-[1px] font-[800] text-[#94a3b8] uppercase">
                                 Description
                             </th>
 
-                            <th className="px-6 py-5 text-left text-[10px] tracking-[1px] font-[800] text-[#94a3b8] uppercase">
+                            <th className="px-4 sm:px-5 lg:px-6 py-4 sm:py-4.5 lg:py-5 text-left text-[9.5px] lg:text-[10px] tracking-[0.8px] lg:tracking-[1px] font-[800] text-[#94a3b8] uppercase">
                                 Location
                             </th>
 
-                            <th className="px-6 py-5 text-right text-[10px] tracking-[1px] font-[800] text-[#94a3b8] uppercase">
+                            <th className="px-4 sm:px-5 lg:px-6 py-4 sm:py-4.5 lg:py-5 text-right text-[9.5px] lg:text-[10px] tracking-[0.8px] lg:tracking-[1px] font-[800] text-[#94a3b8] uppercase">
                                 Details
                             </th>
 
@@ -462,7 +463,7 @@ if (search) {
                             <tr>
                                 <td
                                     colSpan={5}
-                                    className="px-6 py-12 text-center text-[13px] font-[500] text-[#64748b] bg-white"
+                                    className="px-4 sm:px-5 lg:px-6 py-12 text-center text-[13px] font-[500] text-[#64748b] bg-white"
                                 >
                                     No crash records found matching the criteria.
                                 </td>
@@ -475,25 +476,25 @@ if (search) {
                                     className="border-t border-[#f1f5f9]"
                                 >
 
-                                    <td className="px-6 py-5 text-[13px] font-[700] text-[#0f172a]">
+                                    <td className="px-4 sm:px-5 lg:px-6 py-4 sm:py-4.5 lg:py-5 text-[12.5px] lg:text-[13px] font-[700] text-[#0f172a] whitespace-nowrap">
                                        {row.report_date || 'N/A'}
                                     </td>
 
-                                    <td className="px-6 py-5">
+                                    <td className="px-4 sm:px-5 lg:px-6 py-4 sm:py-4.5 lg:py-5">
 
-                                        <span className={`px-3 py-1 rounded-full text-[10px] font-[800] uppercase ${getSeverityStyles(row.severity)}`}>
+                                        <span className={`px-3 py-1 rounded-full text-[9.5px] lg:text-[10px] font-[800] uppercase whitespace-nowrap ${getSeverityStyles(row.severity)}`}>
                                             {row.severity || 'N/A'}
                                         </span>
 
                                     </td>
 
-                                    <td className="px-6 py-5 text-[13px] text-[#334155] max-w-[320px]">
+                                    <td className="px-4 sm:px-5 lg:px-6 py-4 sm:py-4.5 lg:py-5 text-[12.5px] lg:text-[13px] text-[#334155] max-w-[280px] lg:max-w-[320px]">
                                         {row.crash_event_seq_id_desc || 'N/A'}
                                     </td>
 
-                                    <td className="px-6 py-5">
+                                    <td className="px-4 sm:px-5 lg:px-6 py-4 sm:py-4.5 lg:py-5">
 
-                                        <div className="flex items-center gap-1 text-[12px] text-[#64748b]">
+                                        <div className="flex items-center gap-1 text-[11.5px] lg:text-[12px] text-[#64748b] whitespace-nowrap">
 
                                             <LocationOnOutlined
                                                 sx={{
@@ -507,9 +508,9 @@ if (search) {
 
                                     </td>
 
-                                    <td className="px-6 py-5 text-right">
+                                    <td className="px-4 sm:px-5 lg:px-6 py-4 sm:py-4.5 lg:py-5 text-right">
 
-                                        <button className="h-[32px] px-4 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-[800] hover:bg-emerald-100 transition-all">
+                                        <button className="h-[30px] lg:h-[32px] px-3 lg:px-4 rounded-full bg-emerald-50 text-emerald-700 text-[10.5px] lg:text-[11px] font-[800] hover:bg-emerald-100 transition-all whitespace-nowrap">
                                             VIEW
                                         </button>
 
@@ -521,11 +522,12 @@ if (search) {
 
                     </tbody>
                 </table>
+                </div>
 
 
-                <div className="flex items-center justify-between px-6 py-4 border-t border-[#eef2f7]">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 sm:px-5 lg:px-6 py-4 border-t border-[#eef2f7]">
 
-                    <p className="text-[11px] text-[#94a3b8]">
+                    <p className="text-[10.5px] lg:text-[11px] text-[#94a3b8] text-center sm:text-left">
                         {filteredRows.length === 0 ? (
                             "Showing 0–0 of 0 incidents"
                         ) : (

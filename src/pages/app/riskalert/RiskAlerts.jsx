@@ -193,7 +193,9 @@ export default function RiskAlerts() {
                     <div className="flex justify-end">
                         <button
                             type="button"
-                            className="rounded-lg border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+                            /* RESPONSIVE: shorter padding/text on mobile & tablet; unchanged
+                               (px-3.5 py-1.5 / text-xs) at lg (desktop) and up. */
+                            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] sm:px-2.5 sm:py-1 sm:text-[11px] lg:px-3.5 lg:py-1.5 lg:text-xs font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
                             onClick={() => {
                                 // wire resolve API call here
                             }}

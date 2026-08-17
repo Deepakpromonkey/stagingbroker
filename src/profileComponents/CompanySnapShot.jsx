@@ -16,7 +16,7 @@ class SelectPill extends React.Component {
             : 'bg-[#f8fafc] text-[#94a3b8] border-[#f1f5f9] opacity-75 font-[500]';
 
         return (
-            <div className={"flex items-center gap-[10px] w-[calc(33.333%-7px)] rounded-[10px] border p-[14px] text-[11px] transition-colors " + layoutClass}>
+            <div className={"flex items-center gap-[10px] w-full sm:w-[calc(50%-5px)] lg:w-[calc(33.333%-7px)] rounded-[10px] border p-[14px] text-[11px] transition-colors " + layoutClass}>
                 {isSelected ? (
                     <CheckCircle sx={{ fontSize: 16, color: '#2563eb' }} />
                 ) : (
@@ -201,11 +201,11 @@ const contractStatusText = this.getAuthorityStateLabel(this.props.data.authority
 const brokerStatusText = this.getAuthorityStateLabel(this.props.data.authority?.broker_stat);
 
         return (
-            <div className="space-y-[24px] bg-[#fbfbfc] p-[24px] rounded-[16px]">
+            <div className="space-y-[20px] bg-[#fbfbfc] p-[14px] rounded-[16px] sm:p-[24px] lg:space-y-[24px]">
 
                 <div>
                     <div className="flex items-center mt-2 gap-2">
-                        <div className="h-[6px] w-[6px] rounded-full bg-[#22c55e]" />
+                        <div className="h-[6px] w-[6px] shrink-0 rounded-full bg-[#22c55e]" />
                         <h2 className="text-[13px] font-[800] tracking-[0.8px] text-[#111827] uppercase">
                             Company Snapshot
                         </h2>
@@ -220,9 +220,9 @@ const brokerStatusText = this.getAuthorityStateLabel(this.props.data.authority?.
 
                 <div className="rounded-[12px] border border-[#e2e8f0] bg-white overflow-hidden">
                     
-                    <div className="flex items-center justify-between px-[24px] py-[18px] border-b border-[#f1f5f9]">
+                    <div className="flex items-center justify-between px-[14px] py-[16px] border-b border-[#f1f5f9] sm:px-[24px] sm:py-[18px]">
                         <div className="flex items-center gap-[10px]">
-                            <div className="flex h-[28px] w-[28px] items-center justify-center rounded-[6px] bg-[#eff6ff] border border-[#e2e8f0] text-[#2563eb] pt-[4px]">
+                            <div className="flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-[6px] bg-[#eff6ff] border border-[#e2e8f0] text-[#2563eb] pt-[4px]">
                                 <VerifiedUser sx={{ fontSize: 16 }} />
                             </div>
                             <h3 className="text-[12px] font-[800] uppercase tracking-wider text-[#1e293b]">
@@ -235,28 +235,28 @@ const brokerStatusText = this.getAuthorityStateLabel(this.props.data.authority?.
                         </span> */}
                     </div>
 
-                    <div className="p-[24px]">
+                    <div className="p-[14px] sm:p-[24px]">
 
-                        <div className="grid grid-cols-4 gap-[16px] pt-[4px]">
-                            <div className="rounded-[10px] bg-[#eff6ff] p-[16px]">
+                        <div className="grid grid-cols-2 gap-[12px] pt-[4px] sm:gap-[16px] lg:grid-cols-4">
+                            <div className="rounded-[10px] bg-[#eff6ff] p-[14px] sm:p-[16px]">
                                 <p className="text-[9px] font-[700] uppercase tracking-wider text-[#94a3b8]">COMMON</p>
                                 <p className="mt-[12px] text-[14px] font-[800] text-[#2563eb]">
                                     {commonStatusText}
                                 </p>
                             </div>
-                            <div className="rounded-[10px] bg-[#eff6ff] p-[16px]">
+                            <div className="rounded-[10px] bg-[#eff6ff] p-[14px] sm:p-[16px]">
                                 <p className="text-[9px] font-[700] uppercase tracking-wider text-[#94a3b8]">CONTRACT</p>
                                 <p className="mt-[12px] text-[14px] font-[800] text-[#2563eb]">
                                     {contractStatusText}
                                 </p>
                             </div>
-                            <div className="rounded-[10px] bg-[#eff6ff] p-[16px]">
+                            <div className="rounded-[10px] bg-[#eff6ff] p-[14px] sm:p-[16px]">
                                 <p className="text-[9px] font-[700] uppercase tracking-wider text-[#94a3b8]">BROKER</p>
                                 <p className="mt-[12px] text-[14px] font-[800] text-[#2563eb]">
                                     {brokerStatusText}
                                 </p>
                             </div>
-                            <div className="rounded-[10px] bg-[#eff6ff] p-[16px]">
+                            <div className="rounded-[10px] bg-[#eff6ff] p-[14px] sm:p-[16px]">
                                 <p className="text-[9px] font-[700] uppercase tracking-wider text-[#94a3b8]">OPERATION</p>
                                 <p className="mt-[12px] text-[12px] font-[800] text-[#2563eb] leading-[16px]">
                                     {parsedOperationText}
@@ -286,10 +286,10 @@ const brokerStatusText = this.getAuthorityStateLabel(this.props.data.authority?.
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-[24px]">
-                    <div className="rounded-[12px] border border-[#e2e8f0] bg-white p-[24px]">
-                        <div className="flex items-center gap-[10px] mb-[20px]">
-                            <div className="flex h-[30px] w-[30px] items-center justify-center rounded-[10px] border border-[#e2e8f0] text-[#2563eb] bg-[#eff6ff] pt-[4px]">
+                <div className="grid grid-cols-1 gap-[16px] lg:grid-cols-2 lg:gap-[24px]">
+                    <div className="rounded-[12px] border border-[#e2e8f0] bg-white p-[14px] sm:p-[24px]">
+                        <div className="flex items-center gap-[10px] mb-[16px] sm:mb-[20px]">
+                            <div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[10px] border border-[#e2e8f0] text-[#2563eb] bg-[#eff6ff] pt-[4px]">
                                 <LocalShipping sx={{ fontSize: 16 }} />
                             </div>
                             <h4 className="text-[14px] font-[500] text-[#1e293b]">
@@ -309,9 +309,9 @@ const brokerStatusText = this.getAuthorityStateLabel(this.props.data.authority?.
                         </div>
                     </div>
 
-                    <div className="rounded-[12px] border border-[#e2e8f0] bg-white p-[24px]">
-                        <div className="flex items-center gap-[10px] mb-[20px]">
-                            <div className="flex h-[30px] w-[30px] items-center justify-center rounded-[10px] border border-[#e2e8f0] text-[#2563eb] bg-[#eff6ff] pt-[4px]">
+                    <div className="rounded-[12px] border border-[#e2e8f0] bg-white p-[14px] sm:p-[24px]">
+                        <div className="flex items-center gap-[10px] mb-[16px] sm:mb-[20px]">
+                            <div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[10px] border border-[#e2e8f0] text-[#2563eb] bg-[#eff6ff] pt-[4px]">
                                 <Inventory2 sx={{ fontSize: 16 }} />
                             </div>
                             <h4 className="text-[14px] font-[500] text-[#1e293b]">
@@ -332,23 +332,23 @@ const brokerStatusText = this.getAuthorityStateLabel(this.props.data.authority?.
                     </div>
                 </div>
 
-                <div className="rounded-[12px] border border-[#e2e8f0] bg-white p-[24px]">
-                    <div className="flex items-center justify-between">
+                <div className="rounded-[12px] border border-[#e2e8f0] bg-white p-[14px] sm:p-[24px]">
+                    <div className="flex flex-col gap-[10px] sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-[10px]">
-                            <span className="h-[16px] w-[3px] rounded bg-[#2563eb]" />
+                            <span className="h-[16px] w-[3px] shrink-0 rounded bg-[#2563eb]" />
                             <h3 className="text-[14px] font-[500] text-[#1e293b]">
                                 Insurance & Financial Responsibility
                             </h3>
                         </div>
 
-                        <span className={"rounded-full px-[14px] py-[4px] text-[11px] font-[800] tracking-wide uppercase " + this.getStatusStyles(insuranceStatusText)}>
+                        <span className={"self-start rounded-full px-[14px] py-[4px] text-[11px] font-[800] tracking-wide uppercase sm:self-auto " + this.getStatusStyles(insuranceStatusText)}>
                             {insuranceStatusText}
                         </span>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-[16px] my-[24px]">
-                        <div className="rounded-[10px] border border-[#e2e8f0] bg-white p-[20px] flex items-center gap-[16px]">
-                            <div className="flex h-[40px] w-[40px] items-center justify-center rounded-[10px] bg-[#eff6ff] pt-[11px] text-[#2563eb]">
+                    <div className="grid grid-cols-1 gap-[14px] my-[18px] sm:grid-cols-3 sm:gap-[16px] sm:my-[24px]">
+                        <div className="rounded-[10px] border border-[#e2e8f0] bg-white p-[16px] flex items-center gap-[16px] sm:p-[20px]">
+                            <div className="flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-[10px] bg-[#eff6ff] pt-[11px] text-[#2563eb]">
                                 <Security sx={{ fontSize: 18 }} />
                             </div>
                             <div>
@@ -359,8 +359,8 @@ const brokerStatusText = this.getAuthorityStateLabel(this.props.data.authority?.
                             </div>
                         </div>
 
-                        <div className="rounded-[10px] border border-[#e2e8f0] bg-white p-[20px] flex items-center gap-[16px]">
-                            <div className="flex h-[40px] w-[40px] items-center justify-center rounded-[10px] bg-[#eff6ff] pt-[11px] text-[#2563eb]">
+                        <div className="rounded-[10px] border border-[#e2e8f0] bg-white p-[16px] flex items-center gap-[16px] sm:p-[20px]">
+                            <div className="flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-[10px] bg-[#eff6ff] pt-[11px] text-[#2563eb]">
                                 <Inventory2 sx={{ fontSize: 18 }} />
                             </div>
                             <div>
@@ -371,8 +371,8 @@ const brokerStatusText = this.getAuthorityStateLabel(this.props.data.authority?.
                             </div>
                         </div>
 
-                        <div className="rounded-[10px] border border-[#e2e8f0] bg-white p-[20px] flex items-center gap-[16px]">
-                            <div className="flex h-[40px] w-[40px] items-center justify-center rounded-[10px] bg-[#eff6ff] pt-[11px] text-[#2563eb]">
+                        <div className="rounded-[10px] border border-[#e2e8f0] bg-white p-[16px] flex items-center gap-[16px] sm:p-[20px]">
+                            <div className="flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-[10px] bg-[#eff6ff] pt-[11px] text-[#2563eb]">
                                 <Security sx={{ fontSize: 18 }} />
                             </div>
                             <div>
@@ -385,7 +385,8 @@ const brokerStatusText = this.getAuthorityStateLabel(this.props.data.authority?.
                     </div>
 
                     <div className="rounded-[8px] border border-[#e2e8f0] overflow-hidden">
-                        <table className="w-full border-collapse">
+                        <div className="overflow-x-auto">
+                        <table className="w-full min-w-[640px] border-collapse">
                             <thead>
                                 <tr className="bg-[#f8fafc]">
                                     <th className="px-[20px] py-[12px] text-left text-[10px] font-[800] tracking-wider text-[#64748b]">CARRIER NAME</th>
@@ -429,9 +430,10 @@ const brokerStatusText = this.getAuthorityStateLabel(this.props.data.authority?.
                                 )}
                             </tbody>
                         </table>
+                        </div>
 
                         {insuranceFilings.length > 0 && (
-                            <div className="flex items-center justify-between px-[20px] py-[12px] bg-white border-t border-[#f1f5f9]">
+                            <div className="flex flex-col gap-[10px] px-[20px] py-[12px] bg-white border-t border-[#f1f5f9] sm:flex-row sm:items-center sm:justify-between">
                                 <div className="text-[11px] font-[500] text-[#64748b]">
                                     Showing {itemFrom} to {itemTo} of {totalInsuranceItems} entries
                                 </div>

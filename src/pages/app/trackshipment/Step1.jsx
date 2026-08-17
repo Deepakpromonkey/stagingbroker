@@ -9,12 +9,23 @@ import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import StepSidebar from "./StepSidebar";
 
 import IconButton from "@mui/material/IconButton";
+import Switch from "@mui/material/Switch";
 import CloseIcon from "@mui/icons-material/Close";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import SearchIcon from "@mui/icons-material/Search";
 import CalendarTodayOutlinedIcon from "@mui/icons-material/CalendarTodayOutlined";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import LocalShippingRoundedIcon from "@mui/icons-material/LocalShippingRounded";
+import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined";
+import ApartmentOutlinedIcon from "@mui/icons-material/ApartmentOutlined";
+import MyLocationOutlinedIcon from "@mui/icons-material/MyLocationOutlined";
+import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
+import MailOutlineIcon from "@mui/icons-material/MailOutlined";
+import NotificationsActiveOutlinedIcon from "@mui/icons-material/NotificationsActiveOutlined";
+import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
+import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
+import BookmarkAddedOutlinedIcon from "@mui/icons-material/BookmarkAddedOutlined";
 
 const TRACKING_METHODS = [
   { value: "driver_phone", label: "Driver's Cell Phone" },
@@ -51,6 +62,28 @@ const INTERVALS = [
   { value: "every 30 minutes", label: "Every 30 minutes" },
   { value: "every 1 hour", label: "Every 1 hour" },
   { value: "every 2 hour", label: "Every 2 hours" },
+];
+
+/*
+| How often the driver app reports its position, in seconds.
+|
+| The API accepts 60–21600 (CreateShipmentRequest), and the driver app reads
+| the chosen value back off every sync response and restarts its tracker when
+| it changes. The ends of the range are bounded for a reason: under a minute
+| flattens a phone battery inside a shift without buying useful precision, and
+| past six hours it is not tracking any more.
+*/
+const TRACKING_INTERVALS = [
+  { value: 60, label: "Every 1 minute" },
+  { value: 120, label: "Every 2 minutes" },
+  { value: 300, label: "Every 5 minutes (default)" },
+  { value: 600, label: "Every 10 minutes" },
+  { value: 900, label: "Every 15 minutes" },
+  { value: 1800, label: "Every 30 minutes" },
+  { value: 3600, label: "Every 1 hour" },
+  { value: 7200, label: "Every 2 hours" },
+  { value: 14400, label: "Every 4 hours" },
+  { value: 21600, label: "Every 6 hours" },
 ];
 
 const PHONE_PATTERN = /^[0-9()+\-\s]{7,}$/;
@@ -91,6 +124,10 @@ export const BLANK_STEP1_VALUES = {
   dispatcherName: "",
   dispatcherEmail: "",
 
+  // How often the driver's phone reports its position on this load. Five
+  // minutes is the backend's default, so the form opens on the same value.
+  trackingIntervalSeconds: 300,
+
   // Kept for backward compatibility with the payload shape / template
   // mapping even though the "Send Updates To" rows are hidden from the UI.
   updates: [
@@ -102,7 +139,7 @@ export const BLANK_STEP1_VALUES = {
   saveAsTemplate: false,
 };
 
-const useShipmentDraftStore = create((set) => ({
+export const useShipmentDraftStore = create((set) => ({
   step1: BLANK_STEP1_VALUES,
   setStep1: (values) => set({ step1: values }),
   resetStep1: () => set({ step1: BLANK_STEP1_VALUES }),
@@ -233,10 +270,34 @@ const inputClass =
 
 const selectClass = inputClass + " appearance-none pr-9";
 
-const SectionHeading = ({ children }) => (
-  <h3 className="mb-4 border-b border-slate-200 pb-2 text-xs font-bold tracking-widest text-blue-600 ">
-    {children}
-  </h3>
+const cardClass =
+  "mb-6 rounded-[28px] border border-slate-200/80 bg-white p-5 sm:p-8 shadow-[0_1px_2px_rgba(15,36,84,0.04),0_16px_32px_-24px_rgba(15,36,84,0.35)] transition-shadow duration-200 hover:shadow-[0_1px_2px_rgba(15,36,84,0.04),0_20px_36px_-20px_rgba(15,36,84,0.18)]";
+
+const switchSx = {
+  "& .MuiSwitch-switchBase.Mui-checked": { color: "#fff" },
+  "& .MuiSwitch-switchBase.Mui-checked .MuiSwitch-thumb": { backgroundColor: "#fff" },
+  "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
+    backgroundColor: "#1D4ED8",
+    opacity: 1,
+  },
+  "& .MuiSwitch-track": { backgroundColor: "#CBD5E1", opacity: 1 },
+  "& .MuiSwitch-thumb": { boxShadow: "0 1px 3px rgba(15,36,84,0.3)" },
+};
+
+const SectionHeading = ({ icon: Icon, children, hint }) => (
+  <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+    <div className="flex items-center gap-3">
+      {Icon ? (
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EEF4FF] text-[#1D4ED8]">
+          <Icon sx={{ fontSize: 19 }} />
+        </span>
+      ) : null}
+      <h3 className="text-[15px] font-bold tracking-tight text-[#112963] ">
+        {children}
+      </h3>
+    </div>
+    {hint ? <span className="text-xs font-medium text-slate-400">{hint}</span> : null}
+  </div>
 );
 
 const ErrorText = ({ children }) =>
@@ -247,6 +308,48 @@ const ChevronDown = () => (
     className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
     sx={{ fontSize: 20 }}
   />
+);
+
+// NEW: a more visible pill-style toggle used for "Save as template".
+// Same on/off boolean contract as MUI's Switch (checked / onChange(bool)),
+// just styled so the on/off state is obvious at a glance: filled blue pill
+// background, a sliding white knob, and a highlighted border + label color
+// when active.
+const CustomToggle = ({ checked, onChange, label, icon: Icon }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    aria-label={label}
+    onClick={() => onChange(!checked)}
+    className={`group flex items-center gap-3 rounded-2xl border px-4 py-2.5 transition-all duration-200  ${
+      checked
+        ? "border-[#1D4ED8] bg-[#EEF4FF] shadow-sm"
+        : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+    }`}
+  >
+    <span
+      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200 ${
+        checked ? "bg-[#1D4ED8]" : "bg-slate-300"
+      }`}
+    >
+      <span
+        className={`inline-block h-[18px] w-[18px] translate-x-[3px] transform rounded-full bg-white shadow-md transition-transform duration-200 ${
+          checked ? "translate-x-[22px]" : ""
+        }`}
+      />
+    </span>
+    <span
+      className={`flex items-center gap-1.5 text-sm font-semibold transition-colors  ${
+        checked ? "text-[#112963]" : "text-slate-600"
+      }`}
+    >
+      {Icon ? (
+        <Icon sx={{ fontSize: 16 }} className={checked ? "text-[#1D4ED8]" : "text-slate-400"} />
+      ) : null}
+      {label}
+    </span>
+  </button>
 );
 
 function CustomDropdown({
@@ -398,7 +501,7 @@ function CustomDatePicker({ value, onChange, placeholder = "Select date", hasErr
       </button>
 
       {open && (
-        <div className="absolute z-20 mt-2 w-[280px] rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
+        <div className="absolute z-20 mt-2 w-[280px] max-w-[90vw] rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
           <div className="mb-2 flex items-center justify-between">
             <IconButton size="small" onClick={goPrev} sx={{ color: "#94a3b8" }}>
               <ChevronLeftIcon fontSize="small" />
@@ -822,6 +925,9 @@ export default function TrackShipmentStep1() {
       dispatcherName: apiData.broker_dispatcher_name || "",
       dispatcherEmail: apiData.broker_dispatcher_email || "",
 
+      // How often the driver's phone reports its position on this load.
+      trackingIntervalSeconds: Number(apiData.tracking_interval_seconds) || 300,
+
       updates: updatesFromApi,
       // The API may return this as an array (["a@x.com", "b@x.com"]) or as
       // the older comma-string shape — normalise either into the
@@ -909,6 +1015,9 @@ export default function TrackShipmentStep1() {
       broker_dispatcher_name: data.dispatcherName || "",
       broker_dispatcher_email: data.dispatcherEmail || "",
 
+      // How often the driver app reports its position on this load.
+      tracking_interval_seconds: Number(data.trackingIntervalSeconds) || 300,
+
   
       send_updates_to: data.updates.map((update) => ({
         date_time: buildDateTime(update.date, update.time),
@@ -994,22 +1103,35 @@ export default function TrackShipmentStep1() {
   }));
 
   return (
-      <div className="flex min-h-screen bg-[#EBF1FC] ">
+      <div className="flex flex-col lg:flex-row min-h-screen bg-[#EBF1FC] ">
         <StepSidebar currentStep={1} />
 
-        <div className="flex-1 px-8 py-10 md:px-14">
-          <div className="mb-4 border-b border-[#E2EAF4] pb-6">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#93A7CD]">STEP 1</p>
-            <h1 className="mt-1 text-[32px] font-extrabold tracking-tight text-[#112963]">Shipment Summary</h1>
-            <p className="mt-2 text-[15px] font-medium leading-relaxed text-[#7085A8]">
-              Fill in the load details below, then continue to the Trip Sheet.
-            </p>
+        <div className="flex-1 min-w-0 px-4 sm:px-6 md:px-10 lg:px-14 py-6 lg:py-10">
+          <div className="mb-8 flex items-start justify-between gap-4 overflow-hidden rounded-[28px] border border-[#DCE6F7] bg-gradient-to-br from-white to-[#F1F6FE] px-6 sm:px-8 py-7 shadow-[0_1px_2px_rgba(15,36,84,0.04),0_20px_40px_-24px_rgba(15,36,84,0.35)]">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#5B7FCB]">Step 1 of 2</p>
+              <h1 className="mt-1.5 text-[24px] sm:text-[28px] lg:text-[32px] font-extrabold tracking-tight text-[#112963]">Shipment Summary</h1>
+              <p className="mt-2 max-w-lg text-[15px] font-medium leading-relaxed text-[#7085A8]">
+                Fill in the load details below, then continue to the Trip Sheet.
+              </p>
+            </div>
+            <span className="hidden sm:flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#112963] text-white shadow-lg shadow-[#112963]/20">
+              <LocalShippingRoundedIcon sx={{ fontSize: 26 }} />
+            </span>
           </div>
 
           <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="mt-2 max-w-4xl pb-28">
-            <div className="mb-10 flex items-center gap-2">
-              <FieldLabel>Reuse from template</FieldLabel>
-              <div className="relative">
+            <div className="mb-6 flex flex-col gap-4 rounded-[28px] border border-[#DCE6F7] bg-white px-5 sm:px-7 py-5 shadow-[0_1px_2px_rgba(15,36,84,0.04),0_16px_32px_-24px_rgba(15,36,84,0.35)] sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EEF4FF] text-[#1D4ED8]">
+                  <HistoryOutlinedIcon sx={{ fontSize: 19 }} />
+                </span>
+                <div>
+                  <p className="text-sm font-bold text-slate-800">Reuse from template</p>
+                  <p className="text-xs text-slate-400">Start from a saved shipment or begin from scratch.</p>
+                </div>
+              </div>
+              <div className="relative w-full sm:w-72">
                 <Controller
                   control={control}
                   name="reuseTemplate"
@@ -1040,9 +1162,10 @@ export default function TrackShipmentStep1() {
               </div>
             </div>
 
-            <SectionHeading>Load</SectionHeading>
+            <div className={cardClass}>
+            <SectionHeading icon={Inventory2OutlinedIcon}>Load</SectionHeading>
             {/* CHANGED: "Dollar Traq No." (tracking number) now sits right after Pro # / Load ID */}
-            <div className="mb-10 grid grid-cols-1 gap-6 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
               <div>
                 <FieldLabel required>Pro # / Load ID</FieldLabel>
                 <input
@@ -1063,8 +1186,10 @@ export default function TrackShipmentStep1() {
                 <ErrorText>{errors.trackingNumber?.message}</ErrorText>
               </div>
             </div>
+            </div>
 
-            <SectionHeading>Carrier</SectionHeading>
+            <div className={cardClass}>
+            <SectionHeading icon={ApartmentOutlinedIcon}>Carrier</SectionHeading>
             <div className="mb-6">
               <div className="mb-2 flex items-center justify-between">
                 <FieldLabel required>Carrier Name</FieldLabel>
@@ -1105,7 +1230,7 @@ export default function TrackShipmentStep1() {
               />
             </div>
             {/* CHANGED: "Ext" removed; Carrier Phone now sits in that spot */}
-            <div className="mb-10 grid grid-cols-1 gap-6 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3">
               <div>
                 <FieldLabel required>Carrier MC #</FieldLabel>
                 <input
@@ -1137,12 +1262,14 @@ export default function TrackShipmentStep1() {
                 <ErrorText>{errors.carrierPhone?.message}</ErrorText>
               </div>
             </div>
+            </div>
 
-            <SectionHeading>Tracking</SectionHeading>
+            <div className={cardClass}>
+            <SectionHeading icon={MyLocationOutlinedIcon}>Tracking</SectionHeading>
             {/* CHANGED: Tracking Full Number moved up to the Load section (as "Dollar Traq No.");
                 Driver Phone 1 now takes its place here, with its own Country Code
                 (default US) right before it. */}
-            <div className="mb-10 grid grid-cols-1 gap-6 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3">
               <div>
                 <FieldLabel>Tracking Method</FieldLabel>
                 <div className="relative">
@@ -1182,8 +1309,10 @@ export default function TrackShipmentStep1() {
                 <ErrorText>{errors.driverPhone1?.message}</ErrorText>
               </div>
             </div>
+            </div>
 
-            <SectionHeading>Driver &amp; Equipment</SectionHeading>
+            <div className={cardClass}>
+            <SectionHeading icon={BadgeOutlinedIcon}>Driver &amp; Equipment</SectionHeading>
             <div className="mb-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
               <div>
                 <FieldLabel required>Truck Number</FieldLabel>
@@ -1206,7 +1335,7 @@ export default function TrackShipmentStep1() {
             </div>
 
             {/* CHANGED: Country Code (default US) now appears right before Driver Phone 2 */}
-            <div className="mb-8 grid grid-cols-1 gap-6 sm:grid-cols-2">
+            <div className="mb-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
               <div>
                 <FieldLabel>Country Code</FieldLabel>
                 <Controller
@@ -1235,7 +1364,7 @@ export default function TrackShipmentStep1() {
               </div>
             </div>
 
-            <div className="mb-4">
+            <div className="mb-6">
               <FieldLabel>Driver Type</FieldLabel>
               <Controller
                 control={control}
@@ -1249,14 +1378,14 @@ export default function TrackShipmentStep1() {
                           type="button"
                           key={type.value}
                           onClick={() => onChange(type.value)}
-                          className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3.5 text-left text-sm font-semibold transition  ${isSelected ? "border-slate-900 text-slate-900" : "border-slate-200 text-slate-700 hover:border-slate-300"
+                          className={`flex items-center gap-3 rounded-xl border-2 px-4 py-3.5 text-left text-sm font-semibold transition  ${isSelected ? "border-[#1D4ED8] bg-[#EEF4FF] text-[#112963]" : "border-slate-200 text-slate-700 hover:border-slate-300"
                             }`}
                         >
                           <span
-                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${isSelected ? "border-slate-900" : "border-slate-300"
+                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${isSelected ? "border-[#1D4ED8]" : "border-slate-300"
                               }`}
                           >
-                            {isSelected && <span className="h-2.5 w-2.5 rounded-full bg-slate-900" />}
+                            {isSelected && <span className="h-2.5 w-2.5 rounded-full bg-[#1D4ED8]" />}
                           </span>
                           {type.label}
                         </button>
@@ -1267,19 +1396,34 @@ export default function TrackShipmentStep1() {
               />
             </div>
 
-            <div className="mb-10">
-              <label className="flex cursor-pointer items-center gap-3">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                  {...register("teamLoad")}
-                />
-                <span className="text-sm font-semibold text-slate-800 ">This load is a team load</span>
-              </label>
+            <Controller
+              control={control}
+              name="teamLoad"
+              render={({ field: { value, onChange } }) => (
+                <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50/70 px-5 py-4">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-[#1D4ED8] shadow-sm">
+                      <GroupsOutlinedIcon sx={{ fontSize: 19 }} />
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800 ">This load is a team load</p>
+                      <p className="text-xs text-slate-400">Two drivers will be assigned to this shipment.</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={!!value}
+                    onChange={(e) => onChange(e.target.checked)}
+                    sx={switchSx}
+                    inputProps={{ "aria-label": "This load is a team load" }}
+                  />
+                </div>
+              )}
+            />
             </div>
 
-            <SectionHeading>Broker Dispatcher Information</SectionHeading>
-            <div className="mb-10 grid grid-cols-1 gap-6 sm:grid-cols-2">
+            <div className={cardClass}>
+            <SectionHeading icon={MailOutlineIcon}>Broker Dispatcher Information</SectionHeading>
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
               <div>
                 <FieldLabel>Dispatcher Name</FieldLabel>
                 <input className={inputClass} placeholder="Enter dispatcher name" {...register("dispatcherName")} />
@@ -1303,8 +1447,37 @@ export default function TrackShipmentStep1() {
                 <ErrorText>{errors.dispatcherEmail?.message}</ErrorText>
               </div>
             </div>
+            </div>
 
-            <SectionHeading>Schedule &amp; Updates</SectionHeading>
+            <div className={cardClass}>
+            <SectionHeading icon={NotificationsActiveOutlinedIcon}>Schedule &amp; Updates</SectionHeading>
+
+            {/* The one control that decides how often the driver's phone
+                reports in. The driver app picks the new value up from its
+                next sync response, so changing it takes effect without the
+                driver doing anything. */}
+            <div className="mb-6">
+              <FieldLabel>Driver Location Updates</FieldLabel>
+              <div className="grid grid-cols-1 gap-2 sm:max-w-md">
+                <div className="relative">
+                  <select
+                    className={selectClass}
+                    {...register("trackingIntervalSeconds", { valueAsNumber: true })}
+                  >
+                    {TRACKING_INTERVALS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown />
+                </div>
+                <p className="text-xs text-slate-500 ">
+                  How often the driver&rsquo;s app sends its position while this load is running.
+                  Shorter intervals track more closely but use more of the driver&rsquo;s battery.
+                </p>
+              </div>
+            </div>
 
             {/* REMOVED: "Send Updates To" date/time/duration/interval rows.
                 Kept here (commented) in case this needs to come back later.
@@ -1420,7 +1593,7 @@ export default function TrackShipmentStep1() {
 
             */}
 
-            <div className="mt-8 mb-8">
+            <div className="mb-6">
               <FieldLabel>Email Updates To</FieldLabel>
               {/* CHANGED: Gmail-style chip UI — each valid email becomes a pill with a
                   colored initial avatar and an ✕ to remove it (matches the reference
@@ -1448,8 +1621,8 @@ export default function TrackShipmentStep1() {
               />
             </div>
 
-            <div className="mb-4">
-              <label className="mb-2 block text-sm font-bold text-blue-600 ">Notes</label>
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-slate-800 ">Notes</label>
               <textarea
                 rows={4}
                 className={inputClass + " resize-y"}
@@ -1457,23 +1630,32 @@ export default function TrackShipmentStep1() {
                 {...register("notes")}
               />
             </div>
+            </div>
           </form>
         </div>
 
-        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 px-8 py-4 backdrop-blur md:px-14 ">
-          <div className="ml-0 flex max-w-6xl items-center justify-between md:ml-[280px]">
-            <div className="flex items-center gap-4">
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 px-4 sm:px-6 md:px-10 lg:px-14 py-3 lg:py-4 shadow-[0_-4px_20px_rgba(15,36,84,0.08)] backdrop-blur ">
+          <div className="ml-0 flex max-w-6xl flex-wrap items-center justify-between gap-3 lg:ml-[280px]">
+            <div className="flex flex-wrap items-center gap-4 sm:gap-5">
               <span className="text-xs text-slate-400">
                 <span className="text-red-500">*</span> Required fields
               </span>
-              <label className="flex cursor-pointer items-center gap-2">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                  {...register("saveAsTemplate")}
-                />
-                <span className="text-sm text-slate-600">Save as template</span>
-              </label>
+              {/* CHANGED: swapped the barely-visible MUI Switch for a more
+                  visible pill-style CustomToggle. Same value/onChange
+                  contract via Controller, nothing else about this field
+                  changed. */}
+              <Controller
+                control={control}
+                name="saveAsTemplate"
+                render={({ field: { value, onChange } }) => (
+                  <CustomToggle
+                    checked={!!value}
+                    onChange={onChange}
+                    label="Save as template"
+                    icon={BookmarkAddedOutlinedIcon}
+                  />
+                )}
+              />
             </div>
 
             <div className="flex items-center gap-3">
@@ -1481,7 +1663,7 @@ export default function TrackShipmentStep1() {
                 type="button"
                 disabled={isSubmitting}
                 onClick={handleSubmit(onSubmit, onInvalid)}
-                className="rounded-xl bg-slate-900 px-6 py-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+                className="rounded-2xl bg-[#112963] px-5 sm:px-7 py-3 sm:py-4 text-sm font-semibold text-white shadow-lg shadow-[#112963]/25 transition hover:bg-[#0F2454] hover:shadow-xl disabled:opacity-60 whitespace-nowrap"
               >
                 {isSubmitting ? "Saving…" : "Continue to Trip Sheet →"}
               </button>

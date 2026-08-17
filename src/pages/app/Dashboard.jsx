@@ -216,6 +216,7 @@ class Dashboard extends Component {
             },
             table: {
                 width: '100%',
+                minWidth: 760,
                 borderCollapse: 'collapse',
                 fontSize: 13,
             },
@@ -251,7 +252,7 @@ class Dashboard extends Component {
         };
 
         return (
-            <div className="px-8 py-8">
+            <div className="px-4 sm:px-6 md:px-8 py-5 sm:py-6 md:py-8">
 
                 {/* ── Inline messages ── */}
                 {this.state.error_message ? (
@@ -280,9 +281,9 @@ class Dashboard extends Component {
                 ) : null}
 
                 {/* ── Header ── */}
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                     <div>
-                        <h1 className="text-[32px] font-normal text-[#1a1a1a] m-0 tracking-[-0.5px]">
+                        <h1 className="text-[22px] sm:text-[26px] md:text-[32px] font-normal text-[#1a1a1a] m-0 tracking-[-0.5px]">
                             Overview <strong className="font-bold text-[#185FA5]">Dashboard</strong>
                         </h1>
                         <p className="text-sm text-[#71717a] mt-1.5 m-0">
@@ -290,9 +291,9 @@ class Dashboard extends Component {
                         </p>
                     </div>
 
-                    <div className="flex items-center gap-3.5 bg-white border border-[#e5e5e5] rounded-[14px] py-2.5 px-5">
+                    <div className="flex items-center gap-3.5 bg-white border border-[#e5e5e5] rounded-[14px] py-2.5 px-5 self-start sm:self-auto">
                         <div className="text-center min-w-[42px]">
-                            <div className="text-[32px] font-bold text-[#185FA5] leading-none">{dayNum}</div>
+                            <div className="text-[24px] sm:text-[28px] md:text-[32px] font-bold text-[#185FA5] leading-none">{dayNum}</div>
                             <div className="text-[9px] text-[#888] font-semibold tracking-[0.5px]">{dayName}</div>
                         </div>
                         <div className="border-l border-[#e5e5e5] h-12 mx-0.5" />
@@ -307,33 +308,33 @@ class Dashboard extends Component {
                 </div>
 
                 {/* ── AI Bar ── */}
-                <div className="bg-white border border-[#edf0f2] rounded-2xl p-2.5 flex items-center justify-between gap-4 mb-6 shadow-sm">
-                    <div className="flex items-center gap-3 pl-2.5 flex-1">
-                        <span className="relative flex h-2.5 w-2.5">
+                <div className="bg-white border border-[#edf0f2] rounded-2xl p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-6 shadow-sm">
+                    <div className="flex items-center gap-3 pl-2.5 flex-1 min-w-0">
+                        <span className="relative flex h-2.5 w-2.5 shrink-0">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#22c55e] opacity-75"></span>
                             <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#22c55e]"></span>
                         </span>
                         <span className="text-sm text-[#7c8ba1] font-medium mr-1 whitespace-nowrap">Ask the Concierge —</span>
                         <input
                             type="text"
-                            className="w-full bg-transparent border-none outline-none text-sm text-[#1a1a1a] placeholder-[#94a3b8]"
+                            className="w-full min-w-0 bg-transparent border-none outline-none text-sm text-[#1a1a1a] placeholder-[#94a3b8]"
                             placeholder={`"vet MC 1234567", "track SH000025", "who's expiring this week?"`}
                             value={this.state.aiQuery}
                             onChange={(e) => this.setState({ aiQuery: e.target.value })}
                         />
                     </div>
-                    <button className="bg-[#1d4ed8] hover:bg-blue-700 text-white font-semibold text-sm rounded-xl py-2.5 px-5 flex items-center gap-2 transition-all shadow-sm border-none cursor-pointer">
+                    <button className="w-full sm:w-auto bg-[#1d4ed8] hover:bg-blue-700 text-white font-semibold text-sm rounded-xl py-2.5 px-5 flex items-center justify-center gap-2 transition-all shadow-sm border-none cursor-pointer">
                         <AutoAwesomeOutlined style={{ fontSize: 16 }} />
                         Ask AI
                     </button>
                 </div>
 
                 {/* ── Cards Grid ── */}
-                <div className="grid grid-cols-[1fr_380px] gap-5 mb-8">
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-5 mb-8">
 
                     {/* Left — Logistics Performance */}
-                    <div className="bg-white rounded-2xl border border-[#e8e8e8] p-8 pb-6 flex flex-col justify-between">
-                        <div className="flex justify-between items-start">
+                    <div className="bg-white rounded-2xl border border-[#e8e8e8] p-5 sm:p-6 md:p-8 pb-5 md:pb-6 flex flex-col justify-between">
+                        <div className="flex flex-wrap gap-3 justify-between items-start">
                             <div>
                                 <div className="text-[11px] font-bold tracking-[1.8px] text-[#404752] uppercase">
                                     Logistics Performance
@@ -348,15 +349,15 @@ class Dashboard extends Component {
                             </span>
                         </div>
 
-                        <div className="flex items-center gap-4 my-8">
-                            <span className="text-[75px] font-extrabold text-[#0f172a] leading-none tracking-[-1px]">
+                        <div className="flex flex-wrap items-center gap-4 my-6 md:my-8">
+                            <span className="text-[46px] sm:text-[60px] md:text-[75px] font-extrabold text-[#0f172a] leading-none tracking-[-1px]">
                                 {totalShipments}
                             </span>
                             <div className="flex flex-col justify-center">
-                                <div className="text-[26px] font-bold text-[#64748B] leading-[1.2]">Shipments</div>
+                                <div className="text-[18px] sm:text-[22px] md:text-[26px] font-bold text-[#64748B] leading-[1.2]">Shipments</div>
                                 <div className="text-xs text-[#0284c7] font-semibold mt-1">Processed Successfully</div>
                             </div>
-                            <div className="ml-auto flex flex-col items-end text-right gap-0.5">
+                            <div className="sm:ml-auto flex flex-col items-start sm:items-end text-left sm:text-right gap-0.5">
                                 <div className="flex items-center gap-1.5 text-medium text-[#185FA5] font-bold">
                                     <CheckCircleOutlined style={{ fontSize: 16 }} />
                                     Efficiency target met
@@ -365,7 +366,7 @@ class Dashboard extends Component {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                             <button
                                 onClick={() => this.setState({ redirect: '/load-search' })}
                                 style={{ all: 'unset', display: 'block', cursor: 'pointer', background: '#EFF6FF', padding: '14px 16px', border: '1px solid #BFDBFE', borderRadius: '12px' }}
@@ -397,7 +398,7 @@ class Dashboard extends Component {
                         </div>
                     </div>
 
-                    <div className="bg-[#005EA4] rounded-2xl p-6 text-white flex flex-col justify-between relative min-h-[280px]">
+                    <div className="bg-[#005EA4] rounded-2xl p-5 sm:p-6 text-white flex flex-col justify-between relative min-h-[240px] sm:min-h-[280px]">
                         <button
                             type="button"
                             className="absolute top-4 right-4 z-50 rounded-lg w-8 h-8 flex items-center justify-center cursor-pointer"
@@ -410,7 +411,7 @@ class Dashboard extends Component {
                             <div className="text-[10px] font-semibold tracking-wider uppercase opacity-60 mb-1.5">
                                 Account Status
                             </div>
-                            <h2 className="text-[28px] font-bold text-white m-0 tracking-[-0.5px]">
+                            <h2 className="text-[22px] sm:text-[24px] md:text-[28px] font-bold text-white m-0 tracking-[-0.5px]">
                                 {this.state.user_subscribed_plan ? this.state.user_subscribed_plan.title : 'Demo Plan'}
                             </h2>
                             <p className="text-xs opacity-75 mt-2.5 leading-normal">
@@ -446,15 +447,15 @@ class Dashboard extends Component {
                     </div>
                 </div>
 
-                <div className="flex items-center justify-between mb-4">
-                    <span className="text-lg font-bold text-[#1a1a1a]">Recent Activity</span>
-                    <a href="#" className="flex items-center gap-1 text-xs font-semibold text-[#185FA5] no-underline">
+                <div className="flex items-center justify-between mb-4 gap-3">
+                    <span className="text-base sm:text-lg font-bold text-[#1a1a1a]">Recent Activity</span>
+                    <a href="#" className="flex items-center gap-1 text-xs font-semibold text-[#185FA5] no-underline whitespace-nowrap">
                         Full Activity Log <OpenInNew style={{ fontSize: 14 }} />
                     </a>
                 </div>
 
                 {/* ── Custom Table ── */}
-                <div style={s.tblWrap}>
+                <div style={s.tblWrap} className="overflow-x-auto">
                     <table style={s.table}>
                         <thead>
                             <tr>

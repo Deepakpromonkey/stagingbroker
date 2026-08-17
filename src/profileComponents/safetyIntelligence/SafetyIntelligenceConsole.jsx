@@ -76,10 +76,10 @@ class SafetyIntelligenceConsole extends React.Component {
 
         return (
             <div className="overflow-hidden rounded-[16px] border border-[#d9e1ee] bg-white shadow-sm">
-                <div className="flex items-center justify-between px-[32px] py-[24px]">
+                <div className="flex items-center justify-between px-[16px] sm:px-[24px] md:px-[32px] py-[16px] sm:py-[20px] md:py-[24px]">
                     <div className="flex items-center gap-3">
-                        <div className="h-[8px] w-[8px] rounded-full bg-[#10b981]" />
-                        <h2 className="text-[14px] font-[800] uppercase tracking-tight text-[#001b3d]">
+                        <div className="h-[8px] w-[8px] rounded-full bg-[#10b981] shrink-0" />
+                        <h2 className="text-[12.5px] sm:text-[13px] md:text-[14px] font-[800] uppercase tracking-tight text-[#001b3d]">
                             Safety Intelligence Console
                         </h2>
                     </div>

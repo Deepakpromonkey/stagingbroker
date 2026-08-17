@@ -6,6 +6,13 @@ const LOGIN_PATH = "/";
 const PUBLIC_PATHS = [LOGIN_PATH, "/signup"];
 const AUTH_USER_KEY = "crm_user";
 
+// Where the user picks a subscription plan, and the localStorage key
+// Subscription.jsx sets once a plan has been chosen. Kept in sync with
+// the values used in Subscription.jsx (PLAN_STORAGE_KEY) and the route
+// registered in App.jsx (path="/subscribe").
+const SUBSCRIBE_PATH = "/subscribe";
+const PLAN_STORAGE_KEY = "crm_plan_selected";
+
 // Carrier onboarding is reached from an invitation email by someone who has no
 // account here at all, so it can't be gated on a session. These need prefix
 // matching rather than the exact-match PUBLIC_PATHS list, because the connect
@@ -57,12 +64,11 @@ const ROUTE_PERMISSIONS = [
 ];
 
 // Routes that depend on an earlier step being completed first, plus the
-// check that must pass before that route is reachable. This is what was
-// missing: TrackShipmentStep1 only calls navigate("/trackshipment/step2")
-// after a shipment is actually created, but nothing stopped someone from
-// typing/refreshing/deep-linking straight into /trackshipment/step2 and
-// skipping step 1 entirely. Add more entries here if step 3+ need similar
-// protection.
+// check that must pass before that route is reachable.
+//
+// Order matters: STEP_PREREQUISITES.find() stops at the first match, so
+// more specific rules must come before more general ones. The plan-select
+// rule below matches almost every path, so it's listed last.
 const STEP_PREREQUISITES = [
   {
     // Matches /trackshipment/step2 (and any nested paths under it)
@@ -72,6 +78,14 @@ const STEP_PREREQUISITES = [
     // completed in this session.
     isSatisfied: () => !!localStorage.getItem("current_shipment_uuid"),
     redirectTo: "/trackshipment/step1",
+  },
+  {
+    // No plan chosen yet blocks every protected route except the plan
+    // picker itself. Set by Subscription.jsx's handleSelectPlan right
+    // after the user picks a plan.
+    match: (pathname) => pathname !== SUBSCRIBE_PATH,
+    isSatisfied: () => !!localStorage.getItem(PLAN_STORAGE_KEY),
+    redirectTo: SUBSCRIBE_PATH,
   },
 ];
 
@@ -132,19 +146,24 @@ export default function RouteGuard({ children }) {
       return;
     }
 
-    // NEW: block deep-linking straight into a later wizard step before its
+    // Block deep-linking straight into a later wizard step before its
     // prerequisite is met (e.g. opening step 2 without having completed
-    // step 1 yet in this session).
+    // step 1 yet in this session), or into any protected route before a
+    // subscription plan has been chosen.
     const blockedStep = STEP_PREREQUISITES.find(
       (step) => step.match(pathname) && !step.isSatisfied()
     );
     if (blockedStep) {
-      toast.error("Please complete the previous step first.");
+      if (blockedStep.redirectTo === SUBSCRIBE_PATH) {
+        toast.error("Please choose a plan to continue.");
+      } else {
+        toast.error("Please complete the previous step first.");
+      }
       navigate(`${blockedStep.redirectTo}?incomplete=1`, { replace: true });
       return;
     }
 
-    // NEW: block direct/typed/deep-linked navigation into a route the
+    // Block direct/typed/deep-linked navigation into a route the
     // logged-in user's role doesn't have permission for — being logged in
     // was previously enough to reach any route regardless of permissions.
     const blockedRoute = ROUTE_PERMISSIONS.find(

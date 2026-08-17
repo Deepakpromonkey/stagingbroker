@@ -37,7 +37,6 @@ const TEXT_MUTE = "#64748b";
 const PAGE_SIZE = 10;
 
 // The API stores/expects the literal label as `answer_type`
-// (see Postman examples: "answer_type": "Yes / No", "answer_type": "Number")
 const ANSWER_TYPES = ["Yes / No", "Text", "Textarea", "Number", "Image Upload"];
 
 const TYPE_STYLES = {
@@ -95,7 +94,6 @@ function fieldCardStyle() {
   };
 }
 
-// Fetches the carrier question list the same way LoadSearch fetches shipments.
 function useCarrierQuestions() {
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -132,18 +130,17 @@ function useCarrierQuestions() {
 }
 
 export default function CarrierQuestions() {
-
   const user = JSON.parse(localStorage.getItem(AUTH_USER_KEY) || "{}");
 
-const can = (permission) => {
-  const permissions = user?.permissions || [];
+  const can = (permission) => {
+    const permissions = user?.permissions || [];
 
-  if (Array.isArray(permission)) {
-    return permission.some((p) => permissions.includes(p));
-  }
+    if (Array.isArray(permission)) {
+      return permission.some((p) => permissions.includes(p));
+    }
 
-  return permissions.includes(permission);
-};
+    return permissions.includes(permission);
+  };
 
   const { questions, setQuestions, loading, reload } = useCarrierQuestions();
 
@@ -162,7 +159,7 @@ const can = (permission) => {
 
   useEffect(() => {
     if (pageIndex >= pageCount) setPageIndex(Math.max(0, pageCount - 1));
-  }, [questions.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [questions.length]);
 
   const openAdd = () => {
     if (!can("edit-carrier-agreements")) return;
@@ -255,6 +252,7 @@ const can = (permission) => {
           borderRadius: 999,
           padding: "4px 12px",
           letterSpacing: "0.01em",
+          display: "inline-block",
         }}
       >
         {type || "Unset"}
@@ -271,6 +269,7 @@ const can = (permission) => {
         padding: "4px 12px",
         color: required ? "#15924c" : TEXT_MUTE,
         background: required ? "#e9f9ef" : "#f1f5f9",
+        display: "inline-block",
       }}
     >
       {required ? "Required" : "Optional"}
@@ -598,25 +597,27 @@ const can = (permission) => {
   const rangeEnd = Math.min(questions.length, (pageIndex + 1) * PAGE_SIZE);
 
   return (
-    <div className="min-h-screen bg-[#F4F5F1] px-8 py-5 md:px-14">
-      <div className="mb-8 flex items-start justify-between">
+    <div className="min-h-screen bg-[#F4F5F1] px-4 py-5 sm:px-8 md:px-14">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between md:mb-8">
         <div>
-          <h1 className="text-[40px] font-semibold tracking-tight text-slate-900">Carrier Questions</h1>
-          <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-slate-500">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl md:text-[40px]">
+            Carrier Questions
+          </h1>
+          <p className="mt-1 text-sm leading-relaxed text-slate-500 sm:mt-2 sm:text-[15px]">
             Custom questionnaire every carrier answers during onboarding.
           </p>
         </div>
 
-{can("edit-carrier-agreements") && (
-  <button
-    onClick={openAdd}
-    className="mt-6 flex items-center gap-2 rounded-2xl px-6 py-4 text-[15px] font-semibold text-white shadow-sm transition-colors hover:opacity-90"
-    style={{ background: ACCENT }}
-  >
-    <Add sx={{ fontSize: 20 }} />
-    Add question
-  </button>
-)}
+        {can("edit-carrier-agreements") && (
+          <button
+            onClick={openAdd}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90 sm:w-auto sm:px-6 sm:py-4 sm:text-[15px]"
+            style={{ background: ACCENT }}
+          >
+            <Add sx={{ fontSize: 20 }} />
+            Add question
+          </button>
+        )}
       </div>
 
       <ToastContainer />
@@ -641,7 +642,8 @@ const can = (permission) => {
       )}
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
+        {/* Desktop Table View */}
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full border-collapse">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">
@@ -691,15 +693,15 @@ const can = (permission) => {
                     <td className="px-6 py-4 align-top">{renderTypeBadge(q.answer_type)}</td>
                     <td className="px-6 py-4 align-top">{renderRequiredBadge(q.is_required)}</td>
                     <td className="px-6 py-4 align-top text-right">
-                   {can("edit-carrier-agreements") && (
-  <button
-    onClick={() => openEdit(q)}
-    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-  >
-    <EditIcon sx={{ fontSize: 14 }} />
-    Edit
-  </button>
-)}
+                      {can("edit-carrier-agreements") && (
+                        <button
+                          onClick={() => openEdit(q)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                          <EditIcon sx={{ fontSize: 14 }} />
+                          Edit
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -708,9 +710,50 @@ const can = (permission) => {
           </table>
         </div>
 
+        {/* Mobile / Tablet Card View */}
+        <div className="block divide-y divide-slate-100 md:hidden">
+          {loading ? (
+            <div className="px-6 py-10 text-center text-sm text-slate-400">Loading questions…</div>
+          ) : questions.length === 0 ? (
+            <div className="px-6 py-12 text-center">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50">
+                <HelpOutlineIcon sx={{ fontSize: 24, color: ACCENT }} />
+              </div>
+              <div className="mb-1 text-[15px] font-bold text-slate-900">No questions yet</div>
+              <div className="text-sm text-slate-400">
+                Click <strong>Add question</strong> to get started.
+              </div>
+            </div>
+          ) : (
+            paginatedQuestions.map((q, index) => (
+              <div key={q.id} className="p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2">
+                    <span className="text-xs font-bold text-slate-400">#{pageIndex * PAGE_SIZE + index + 1}</span>
+                    <p className="text-sm font-semibold text-slate-800 leading-snug">{q.question}</p>
+                  </div>
+                  {can("edit-carrier-agreements") && (
+                    <button
+                      onClick={() => openEdit(q)}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      <EditIcon sx={{ fontSize: 13 }} />
+                      Edit
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  {renderTypeBadge(q.answer_type)}
+                  {renderRequiredBadge(q.is_required)}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
         {questions.length > PAGE_SIZE && (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-6 py-4">
-            <span className="text-sm text-slate-400">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-4 sm:px-6">
+            <span className="text-xs sm:text-sm text-slate-400">
               {rangeStart}-{rangeEnd} of {questions.length}
             </span>
             <div className="flex items-center gap-1">
@@ -722,7 +765,7 @@ const can = (permission) => {
               >
                 <ChevronLeftIcon fontSize="small" />
               </IconButton>
-              <span className="px-2 text-sm font-semibold text-slate-900">
+              <span className="px-2 text-xs sm:text-sm font-semibold text-slate-900">
                 Page {pageIndex + 1} of {pageCount}
               </span>
               <IconButton

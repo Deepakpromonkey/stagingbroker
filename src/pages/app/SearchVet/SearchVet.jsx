@@ -337,7 +337,7 @@ function SearchVetTable({ keyword, refreshKey }) {
 
             {/* Filter bar */}
             <div className="flex flex-wrap items-center gap-3 px-4 py-3 border-b border-gray-100 bg-gray-50/60">
-                <div className="flex items-center bg-white border border-gray-200 rounded-lg px-3 h-9 w-56">
+                <div className="flex items-center bg-white border border-gray-200 rounded-lg px-3 h-9 w-full sm:w-56">
                     <svg className="w-3.5 h-3.5 text-gray-400 mr-2 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                         <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
                     </svg>
@@ -360,79 +360,83 @@ function SearchVetTable({ keyword, refreshKey }) {
                     ))}
                 </select>
 
-                <span className="ml-auto text-xs text-gray-400">
+                <span className="w-full sm:w-auto sm:ml-auto text-xs text-gray-400">
                     {rangeStart}-{rangeEnd} of {total}
                 </span>
             </div>
 
-            <table className="w-full text-sm border-collapse">
-                <thead>
-                    {table.getHeaderGroups().map((headerGroup) => (
-                        <tr key={headerGroup.id}>
-                            {headerGroup.headers.map((header) => {
-                                const colId = header.column.id;
-                                const isSortable = Object.prototype.hasOwnProperty.call(SORTABLE_COLUMNS, colId);
+            {/* Horizontal scroll wrapper so the table degrades gracefully on
+                narrow screens instead of squeezing every column. */}
+            <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] text-sm border-collapse">
+                    <thead>
+                        {table.getHeaderGroups().map((headerGroup) => (
+                            <tr key={headerGroup.id}>
+                                {headerGroup.headers.map((header) => {
+                                    const colId = header.column.id;
+                                    const isSortable = Object.prototype.hasOwnProperty.call(SORTABLE_COLUMNS, colId);
 
-                                return (
-                                    <th
-                                        key={header.id}
-                                        className="text-left bg-gray-50 border-b border-gray-200 px-4 py-3 whitespace-nowrap"
-                                    >
-                                        {isSortable ? (
-                                            <SortableHeader
-                                                label={SORTABLE_COLUMNS[colId]}
-                                                sortKey={colId}
-                                                sorting={sorting}
-                                                onSortChange={setSorting}
-                                            />
-                                        ) : (
-                                            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">
-                                                {flexRender(header.column.columnDef.header, header.getContext())}
-                                            </span>
-                                        )}
-                                    </th>
-                                );
-                            })}
-                        </tr>
-                    ))}
-                </thead>
-                <tbody>
-                    {loading && (
-                        <tr>
-                            <td colSpan={columns.length} className="text-center py-10 text-gray-400">
-                                <div className="flex items-center justify-center gap-2">
-                                    <CircularProgress size={18} />
-                                    Loading…
-                                </div>
-                            </td>
-                        </tr>
-                    )}
-
-                    {!loading && data.length === 0 && (
-                        <tr>
-                            <td colSpan={columns.length} className="text-center py-10 text-gray-400">
-                                No carriers found.
-                            </td>
-                        </tr>
-                    )}
-
-                    {!loading && table.getRowModel().rows.map((row) => (
-                        <tr
-                            key={row.id}
-                            className="border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors"
-                        >
-                            {row.getVisibleCells().map((cell) => (
-                                <td key={cell.id} className="px-4 py-3 align-middle">
-                                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                    return (
+                                        <th
+                                            key={header.id}
+                                            className="text-left bg-gray-50 border-b border-gray-200 px-4 py-3 whitespace-nowrap"
+                                        >
+                                            {isSortable ? (
+                                                <SortableHeader
+                                                    label={SORTABLE_COLUMNS[colId]}
+                                                    sortKey={colId}
+                                                    sorting={sorting}
+                                                    onSortChange={setSorting}
+                                                />
+                                            ) : (
+                                                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+                                                    {flexRender(header.column.columnDef.header, header.getContext())}
+                                                </span>
+                                            )}
+                                        </th>
+                                    );
+                                })}
+                            </tr>
+                        ))}
+                    </thead>
+                    <tbody>
+                        {loading && (
+                            <tr>
+                                <td colSpan={columns.length} className="text-center py-10 text-gray-400">
+                                    <div className="flex items-center justify-center gap-2">
+                                        <CircularProgress size={18} />
+                                        Loading…
+                                    </div>
                                 </td>
-                            ))}
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+                            </tr>
+                        )}
+
+                        {!loading && data.length === 0 && (
+                            <tr>
+                                <td colSpan={columns.length} className="text-center py-10 text-gray-400">
+                                    No carriers found.
+                                </td>
+                            </tr>
+                        )}
+
+                        {!loading && table.getRowModel().rows.map((row) => (
+                            <tr
+                                key={row.id}
+                                className="border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors"
+                            >
+                                {row.getVisibleCells().map((cell) => (
+                                    <td key={cell.id} className="px-4 py-3 align-middle">
+                                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                    </td>
+                                ))}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
 
             {/* Pagination footer */}
-            <div className="flex items-center justify-end gap-3 px-4 py-3 border-t border-gray-100">
+            <div className="flex flex-wrap items-center justify-end gap-3 px-4 py-3 border-t border-gray-100">
                 <select
                     value={pageSize}
                     onChange={(e) => {
@@ -500,16 +504,16 @@ export default function SearchVet() {
     const placeholder = PLACEHOLDERS[searchType] || 'Search…';
 
     return (
-        <div className="min-h-screen bg-[#F4F5F1] px-8 py-5 md:px-14">
+        <div className="min-h-screen bg-[#F4F5F1] px-4 sm:px-6 md:px-10 lg:px-14 py-4 lg:py-5">
 
-            <div className="mb-8">
-                <h1 className="text-[40px] font-semibold tracking-tight text-slate-900">Search &amp; Instant Vet</h1>
-                <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-slate-500">
+            <div className="mb-6 lg:mb-8">
+                <h1 className="text-[26px] sm:text-[32px] lg:text-[40px] font-semibold tracking-tight text-slate-900">Search &amp; Instant Vet</h1>
+                <p className="mt-2 max-w-2xl text-sm lg:text-[15px] leading-relaxed text-slate-500">
                     One lookup → FMCSA authority, insurance, safety, VIN, associations &amp; a live Trust Score.
                 </p>
             </div>
 
-            <div className="bg-white rounded-xl p-7 mb-5 shadow-sm">
+            <div className="bg-white rounded-xl p-4 sm:p-5 lg:p-7 mb-5 shadow-sm">
                 <h2 className="text-lg font-bold text-gray-900 mb-1">Look up any carrier</h2>
                 <p className="text-sm text-gray-500 mb-4">
                     Search by MC #, DOT #, Company name, phone, or email.
@@ -524,7 +528,7 @@ export default function SearchVet() {
                                 type="button"
                                 onClick={() => setSearchType(t.value)}
                                 className={
-                                    'px-5 h-9 rounded-full border text-xs font-bold tracking-wide transition-colors ' +
+                                    'px-4 sm:px-5 h-8 sm:h-9 rounded-full border text-xs font-bold tracking-wide transition-colors ' +
                                     (isActive
                                         ? 'border-blue-600 text-white bg-blue-600 shadow-sm'
                                         : 'border-transparent text-slate-600 bg-slate-100 hover:bg-slate-200 hover:text-slate-800')
@@ -536,9 +540,9 @@ export default function SearchVet() {
                     })}
                 </div>
 
-                <div className="flex items-start gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-start gap-3">
 
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                         <div
                             className={
                                 'flex items-center bg-gray-100 rounded-lg px-4 h-12 ' +
@@ -569,7 +573,7 @@ export default function SearchVet() {
                     <button
                         onClick={handleRunVet}
                         disabled={vetting}
-                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-6 h-12 rounded-lg whitespace-nowrap transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                        className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-6 h-12 rounded-lg whitespace-nowrap transition-colors disabled:opacity-70 disabled:cursor-not-allowed w-full sm:w-auto"
                     >
                         {vetting ? (
                             <CircularProgress size={16} sx={{ color: '#fff' }} />
@@ -582,14 +586,14 @@ export default function SearchVet() {
                     </button>
                 </div>
 
-                <div className="flex gap-6 mt-3">
+                <div className="flex flex-wrap gap-x-6 gap-y-2 mt-3">
                     {[
                         '2.34M carriers · FMCSA synced daily',
                         'Carrier411 + GenLogs physical layer',
                         'Sub-200ms pass/fail at load tender',
                     ].map((text) => (
                         <span key={text} className="flex items-center gap-1.5 text-xs text-gray-500">
-                            <svg className="w-3 h-3 text-green-500" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                            <svg className="w-3 h-3 text-green-500 shrink-0" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                                 <polyline points="20 6 9 17 4 12" />
                             </svg>
                             {text}

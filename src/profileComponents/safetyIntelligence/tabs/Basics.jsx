@@ -366,19 +366,19 @@ function Basics({ data }) {
 
     return (
 
-        <div className='space-y-6 bg-[#f8fafc] p-6'>
+        <div className='space-y-4 sm:space-y-5 md:space-y-6 bg-[#f8fafc] p-4 sm:p-5 md:p-6'>
 
             <div className='flex items-center justify-between'>
 
                 <div>
 
-                    <h2 className='text-xl font-extrabold text-[#001b3d]'>
+                    <h2 className='text-[17px] sm:text-[19px] md:text-xl font-extrabold text-[#001b3d]'>
 
                         Safety Performance
 
                     </h2>
 
-                    <p className='mt-1 text-[12px] tracking-wide text-[#94a3b8]'>
+                    <p className='mt-1 text-[11px] sm:text-[12px] tracking-wide text-[#94a3b8]'>
 
                         Real-time compliance monitoring and risk assessment
 
@@ -392,7 +392,7 @@ function Basics({ data }) {
 
             </div>
 
-            <div className='grid grid-cols-5 gap-4'>
+            <div className='grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-4'>
 
                 {METRIC_CONFIG.map(function (config) {
 
@@ -408,7 +408,7 @@ function Basics({ data }) {
                                 setSelectedMetric(config.key);
 
                             }}
-                            className={`relative flex flex-col items-start rounded-xl border p-4 text-left shadow-sm transition-colors ${
+                            className={`relative flex flex-col items-start rounded-xl border p-3 md:p-4 text-left shadow-sm transition-colors ${
                                 isSelected
                                     ? 'border-transparent bg-blue-600'
                                     : 'border-[#e2e8f0] bg-white hover:bg-slate-50'
@@ -426,7 +426,7 @@ function Basics({ data }) {
                             )}
 
                             <div
-                                className={`mb-4 flex h-8 w-8 items-center justify-center rounded-lg ${
+                                className={`mb-3 md:mb-4 flex h-7 w-7 md:h-8 md:w-8 items-center justify-center rounded-lg ${
                                     isSelected
                                         ? 'bg-white/15 text-white'
                                         : 'bg-slate-100 text-slate-500'
@@ -438,7 +438,7 @@ function Basics({ data }) {
                             </div>
 
                             <p
-                                className={`text-[13px] font-[900] ${
+                                className={`text-[12px] sm:text-[12.5px] md:text-[13px] font-[900] ${
                                     isSelected ? 'text-white' : 'text-[#001b3d]'
                                 }`}
                             >
@@ -448,7 +448,7 @@ function Basics({ data }) {
                             </p>
 
                             <p
-                                className={`mt-1 text-[11px] ${
+                                className={`mt-1 text-[10px] sm:text-[10.5px] md:text-[11px] ${
                                     isSelected ? 'text-white/70' : 'text-slate-400'
                                 }`}
                             >
@@ -468,14 +468,14 @@ function Basics({ data }) {
             {/* SELECTED METRIC SUMMARY */}
 
             <div
-                className='flex items-center gap-5 rounded-2xl border border-[#e2e8f0] bg-white p-6 shadow-sm'
+                className='flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-5 rounded-2xl border border-[#e2e8f0] bg-white p-4 sm:p-5 md:p-6 shadow-sm'
                 style={{
                     background: `linear-gradient(90deg, ${selectedConfig.color}0d 0%, #ffffff 45%)`
                 }}
             >
 
                 <div
-                    className='flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl'
+                    className='flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-2xl'
                     style={{
                         backgroundColor: `${selectedConfig.color}1a`,
                         color: selectedConfig.color
@@ -488,13 +488,13 @@ function Basics({ data }) {
 
                 <div className='flex-1'>
 
-                    <p className='text-[11px] font-black uppercase tracking-wide text-slate-400'>
+                    <p className='text-[10.5px] sm:text-[11px] font-black uppercase tracking-wide text-slate-400'>
 
                         {selectedConfig.subtitle}
 
                     </p>
 
-                    <p className='mt-0.5 text-[16px] font-[900] text-[#001b3d]'>
+                    <p className='mt-0.5 text-[14.5px] sm:text-[15px] md:text-[16px] font-[900] text-[#001b3d]'>
 
                         {selectedConfig.label} Measure
 
@@ -503,14 +503,14 @@ function Basics({ data }) {
                 </div>
 
                 <div
-                    className='flex items-center gap-3 rounded-2xl px-6 py-3'
+                    className='flex items-center justify-center sm:justify-start gap-3 rounded-2xl px-5 sm:px-6 py-3 w-full sm:w-auto'
                     style={{
                         backgroundColor: `${selectedConfig.color}12`
                     }}
                 >
 
                     <span
-                        className='text-[28px] font-[900] leading-none'
+                        className='text-[24px] sm:text-[26px] md:text-[28px] font-[900] leading-none'
                         style={{ color: selectedConfig.color }}
                     >
 
@@ -530,11 +530,11 @@ function Basics({ data }) {
                 className='overflow-hidden rounded-[24px] border border-[#e2e8f0] bg-white shadow-sm scroll-mt-6'
             >
 
-                <div className='flex items-center justify-between border-b border-slate-100 px-8 py-6'>
+                <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 px-4 sm:px-6 md:px-8 py-4 sm:py-5 md:py-6'>
 
-                    <div className='flex items-center gap-3'>
+                    <div className='flex items-center gap-3 flex-wrap'>
 
-                        <h3 className='text-[16px] font-[900] text-[#001b3d]'>
+                        <h3 className='text-[14.5px] sm:text-[15px] md:text-[16px] font-[900] text-[#001b3d]'>
 
                             Violation History
 
@@ -569,33 +569,34 @@ function Basics({ data }) {
 
                 {visibleData && visibleData.length > 0 ? (
                     <>
-                        <table className='w-full table-fixed'>
+                        <div className='overflow-x-auto'>
+                        <table className='w-full table-fixed min-w-[720px]'>
 
                             <thead className='border-b border-slate-100 bg-[#f8fafc]'>
 
                                 <tr>
 
-                                    <th className='w-[15%] px-8 py-5 text-left text-[11px] font-black text-slate-400'>
+                                    <th className='w-[15%] px-4 sm:px-6 md:px-8 py-4 sm:py-4.5 md:py-5 text-left text-[11px] font-black text-slate-400'>
                                         Date
                                     </th>
 
-                                    <th className='w-[15%] px-8 py-5 text-left text-[11px] font-black text-slate-400'>
+                                    <th className='w-[15%] px-4 sm:px-6 md:px-8 py-4 sm:py-4.5 md:py-5 text-left text-[11px] font-black text-slate-400'>
                                         Code
                                     </th>
 
-                                    <th className='w-[22%] px-8 py-5 text-left text-[11px] font-black text-slate-400'>
+                                    <th className='w-[22%] px-4 sm:px-6 md:px-8 py-4 sm:py-4.5 md:py-5 text-left text-[11px] font-black text-slate-400'>
                                         Category
                                     </th>
 
-                                    <th className='w-[28%] px-8 py-5 text-left text-[11px] font-black text-slate-400'>
+                                    <th className='w-[28%] px-4 sm:px-6 md:px-8 py-4 sm:py-4.5 md:py-5 text-left text-[11px] font-black text-slate-400'>
                                         Description
                                     </th>
 
-                                    <th className='w-[10%] px-8 py-5 text-center text-[11px] font-black text-slate-400'>
+                                    <th className='w-[10%] px-4 sm:px-6 md:px-8 py-4 sm:py-4.5 md:py-5 text-center text-[11px] font-black text-slate-400'>
                                         OOS
                                     </th>
 
-                                    <th className='w-[10%] px-8 py-5 text-center text-[11px] font-black text-slate-400'>
+                                    <th className='w-[10%] px-4 sm:px-6 md:px-8 py-4 sm:py-4.5 md:py-5 text-center text-[11px] font-black text-slate-400'>
                                         Severity
                                     </th>
 
@@ -643,19 +644,19 @@ function Basics({ data }) {
                                             className='border-b border-slate-100 align-top'
                                         >
 
-                                            <td className='px-8 py-6 text-[14px] font-bold text-[#475569] whitespace-nowrap'>
+                                            <td className='px-4 sm:px-6 md:px-8 py-4 sm:py-5 md:py-6 text-[13px] sm:text-[13.5px] md:text-[14px] font-bold text-[#475569] whitespace-nowrap'>
 
                                                 {formatDate(log?.insp_date)}
 
                                             </td>
 
-                                            <td className='px-8 py-6 text-[14px] font-[800] text-[#0f172a]'>
+                                            <td className='px-4 sm:px-6 md:px-8 py-4 sm:py-5 md:py-6 text-[13px] sm:text-[13.5px] md:text-[14px] font-[800] text-[#0f172a]'>
 
                                                 {log?.viol_code || '--'}
 
                                             </td>
 
-                                            <td className='px-8 py-6'>
+                                            <td className='px-4 sm:px-6 md:px-8 py-4 sm:py-5 md:py-6'>
 
                                                 <span
                                                     style={{
@@ -674,7 +675,7 @@ function Basics({ data }) {
 
                                             </td>
 
-                                            <td className='px-8 py-6 text-[13px] font-medium text-slate-500 break-words'>
+                                            <td className='px-4 sm:px-6 md:px-8 py-4 sm:py-5 md:py-6 text-[12.5px] sm:text-[13px] font-medium text-slate-500 break-words'>
                                                 <div className={isRowExpanded ? "" : "line-clamp-2"}>
                                                     {descriptionText}
                                                 </div>
@@ -690,7 +691,7 @@ function Basics({ data }) {
                                                 )}
                                             </td>
 
-                                            <td className='px-8 py-6 text-center'>
+                                            <td className='px-4 sm:px-6 md:px-8 py-4 sm:py-5 md:py-6 text-center'>
 
                                                 {isOOS ? (
 
@@ -713,7 +714,7 @@ function Basics({ data }) {
 
                                             </td>
 
-                                            <td className='px-8 py-6 text-center text-[14px] font-black text-[#0f172a]'>
+                                            <td className='px-4 sm:px-6 md:px-8 py-4 sm:py-5 md:py-6 text-center text-[13px] sm:text-[13.5px] md:text-[14px] font-black text-[#0f172a]'>
 
                                                 {severity}
 
@@ -728,8 +729,9 @@ function Basics({ data }) {
                             </tbody>
 
                         </table>
+                        </div>
 
-                        <div className='flex items-center justify-center gap-6 border-t border-slate-100 py-5'>
+                        <div className='flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 border-t border-slate-100 py-5 px-4'>
                             {hasMore && (
                                 <button
                                     onClick={function () {
@@ -737,7 +739,7 @@ function Basics({ data }) {
                                             visibleCount + ROWS_PER_LOAD
                                         );
                                     }}
-                                    className='flex items-center gap-2 text-[13px] font-black text-[#001b3d] hover:text-blue-600'
+                                    className='flex items-center gap-2 text-[12.5px] sm:text-[13px] font-black text-[#001b3d] hover:text-blue-600 text-center'
                                 >
                                     Show {Math.min(ROWS_PER_LOAD, remainingCount)} more ({remainingCount} left of {totalCount})
                                     <ArrowForward sx={{ fontSize: 16 }} />
@@ -750,7 +752,7 @@ function Basics({ data }) {
                                         setVisibleCount(ROWS_PER_LOAD);
                                         scrollToTable();
                                     }}
-                                    className='text-[13px] font-black text-slate-400 hover:text-blue-600'
+                                    className='text-[12.5px] sm:text-[13px] font-black text-slate-400 hover:text-blue-600'
                                 >
                                     Show less
                                 </button>
@@ -758,13 +760,13 @@ function Basics({ data }) {
                         </div>
                     </>
                 ) : (
-                    <div className='flex flex-col items-center justify-center border-t border-slate-100 py-10 text-center'>
+                    <div className='flex flex-col items-center justify-center border-t border-slate-100 py-10 px-4 text-center'>
 
-                        <p className='text-[15px] font-[900] text-slate-700'>
+                        <p className='text-[14px] sm:text-[15px] font-[900] text-slate-700'>
                             No Logs Found
                         </p>
 
-                        <p className='mt-1 text-[13px] text-slate-400'>
+                        <p className='mt-1 text-[12.5px] sm:text-[13px] text-slate-400'>
                             There are no {selectedConfig.label.toLowerCase()} violations recorded.
                         </p>
 

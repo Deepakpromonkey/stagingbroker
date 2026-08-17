@@ -209,7 +209,7 @@ export default function ScoringWeights() {
   const totalSum = Object.values(weights).reduce((a, b) => a + b, 0);
 
   return (
-<div className="min-h-screen bg-[#F4F5F1] px-6 py-10 md:px-14 text-[#0F172A]">
+<div className="min-h-screen bg-[#F4F5F1] px-4 py-6 sm:px-6 sm:py-8 md:px-14 md:py-10 text-[#0F172A]">
       <ToastContainer />
 
       <style>{`
@@ -248,9 +248,9 @@ export default function ScoringWeights() {
         }
       `}</style>
 
-      <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-[40px] font-semibold tracking-tight text-slate-900">
+          <h1 className="text-[26px] sm:text-[32px] md:text-[40px] font-semibold tracking-tight text-slate-900">
             Scoring Weights
           </h1>
           <p className="mt-1 text-sm text-[#64748B]">
@@ -273,16 +273,16 @@ export default function ScoringWeights() {
       ) : (
         <>
           {/* Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {FIELD_ORDER.map((field) => {
               const val = weights[field];
               return (
                 <div
                   key={field}
-                  className="bg-white rounded-2xl p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)] border border-gray-100/80 flex flex-col justify-between"
+                  className="bg-white rounded-2xl p-5 sm:p-6 shadow-[0_1px_3px_rgba(0,0,0,0.02)] border border-gray-100/80 flex flex-col justify-between"
                 >
                   <div>
-                    <div className="flex items-center justify-between mb-5">
+                    <div className="flex items-center justify-between mb-4 sm:mb-5">
                       <div className="w-10 h-10 rounded-xl bg-[#EFF6FF] flex items-center justify-center">
                         <ShieldOutlinedIcon sx={{ fontSize: 20, color: "#2563EB" }} />
                       </div>
@@ -291,7 +291,7 @@ export default function ScoringWeights() {
                       </span>
                     </div>
 
-                    <div className="mb-6">
+                    <div className="mb-5 sm:mb-6">
                       <h2 className="text-base font-semibold text-[#0F172A]">
                         {FIELD_META[field].label}
                       </h2>
@@ -320,7 +320,7 @@ export default function ScoringWeights() {
           </div>
 
           {/* Action Bar Below Cards */}
-          <div className="mt-8 bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.02)] p-5">
+          <div className="mt-6 sm:mt-8 bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.02)] p-4 sm:p-5">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               {/* Weight Total */}
               <div className="flex items-center gap-3">
@@ -336,7 +336,7 @@ export default function ScoringWeights() {
               </div>
 
               {/* Right Options & Action */}
-              <div className="flex flex-wrap items-center justify-end gap-4">
+              <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center sm:justify-end gap-3 sm:gap-4">
                 {/* Optional Toggle */}
                 <div className="flex items-center gap-2.5">
                   <button
@@ -344,7 +344,7 @@ export default function ScoringWeights() {
                     role="switch"
                     aria-checked={saveAsTemplate}
                     onClick={toggleSaveAsTemplate}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer shrink-0 ${
                       saveAsTemplate ? "bg-[#2563EB]" : "bg-gray-200"
                     }`}
                   >
@@ -364,7 +364,7 @@ export default function ScoringWeights() {
                     value={templateName}
                     onChange={(e) => setTemplateName(e.target.value)}
                     placeholder="Template name *"
-                    className="rounded-xl border border-gray-200 px-3.5 py-2 text-xs text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all w-48"
+                    className="rounded-xl border border-gray-200 px-3.5 py-2 text-xs text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all w-full sm:w-48"
                   />
                 )}
 
@@ -373,7 +373,7 @@ export default function ScoringWeights() {
                   type="button"
                   onClick={handleSave}
                   disabled={saving || totalSum !== 100}
-                  className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#2563EB] hover:bg-[#1D4ED8] disabled:bg-gray-200 disabled:text-gray-400 text-white text-xs font-semibold rounded-xl shadow-xs transition-all cursor-pointer disabled:cursor-not-allowed"
+                  className="inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-[#2563EB] hover:bg-[#1D4ED8] disabled:bg-gray-200 disabled:text-gray-400 text-white text-xs font-semibold rounded-xl shadow-xs transition-all cursor-pointer disabled:cursor-not-allowed w-full sm:w-auto"
                 >
                   {saving ? (
                     <>

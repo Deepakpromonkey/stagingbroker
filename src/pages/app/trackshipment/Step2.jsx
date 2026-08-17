@@ -3,19 +3,25 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { create } from "zustand";
 
- 
 import { apiFetch } from "../../../lib/api";
 import { toast } from "../../../components/ui/Toaster";
 
- 
 import StepSidebar from "./StepSidebar";
+import { useShipmentDraftStore } from "./Step1";
 
- 
 import IconButton from "@mui/material/IconButton";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import AddIcon from "@mui/icons-material/Add";
+import RouteOutlinedIcon from "@mui/icons-material/RouteOutlined";
+import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
+import AccessTimeOutlinedIcon from "@mui/icons-material/AccessTimeOutlined";
+import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutlined";
+import EventNoteOutlinedIcon from "@mui/icons-material/EventNoteOutlined";
+import FlagCircleOutlinedIcon from "@mui/icons-material/FlagCircleOutlined";
+import TripOriginOutlinedIcon from "@mui/icons-material/TripOriginOutlined";
+import PlaceOutlinedIcon from "@mui/icons-material/PlaceOutlined";
 
  
 const COUNTRIES = ["United States", "Canada", "Mexico", "India"];
@@ -44,11 +50,6 @@ const TIMEZONES = [
  
 const EMAIL_LIST_PATTERN = /^\s*[^\s@]+@[^\s@]+\.[^\s@]+\s*(,\s*[^\s@]+@[^\s@]+\.[^\s@]+\s*)*$/;
 
- 
-// --- Stop type is now derived purely from position in the route ---
-// index 0            -> Pickup
-// last index          -> Delivery
-// anything in between -> Intermediate, Intermediate 2, Intermediate 3, ...
 const getStopTypeInfo = (index, total) => {
   if (index === 0) return { value: "pickup", label: "Pickup" };
   if (index === total - 1) return { value: "delivery", label: "Delivery" };
@@ -63,6 +64,11 @@ const blankStop = () => ({
   stopType: "pickup",
   stopTypeLabel: "Pickup",
   stopName: "",
+
+  // Who the driver's verification code is texted to at this stop.
+  contactName: "",
+  contactPhone: "",
+
   address: "",
   address2: "",
   city: "",
@@ -73,11 +79,18 @@ const blankStop = () => ({
   longitude: null,
 
  
+  // Only used/shown for the Pickup stop
   startDate: "",
   startTime: "",
   startTimezone: "",
 
- 
+
+  // Only used/shown for Intermediate and Delivery stops
+  endDate: "",
+  endTime: "",
+  endTimezone: "",
+
+
   // Only used/shown for the Pickup stop
   trackStartOffset: "",
 
@@ -117,11 +130,20 @@ const FieldLabel = ({ children, required }) => (
 );
 
  
-const SectionEyebrow = ({ children }) => (
-  <p className="mb-4 border-b border-slate-200 pb-2 text-xs font-bold tracking-widest text-blue-600 font-sans">
-    {children}
-  </p>
+const SectionEyebrow = ({ icon: Icon, children }) => (
+  <div className="mb-5 flex items-center gap-3 border-b border-slate-100 pb-3.5">
+    {Icon ? (
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EEF4FF] text-[#1D4ED8]">
+        <Icon sx={{ fontSize: 19 }} />
+      </span>
+    ) : null}
+    <p className="text-[15px] font-bold tracking-tight text-[#112963] font-sans">
+      {children}
+    </p>
+  </div>
 );
+
+const subPanelClass = "rounded-2xl border border-slate-100 bg-slate-50/50 p-4";
 
  
 const ErrorText = ({ children }) =>
@@ -138,11 +160,9 @@ const ChevronDown = () => (
  
 const pad = (n) => String(n).padStart(2, "0");
 
- 
 function to12Hour(value24) {
   if (!value24) {
-    const now = new Date();
-    return { hour: ((now.getHours() % 12) || 12), minute: now.getMinutes(), period: now.getHours() >= 12 ? "PM" : "AM" };
+    return { hour: 12, minute: 0, period: "AM" };
   }
   const [h, m] = value24.split(":").map(Number);
   const period = h >= 12 ? "PM" : "AM";
@@ -157,9 +177,6 @@ function to24HourString(hour, minute, period) {
   return `${pad(h)}:${pad(minute)}`;
 }
 
- 
-// Same 12-hour spinner time picker used on Step 1's "Send Updates To" rows,
-// reused here for each stop's Start — Time field.
 function CustomTimePicker({ value, onChange, hasError = false }) {
   const { hour, minute, period } = to12Hour(value);
 
@@ -248,11 +265,6 @@ function CustomTimePicker({ value, onChange, hasError = false }) {
   );
 }
 
- 
-// Plain typed HH:MM duration input for "Start the Track: __ hrs before
-// pickup" — just a text box showing 00:00 that the user types over directly
-// (no spinners). Auto-inserts the colon as digits are typed, and clamps
-// hours to 0-99 / minutes to 0-59 on blur.
 function DurationInput({ value, onChange, hasError = false }) {
   const handleChange = (e) => {
     const digits = e.target.value.replace(/\D/g, "").slice(0, 4);
@@ -261,9 +273,7 @@ function DurationInput({ value, onChange, hasError = false }) {
 
  
     if (hourDigits.length === 1 && parseInt(hourDigits, 10) > 2) {
-      // Max is 24 hrs, so a lone first digit of 3-9 can only be a
-      // single-digit hour — pad it immediately (e.g. "9" -> "09") and
-      // move straight on to the minutes.
+
       hourDigits = pad(parseInt(hourDigits, 10));
     } else if (hourDigits.length === 2) {
       const hVal = Math.min(parseInt(hourDigits, 10) || 0, 24);
@@ -396,39 +406,63 @@ function AddressAutocomplete({ index, value, onChange, setValue, error, hasError
 }
 
  
+// "(UTC-08:00) Pacific" -> "Pacific" (what the backend stores)
+const timezoneName = (tz) => (tz ? tz.split(") ")[1] || tz : "");
+
+
 // Builds the specific JSON structure your backend expects
 function buildTripSheetPayload(stops) {
-  return stops.map((stop) => ({
-    stop_type: stop.stopTypeLabel || stop.stopType,
-    stop_name: stop.stopName,
-    address: stop.address,
-    address_2: stop.address2 || "",
-    city: stop.city || "",
-    state: stop.state || "",
-    zipcode: stop.zipcode || "",
-    country: stop.country || "",
-    latitude: stop.latitude,
-    longitude: stop.longitude,
+  return stops.map((stop) => {
+    // Pickup has no arrival window — only Intermediate/Delivery stops carry End timing.
+    const hasEndWindow = stop.stopType !== "pickup";
+    // CHANGED: Start window (date/time/timezone) is now only collected for
+    // the Pickup stop — Intermediate/Delivery stops no longer show or send it.
+    const hasStartWindow = stop.stopType === "pickup";
 
- 
-    start_date: stop.startDate || "",
-    start_time: stop.startTime || "",
-    start_timezone: stop.startTimezone ? stop.startTimezone.split(') ')[1] : "", // Extracts 'Pacific' from '(UTC-08:00) Pacific'
+    return {
+      stop_type: stop.stopTypeLabel || stop.stopType,
+      stop_name: stop.stopName,
 
- 
-    // Only meaningful for the Pickup stop
-    track_start_offset: stop.stopType === "pickup" ? (stop.trackStartOffset || "") : "",
+      // The driver app texts this stop's verification code here.
+      contact_name: stop.contactName || "",
+      contact_phone: stop.contactPhone || "",
 
- 
-    comment_to_driver: stop.commentToDriver || "",
-    alert_emails: stop.alertEmails || "",
+      address: stop.address,
+      address_2: stop.address2 || "",
+      city: stop.city || "",
+      state: stop.state || "",
+      zipcode: stop.zipcode || "",
+      country: stop.country || "",
+      latitude: stop.latitude,
+      longitude: stop.longitude,
 
- 
-    custom_events: (stop.customEvents || []).map((ce) => ({
-      question: ce.question || "",
-      answer_type: ce.answerType || "",
-    })),
-  }));
+
+      // Only meaningful for the Pickup stop
+      start_date: hasStartWindow ? stop.startDate || "" : "",
+      start_time: hasStartWindow ? stop.startTime || "" : "",
+      start_timezone: hasStartWindow ? timezoneName(stop.startTimezone) : "",
+
+
+      // Only meaningful for Intermediate/Delivery stops
+      end_date: hasEndWindow ? stop.endDate || "" : "",
+      end_time: hasEndWindow ? stop.endTime || "" : "",
+      end_timezone: hasEndWindow ? timezoneName(stop.endTimezone) : "",
+
+
+      // Only meaningful for the Pickup stop
+      track_start_offset: stop.stopType === "pickup" ? (stop.trackStartOffset || "") : "",
+
+
+      comment_to_driver: stop.commentToDriver || "",
+      alert_emails: stop.alertEmails || "",
+
+
+      custom_events: (stop.customEvents || []).map((ce) => ({
+        question: ce.question || "",
+        answer_type: ce.answerType || "",
+      })),
+    };
+  });
 }
 
  
@@ -493,12 +527,22 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
  
   const { value: stopTypeValue, label: stopTypeLabel } = getStopTypeInfo(index, total);
 
+  // Who the on-site contact is depends on what happens at the stop: you load
+  // from a shipper and hand over to a receiver.
+  const contactLabel =
+    stopTypeValue === "pickup" ? "Shipper" : stopTypeValue === "delivery" ? "Receiver" : "Contact";
+
  
   const toggleCollapsed = () => setCollapsed((v) => !v);
 
  
+  const stopAccent =
+    stopTypeValue === "pickup" ? "#1D4ED8" : stopTypeValue === "delivery" ? "#12B76A" : "#7C6EF2";
+  const StopIcon =
+    stopTypeValue === "pickup" ? TripOriginOutlinedIcon : stopTypeValue === "delivery" ? FlagCircleOutlinedIcon : PlaceOutlinedIcon;
+
   return (
-    <div className="mb-6 rounded-2xl border border-slate-200 bg-white shadow-sm font-sans">
+    <div className="mb-6 overflow-hidden rounded-[28px] border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,36,84,0.04),0_16px_32px_-24px_rgba(15,36,84,0.35)] transition-shadow duration-200 hover:shadow-[0_1px_2px_rgba(15,36,84,0.04),0_20px_36px_-20px_rgba(15,36,84,0.18)] font-sans">
       <div
         role="button"
         tabIndex={0}
@@ -509,11 +553,15 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
             toggleCollapsed();
           }
         }}
-        className="flex cursor-pointer select-none items-center justify-between border-b border-slate-100 px-6 py-4"
+        className="flex cursor-pointer select-none flex-wrap items-center justify-between gap-y-2 border-b border-slate-100 bg-slate-50/60 px-4 sm:px-6 py-4"
+        style={{ borderLeft: `4px solid ${stopAccent}` }}
       >
-        <div className="flex items-center gap-3">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#112963] text-sm font-bold text-white">
-            {index + 1}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <span
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white shadow-sm"
+            style={{ backgroundColor: stopAccent }}
+          >
+            <StopIcon sx={{ fontSize: 18 }} />
           </span>
           <p className="text-sm font-bold text-slate-800">
             Stop {index + 1} · {stopTypeLabel}
@@ -531,7 +579,7 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
                 remove(index);
                 toast.success({ title: "Stop removed", duration: 2500 });
               }}
-              sx={{ color: "#94a3b8", border: "1px solid #E2E8F0", borderRadius: "10px", padding: "6px" }}
+              sx={{ color: "#94a3b8", border: "1px solid #E2E8F0", borderRadius: "10px", padding: "6px", background: "#fff" }}
             >
               <DeleteOutlineIcon fontSize="small" />
             </IconButton>
@@ -547,6 +595,7 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
               border: "1px solid #E2E8F0",
               borderRadius: "10px",
               padding: "6px",
+              background: "#fff",
               transform: collapsed ? "rotate(-90deg)" : "none",
               transition: "transform 0.15s",
             }}
@@ -558,9 +607,9 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
 
  
       {!collapsed && (
-        <div className="grid grid-cols-1 gap-8 px-6 py-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-8 px-4 sm:px-6 py-6 lg:grid-cols-2">
           <div>
-            <SectionEyebrow>Location</SectionEyebrow>
+            <SectionEyebrow icon={LocationOnOutlinedIcon}>Location</SectionEyebrow>
 
  
             <div className="mb-5">
@@ -576,6 +625,47 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
             <div className="mb-5">
               <FieldLabel>Stop Name</FieldLabel>
               <input className={inputClass} placeholder="Enter stop name" {...register(`stops.${index}.stopName`)} />
+            </div>
+
+
+            {/* The person on site who confirms the driver. The driver app texts
+                a 6-digit code to this number and cannot load or deliver until
+                it is read back — without it the stop is stuck. */}
+            <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+              <div>
+                <FieldLabel required>{contactLabel} Name</FieldLabel>
+                <input
+                  className={inputClass}
+                  placeholder={`Who the driver reports to at ${stopTypeLabel.toLowerCase()}`}
+                  {...register(`stops.${index}.contactName`, {
+                    required: `${contactLabel} name is required`,
+                  })}
+                />
+                <ErrorText>{errors?.stops?.[index]?.contactName?.message}</ErrorText>
+              </div>
+              <div>
+                <FieldLabel required>{contactLabel} Phone</FieldLabel>
+                <input
+                  className={
+                    inputClass +
+                    (errors?.stops?.[index]?.contactPhone ? " border-red-400 focus:border-red-400 focus:ring-red-100" : "")
+                  }
+                  placeholder="+1 555 000 1111"
+                  {...register(`stops.${index}.contactPhone`, {
+                    required: "Phone number is required — the OTP is sent here",
+                    validate: (v) =>
+                      // Matches the driver app: strip everything but digits and
+                      // require at least 10, since a 10-digit number is taken as
+                      // North American and anything longer carries its own code.
+                      String(v || "").replace(/\D/g, "").length >= 10 ||
+                      "Enter a full phone number with country code",
+                  })}
+                />
+                <ErrorText>{errors?.stops?.[index]?.contactPhone?.message}</ErrorText>
+                <p className="mt-1.5 text-xs text-slate-500 font-sans">
+                  The verification code for this stop is texted to this number.
+                </p>
+              </div>
             </div>
 
  
@@ -608,7 +698,7 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
             </div>
 
  
-            <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
               <div>
                 <FieldLabel>City</FieldLabel>
                 <input className={inputClass} placeholder="City" {...register(`stops.${index}.city`)} />
@@ -624,7 +714,7 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
             </div>
 
  
-            <div className="mb-8">
+            <div className="mb-2">
               <FieldLabel>Country</FieldLabel>
               <div className="relative">
                 <select className={selectClass} {...register(`stops.${index}.country`)} defaultValue="">
@@ -634,45 +724,115 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
                 <ChevronDown />
               </div>
             </div>
+          </div>
 
- 
-            <SectionEyebrow>Timing</SectionEyebrow>
-            <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div>
-                <FieldLabel required>Start — Date</FieldLabel>
-                <input
-                  className={inputClass}
-                  type="date"
-                  {...register(`stops.${index}.startDate`, { required: "Start date is required" })}
-                />
-                <ErrorText>{errors?.stops?.[index]?.startDate?.message}</ErrorText>
-              </div>
-              <div>
-                <FieldLabel>Time</FieldLabel>
-                <Controller
-                  control={control}
-                  name={`stops.${index}.startTime`}
-                  render={({ field: { value, onChange } }) => (
-                    <CustomTimePicker value={value} onChange={onChange} />
-                  )}
-                />
-              </div>
-              <div>
-                <FieldLabel>Timezone</FieldLabel>
-                <div className="relative">
-                  <select className={selectClass} {...register(`stops.${index}.startTimezone`)} defaultValue="">
-                    <option value="" disabled>Select timezone</option>
-                    {TIMEZONES.map((tz) => <option key={tz} value={tz}>{tz}</option>)}
-                  </select>
-                  <ChevronDown />
+          <div>
+            <SectionEyebrow icon={AccessTimeOutlinedIcon}>Timing</SectionEyebrow>
+
+            {/* CHANGED: Start window (Date / Time / Timezone) is now only
+                collected for the Pickup stop. Intermediate and Delivery
+                stops only ask for the End window below. */}
+            {stopTypeValue === "pickup" && (
+              <div className={`mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 ${subPanelClass}`}>
+                <p className="col-span-full -mt-0.5 mb-0.5 text-[11px] font-bold uppercase tracking-wide text-[#1D4ED8]">
+                  Start Window
+                </p>
+                <div>
+                  <FieldLabel required>Start — Date</FieldLabel>
+                  <input
+                    className={inputClass}
+                    type="date"
+                    {...register(`stops.${index}.startDate`, { required: "Start date is required" })}
+                  />
+                  <ErrorText>{errors?.stops?.[index]?.startDate?.message}</ErrorText>
+                </div>
+                <div>
+                  <FieldLabel>Time</FieldLabel>
+                  <Controller
+                    control={control}
+                    name={`stops.${index}.startTime`}
+                    render={({ field: { value, onChange } }) => (
+                      <CustomTimePicker value={value} onChange={onChange} />
+                    )}
+                  />
+                </div>
+                <div>
+                  <FieldLabel>Timezone</FieldLabel>
+                  <div className="relative">
+                    <select className={selectClass} {...register(`stops.${index}.startTimezone`)} defaultValue="">
+                      <option value="" disabled>Select timezone</option>
+                      {TIMEZONES.map((tz) => <option key={tz} value={tz}>{tz}</option>)}
+                    </select>
+                    <ChevronDown />
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
  
+            {/* End window — only Intermediate and Delivery stops have an arrival/departure end */}
+            {stopTypeValue !== "pickup" && (
+              <div className={`mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 ${subPanelClass}`}>
+                <p className="col-span-full -mt-0.5 mb-0.5 text-[11px] font-bold uppercase tracking-wide text-[#12B76A]">
+                  End Window
+                </p>
+                <div>
+                  <FieldLabel required>End — Date</FieldLabel>
+                  <input
+                    className={inputClass}
+                    type="date"
+                    {...register(`stops.${index}.endDate`, {
+                      required: "End date is required",
+                      validate: (value, formValues) => {
+                        const stop = formValues?.stops?.[index];
+                        if (!value || !stop?.startDate) return true;
+                        const start = `${stop.startDate}T${stop.startTime || "00:00"}`;
+                        const end = `${value}T${stop.endTime || "00:00"}`;
+                        return end >= start || "End must be after the start date/time";
+                      },
+                    })}
+                  />
+                  <ErrorText>{errors?.stops?.[index]?.endDate?.message}</ErrorText>
+                </div>
+                <div>
+                  <FieldLabel required>Time</FieldLabel>
+                  <Controller
+                    control={control}
+                    name={`stops.${index}.endTime`}
+                    rules={{ required: "End time is required" }}
+                    render={({ field: { value, onChange }, fieldState }) => (
+                      <>
+                        <CustomTimePicker value={value} onChange={onChange} hasError={!!fieldState.error} />
+                        <ErrorText>{fieldState.error?.message}</ErrorText>
+                      </>
+                    )}
+                  />
+                </div>
+                <div>
+                  <FieldLabel required>Timezone</FieldLabel>
+                  <div className="relative">
+                    <select
+                      className={
+                        selectClass +
+                        (errors?.stops?.[index]?.endTimezone ? " border-red-400 focus:border-red-400 focus:ring-red-100" : "")
+                      }
+                      {...register(`stops.${index}.endTimezone`, { required: "End timezone is required" })}
+                      defaultValue=""
+                    >
+                      <option value="" disabled>Select timezone</option>
+                      {TIMEZONES.map((tz) => <option key={tz} value={tz}>{tz}</option>)}
+                    </select>
+                    <ChevronDown />
+                  </div>
+                  <ErrorText>{errors?.stops?.[index]?.endTimezone?.message}</ErrorText>
+                </div>
+              </div>
+            )}
+
+
             {/* Start the Track — only shown for the Pickup stop */}
             {stopTypeValue === "pickup" && (
-              <div className="mb-8">
+              <div className={`mb-6 ${subPanelClass}`}>
                 <FieldLabel>Start the Track</FieldLabel>
                 <div className="flex flex-wrap items-center gap-3">
                   <Controller
@@ -690,7 +850,7 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
             )}
 
  
-            <SectionEyebrow>Driver Comms</SectionEyebrow>
+            <SectionEyebrow icon={ChatBubbleOutlineIcon}>Driver Comms</SectionEyebrow>
             <div className="mb-5">
               <FieldLabel>Comment to Driver</FieldLabel>
               <textarea
@@ -711,43 +871,40 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
               />
               <ErrorText>{errors?.stops?.[index]?.alertEmails?.message}</ErrorText>
             </div>
-          </div>
+
+            <div className="mt-8">
+              <SectionEyebrow icon={EventNoteOutlinedIcon}>Events at Location</SectionEyebrow>
+              <div className="overflow-hidden rounded-2xl border border-slate-200">
+                {customEventFields.length === 0 ? (
+                  <div className="px-4 py-6 text-center text-sm text-slate-400 font-sans">
+                    No custom events yet
+                  </div>
+                ) : (
+                  customEventFields.map((ce, ceIndex) => (
+                    <CustomEventRow
+                      key={ce.id}
+                      stopIndex={index}
+                      ceIndex={ceIndex}
+                      control={control}
+                      register={register}
+                      remove={removeCustomEvent}
+                    />
+                  ))
+                )}
 
  
-          <div>
-            <div className="mb-4 flex items-center gap-2 border-b border-slate-200 pb-2">
-              <p className="text-xs font-bold tracking-widest text-blue-600 font-sans">EVENTS AT LOCATION</p>
-            </div>
-            <div className="overflow-hidden rounded-xl border border-slate-200">
-              {customEventFields.length === 0 ? (
-                <div className="px-4 py-6 text-center text-sm text-slate-400 font-sans">
-                  No custom events yet
+                <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => appendCustomEvent({ question: "", answerType: "" })}
+                    className="flex items-center gap-1.5 text-sm font-bold text-blue-600 hover:text-blue-700 font-sans"
+                  >
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-50">
+                      <AddIcon sx={{ fontSize: 14 }} />
+                    </span>
+                    Add custom event
+                  </button>
                 </div>
-              ) : (
-                customEventFields.map((ce, ceIndex) => (
-                  <CustomEventRow
-                    key={ce.id}
-                    stopIndex={index}
-                    ceIndex={ceIndex}
-                    control={control}
-                    register={register}
-                    remove={removeCustomEvent}
-                  />
-                ))
-              )}
-
- 
-              <div className="border-t border-slate-100 px-4 py-3">
-                <button
-                  type="button"
-                  onClick={() => appendCustomEvent({ question: "", answerType: "" })}
-                  className="flex items-center gap-1.5 text-sm font-bold text-blue-600 hover:text-blue-700 font-sans"
-                >
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-50">
-                    <AddIcon sx={{ fontSize: 14 }} />
-                  </span>
-                  Add custom event
-                </button>
               </div>
             </div>
           </div>
@@ -764,6 +921,8 @@ export default function TrackShipmentStep2() {
   const step2Draft = useTripSheetDraftStore((s) => s.step2);
   const setStep2Draft = useTripSheetDraftStore((s) => s.setStep2);
   const resetStep2Draft = useTripSheetDraftStore((s) => s.resetStep2);
+
+  const resetStep1Draft = useShipmentDraftStore((s) => s.resetStep1);
 
   const {
     control,
@@ -838,6 +997,7 @@ export default function TrackShipmentStep2() {
 
       toast.success({ title: "Shipment and Stops saved successfully!", duration: 2500 });
       resetStep2Draft();
+      resetStep1Draft();
       navigate("/dashboard");
     } catch (err) {
       toast.error({ title: "Failed to save data", message: err?.message || "An error occurred." });
@@ -845,15 +1005,20 @@ export default function TrackShipmentStep2() {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#EBF1FC] font-sans">
+    <div className="flex flex-col lg:flex-row min-h-screen bg-[#EBF1FC] font-sans">
       <StepSidebar currentStep={2} />
-      <div className="flex-1 px-8 py-10 md:px-14">
-        <div className="mb-4 border-b border-[#E2EAF4] pb-6">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#93A7CD]">STEP 2</p>
-          <h1 className="mt-1 text-[32px] font-extrabold tracking-tight text-[#112963]">Trip Sheet</h1>
-          <p className="mt-2 text-[15px] font-medium leading-relaxed text-[#7085A8]">
-            Add each stop on the route. Search addresses below to automatically get coordinates.
-          </p>
+      <div className="flex-1 min-w-0 px-4 sm:px-6 md:px-10 lg:px-14 py-6 lg:py-10">
+        <div className="mb-8 flex items-start justify-between gap-4 overflow-hidden rounded-[28px] border border-[#DCE6F7] bg-gradient-to-br from-white to-[#F1F6FE] px-6 sm:px-8 py-7 shadow-[0_1px_2px_rgba(15,36,84,0.04),0_20px_40px_-24px_rgba(15,36,84,0.35)]">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#5B7FCB]">Step 2 of 2</p>
+            <h1 className="mt-1.5 text-[24px] sm:text-[28px] lg:text-[32px] font-extrabold tracking-tight text-[#112963]">Trip Sheet</h1>
+            <p className="mt-2 max-w-lg text-[15px] font-medium leading-relaxed text-[#7085A8]">
+              Add each stop on the route. Search addresses below to automatically get coordinates.
+            </p>
+          </div>
+          <span className="hidden sm:flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#112963] text-white shadow-lg shadow-[#112963]/20">
+            <RouteOutlinedIcon sx={{ fontSize: 26 }} />
+          </span>
         </div>
 
         <div className="max-w-5xl">
@@ -876,7 +1041,7 @@ export default function TrackShipmentStep2() {
               <button
                 type="button"
                 onClick={() => insert(Math.max(fields.length - 1, 0), blankStop())}
-                className="group inline-flex items-center gap-2.5 rounded-xl border border-dashed border-[#B8CCF8] bg-white px-6 py-3 transition-all duration-200 hover:border-[#2F5CFB] hover:bg-[#F8FBFF]"
+                className="group inline-flex items-center gap-2.5 rounded-2xl border border-dashed border-[#B8CCF8] bg-white px-5 sm:px-7 py-3.5 shadow-sm transition-all duration-200 hover:border-[#2F5CFB] hover:bg-[#F8FBFF] hover:shadow-md"
               >
                 <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#EEF4FF] group-hover:bg-[#DCE9FF]">
                   <AddIcon sx={{ fontSize: 18, color: "#2F5CFB" }} />
@@ -888,9 +1053,9 @@ export default function TrackShipmentStep2() {
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 px-8 py-4 backdrop-blur md:px-14 font-sans">
-        <div className="ml-0 flex max-w-6xl items-center justify-between md:ml-[280px]">
-          <span className="text-sm font-semibold text-slate-500 font-sans">
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/95 px-4 sm:px-6 md:px-10 lg:px-14 py-3 lg:py-4 shadow-[0_-4px_20px_rgba(15,36,84,0.08)] backdrop-blur font-sans">
+        <div className="ml-0 flex max-w-6xl flex-wrap items-center justify-between gap-3 lg:ml-[280px]">
+          <span className="inline-flex items-center gap-2 rounded-full bg-[#EEF4FF] px-3 py-1.5 text-sm font-semibold text-[#112963] font-sans">
             {fields.length} stop{fields.length === 1 ? "" : "s"} on this route
           </span>
 
@@ -898,7 +1063,7 @@ export default function TrackShipmentStep2() {
             <button
               type="button"
               onClick={() => navigate("/trackshipment/step1")}
-              className="rounded-xl border border-slate-200 px-6 py-4 text-sm font-semibold text-slate-500 hover:bg-slate-50"
+              className="rounded-2xl border border-slate-200 bg-white px-5 sm:px-6 py-3 sm:py-4 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 whitespace-nowrap"
             >
               ← Back
             </button>
@@ -906,7 +1071,7 @@ export default function TrackShipmentStep2() {
               type="button"
               disabled={isSubmitting}
               onClick={handleSubmit(onSubmit, onInvalid)}
-              className="rounded-xl bg-slate-900 px-6 py-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+              className="rounded-2xl bg-[#112963] px-5 sm:px-7 py-3 sm:py-4 text-sm font-semibold text-white shadow-lg shadow-[#112963]/25 transition hover:bg-[#0F2454] hover:shadow-xl disabled:opacity-60 whitespace-nowrap"
             >
               {isSubmitting ? "Saving…" : "Save"}
             </button>

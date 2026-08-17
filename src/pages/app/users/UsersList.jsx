@@ -104,7 +104,7 @@ const SectionLabel = ({ icon, text }) => (
 );
 
 const cardSx = {
-  p: 3,
+  p: { xs: 2, sm: 3 },
   backgroundColor: "#fff",
   border: `1px solid ${BORDER}`,
   borderRadius: "16px",
@@ -143,6 +143,7 @@ const dialogPaperSx = {
   borderRadius: "22px",
   boxShadow: "0 30px 70px -20px rgba(15, 23, 42, 0.35)",
   overflow: "hidden",
+  margin: { xs: "16px", sm: "32px" },
 };
 
 const RequiredLabel = ({ text }) => (
@@ -316,9 +317,9 @@ function ModalHeader({ icon, title, subtitle, onClose }) {
     <Box
       sx={{
         position: "relative",
-        px: 4,
-        pt: 4,
-        pb: 3,
+        px: { xs: 2.5, sm: 4 },
+        pt: { xs: 3, sm: 4 },
+        pb: { xs: 2.5, sm: 3 },
         display: "flex",
         alignItems: "flex-start",
         gap: 2,
@@ -338,7 +339,7 @@ function ModalHeader({ icon, title, subtitle, onClose }) {
         {icon}
       </Avatar>
 
-      <Box sx={{ pt: 0.25 }}>
+      <Box sx={{ pt: 0.25, pr: { xs: 4, sm: 0 } }}>
         <Typography sx={{ fontSize: "19px", fontWeight: 800, color: INK, lineHeight: 1.3 }}>
           {title}
         </Typography>
@@ -352,8 +353,8 @@ function ModalHeader({ icon, title, subtitle, onClose }) {
         size="small"
         sx={{
           position: "absolute",
-          top: 16,
-          right: 16,
+          top: { xs: 12, sm: 16 },
+          right: { xs: 12, sm: 16 },
           color: SUBTLE,
           backgroundColor: "#fff",
           border: `1px solid ${BORDER}`,
@@ -483,7 +484,7 @@ const selectedRole = watch("roles");
       />
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
-        <DialogContent sx={{ px: 4, py: 3.5, backgroundColor: "#f8fafc", maxHeight: "64vh", overflowY: "auto" }}>
+        <DialogContent sx={{ px: { xs: 2.5, sm: 4 }, py: { xs: 2.5, sm: 3.5 }, backgroundColor: "#f8fafc", maxHeight: "64vh", overflowY: "auto" }}>
           {loadingUser ? (
             <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
               <CircularProgress size={22} sx={{ color: BRAND }} />
@@ -493,7 +494,7 @@ const selectedRole = watch("roles");
               <Box sx={{ ...cardSx, mb: 2.5 }}>
                 <SectionLabel icon={<BadgeOutlinedIcon sx={{ fontSize: 16 }} />} text="PERSONAL DETAILS" />
 
-                <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2.25 }}>
+                <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2.25 }}>
                   <TextField
                     label={<RequiredLabel text="First name" />}
                     fullWidth
@@ -697,7 +698,7 @@ const selectedRole = watch("roles");
           )}
         </DialogContent>
 
-        <DialogActions sx={{ px: 4, py: 2.5, borderTop: `1px solid ${BORDER}`, backgroundColor: "#ffffff" }}>
+        <DialogActions sx={{ px: { xs: 2.5, sm: 4 }, py: 2.5, borderTop: `1px solid ${BORDER}`, backgroundColor: "#ffffff" }}>
           <Button onClick={handleClose} disabled={isSubmitting} sx={cancelButtonSx}>
             Cancel
           </Button>
@@ -739,7 +740,7 @@ function UserDetailsModal({ open, onClose, viewData, roles }) {
         onClose={onClose}
       />
 
-      <DialogContent sx={{ px: 4, py: 3.5, backgroundColor: "#f8fafc" }}>
+      <DialogContent sx={{ px: { xs: 2.5, sm: 4 }, py: { xs: 2.5, sm: 3.5 }, backgroundColor: "#f8fafc" }}>
         <Box sx={{ ...cardSx, display: "flex", alignItems: "center", gap: 2, mb: 2.5 }}>
           <Avatar
             sx={{
@@ -840,7 +841,7 @@ function UserDetailsModal({ open, onClose, viewData, roles }) {
 </Box>
       </DialogContent>
 
-      <DialogActions sx={{ px: 4, py: 2.5, borderTop: `1px solid ${BORDER}`, backgroundColor: "#ffffff" }}>
+      <DialogActions sx={{ px: { xs: 2.5, sm: 4 }, py: 2.5, borderTop: `1px solid ${BORDER}`, backgroundColor: "#ffffff" }}>
         <Button onClick={onClose} variant="contained" sx={submitButtonSx}>
           Close
         </Button>
@@ -911,11 +912,11 @@ const selectedRole = watch("roles");
       />
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
-        <DialogContent sx={{ px: 4, py: 3.5, backgroundColor: "#f8fafc", maxHeight: "64vh", overflowY: "auto" }}>
+        <DialogContent sx={{ px: { xs: 2.5, sm: 4 }, py: { xs: 2.5, sm: 3.5 }, backgroundColor: "#f8fafc", maxHeight: "64vh", overflowY: "auto" }}>
           <Box sx={{ ...cardSx, mb: 2.5 }}>
             <SectionLabel icon={<BadgeOutlinedIcon sx={{ fontSize: 16 }} />} text="PERSONAL DETAILS" />
 
-            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2.25 }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2.25 }}>
               <TextField
                 label={<RequiredLabel text="First name" />}
                 fullWidth
@@ -1094,7 +1095,7 @@ const selectedRole = watch("roles");
           )}
         </DialogContent>
 
-        <DialogActions sx={{ px: 4, py: 2.5, borderTop: `1px solid ${BORDER}`, backgroundColor: "#ffffff" }}>
+        <DialogActions sx={{ px: { xs: 2.5, sm: 4 }, py: 2.5, borderTop: `1px solid ${BORDER}`, backgroundColor: "#ffffff" }}>
           <Button onClick={handleClose} disabled={isSubmitting} sx={cancelButtonSx}>
             Cancel
           </Button>
@@ -1199,17 +1200,17 @@ export default function UsersList() {
   const rangeEnd = Math.min(total, (pageIndex + 1) * pageSize);
 
   return (
-    <div className="min-h-screen bg-[#F4F5F1] px-8 py-5 md:px-14 ">
-      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+    <div className="min-h-screen bg-[#F4F5F1] px-4 py-5 sm:px-6 md:px-8 lg:px-14">
+      <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-[40px] font-semibold tracking-tight text-slate-900">Users</h1>
-          <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-slate-500">
+          <h1 className="text-[26px] sm:text-[32px] md:text-[40px] font-semibold tracking-tight text-slate-900">Users</h1>
+          <p className="mt-2 max-w-2xl text-sm sm:text-[15px] leading-relaxed text-slate-500">
             Enter carrier details to activate live telemetry and predictive delivery windows.
           </p>
         </div>
 <button
   onClick={() => setInviteOpen(true)}
-  className="mt-6 flex items-center gap-2 rounded-2xl px-6 py-4 text-[15px] font-semibold text-white shadow-sm transition-colors hover:opacity-90"
+  className="mt-2 sm:mt-6 flex items-center justify-center gap-2 rounded-2xl px-5 py-3 sm:px-6 sm:py-4 text-sm sm:text-[15px] font-semibold text-white shadow-sm transition-colors hover:opacity-90 w-full sm:w-auto"
   style={{ background: BRAND }}
 >
   <PersonAddAlt1Icon sx={{ fontSize: 20 }} />
@@ -1217,9 +1218,9 @@ export default function UsersList() {
 </button>
       </div>
 
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+      <div className="mb-6 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center justify-between gap-3 sm:gap-4">
+        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm w-full sm:w-auto">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 shrink-0">
             <FormatListBulletedIcon sx={{ fontSize: 18 }} />
           </span>
           <div>
@@ -1228,7 +1229,7 @@ export default function UsersList() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm w-full sm:w-auto">
           <span className="text-xs font-bold uppercase tracking-wide text-slate-400">Display:</span>
           <select
             value={pageSize}
@@ -1259,7 +1260,7 @@ export default function UsersList() {
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id} className="border-b border-slate-100 bg-slate-50">
                   {headerGroup.headers.map((header) => (
-                    <th key={header.id} className="whitespace-nowrap px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                    <th key={header.id} className="whitespace-nowrap px-4 py-3 sm:px-6 sm:py-4 text-left text-[11px] font-bold uppercase tracking-wide text-slate-400">
                       {flexRender(header.column.columnDef.header, header.getContext())}
                     </th>
                   ))}
@@ -1294,7 +1295,7 @@ export default function UsersList() {
                 table.getRowModel().rows.map((row) => (
                   <tr key={row.original.row_id || row.id} className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/60">
                     {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="px-6 py-4 align-top">
+                      <td key={cell.id} className="px-4 py-3 sm:px-6 sm:py-4 align-top">
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     ))}

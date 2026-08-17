@@ -81,12 +81,12 @@ function CarrierSettings() {
             <div>
 
                 {/* Header - preserved standard layout */}
-                <div className="mb-8">
-                    <h1 className="text-[40px] font-semibold tracking-tight text-slate-900">
+                <div className="mb-6 md:mb-8">
+                    <h1 className="text-[26px] sm:text-[32px] md:text-[40px] font-semibold tracking-tight text-slate-900">
                         Carrier Settings
                     </h1>
 
-                    <p className="mt-2 text-[15px] leading-relaxed text-slate-500">
+                    <p className="mt-2 text-[13.5px] sm:text-[14px] md:text-[15px] leading-relaxed text-slate-500">
                         Manage carrier agreements and the email templates sent during onboarding.
                     </p>
                 </div>
@@ -95,12 +95,12 @@ function CarrierSettings() {
                 <div className="max-w-[1200px] mx-auto">
 
                     {/* Tabs */}
-                    <div className="inline-flex items-center gap-[4px] bg-[#EFF0ED] rounded-[12px] p-[4px] mb-[24px]">
+                    <div className="inline-flex flex-wrap items-center gap-[4px] bg-[#EFF0ED] rounded-[12px] p-[4px] mb-[20px] md:mb-[24px]">
                         {TABS.map((tab) => (
                             <button
                                 key={tab.key}
                                 onClick={() => setActiveTab(tab.key)}
-                                className={`flex items-center gap-[8px] px-[16px] py-[9px] rounded-[9px] text-[12px] font-[600] uppercase tracking-wide transition-colors ${
+                                className={`flex items-center gap-[6px] sm:gap-[8px] px-[12px] sm:px-[14px] md:px-[16px] py-[8px] md:py-[9px] rounded-[9px] text-[11px] sm:text-[11.5px] md:text-[12px] font-[600] uppercase tracking-wide transition-colors whitespace-nowrap ${
                                     activeTab === tab.key
                                         ? 'bg-white text-[#1c5dbe] shadow-sm'
                                         : 'text-[#7c8fac] hover:text-[#111827]'
@@ -371,16 +371,16 @@ function AgreementsPanel() {
     return (
         <div className="rounded-[16px] border border-[#d9e1ee] bg-white shadow-sm overflow-hidden">
 
-            <div className="flex items-center justify-between px-[24px] py-[18px] border-b border-[#d9e1ee]">
-                <div>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-[14px] px-[16px] sm:px-[20px] md:px-[24px] py-[16px] md:py-[18px] border-b border-[#d9e1ee]">
+                <div className="min-w-0">
                     <div className="text-[14px] font-[700] text-[#0f172a]">Compliance Documents</div>
                     <div className="text-[12px] text-[#64748b] mt-[2px]">Legally binding agreements required for carrier activation.</div>
                 </div>
-                <div className="flex items-center gap-[10px]">
+                <div className="flex flex-wrap sm:flex-nowrap items-center gap-[10px] shrink-0">
                     <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
-                        className="h-[42px] rounded-[10px] border border-[#d9e1ee] bg-white px-[12px] text-[13px] font-[500] text-[#334155] outline-none"
+                        className="h-[42px] rounded-[10px] border border-[#d9e1ee] bg-white px-[12px] text-[13px] font-[500] text-[#334155] outline-none flex-1 sm:flex-none min-w-[130px]"
                     >
                         <option value="">All statuses</option>
                         <option value="active">Active</option>
@@ -388,7 +388,7 @@ function AgreementsPanel() {
                     </select>
                     <button
                         onClick={openUpload}
-                        className="flex items-center gap-[8px] bg-[#164a99] text-white text-[13px] font-[500] px-[16px] py-[15px] rounded-[10px] hover:bg-[#164a99] transition-colors"
+                        className="flex items-center justify-center gap-[8px] bg-[#164a99] text-white text-[13px] font-[500] px-[16px] py-[11px] md:py-[15px] rounded-[10px] hover:bg-[#164a99] transition-colors flex-1 sm:flex-none whitespace-nowrap"
                     >
                         <AddCircleOutline className="!text-[18px]" />
                         Upload new agreement
@@ -397,7 +397,7 @@ function AgreementsPanel() {
             </div>
 
             {listError && (
-                <div className="px-[24px] py-[12px] bg-[#fef2f2] text-[12.5px] text-[#dc2626] border-b border-[#fee2e2]">
+                <div className="px-[16px] sm:px-[20px] md:px-[24px] py-[12px] bg-[#fef2f2] text-[12.5px] text-[#dc2626] border-b border-[#fee2e2]">
                     {listError}
                 </div>
             )}
@@ -410,9 +410,9 @@ function AgreementsPanel() {
             )}
 
             {!loading && agreements.length === 0 && (
-                <div className="flex flex-col items-center justify-center px-[24px] py-[56px] text-center">
+                <div className="flex flex-col items-center justify-center px-[16px] sm:px-[20px] md:px-[24px] py-[40px] md:py-[56px] text-center">
 
-                    <div className="w-[96px] h-[96px] rounded-[20px] bg-[#F4F7FC] flex items-center justify-center mb-[24px]">
+                    <div className="w-[80px] h-[80px] md:w-[96px] md:h-[96px] rounded-[20px] bg-[#F4F7FC] flex items-center justify-center mb-[20px] md:mb-[24px]">
                         <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M9 4C7.89543 4 7 4.89543 7 6V34C7 35.1046 7.89543 36 9 36H27C28.1046 36 29 35.1046 29 34V13L20 4H9Z" stroke="#CBD5E1" strokeWidth="1.6" strokeLinejoin="round"/>
                             <path d="M20 4V13H29" stroke="#CBD5E1" strokeWidth="1.6" strokeLinejoin="round"/>
@@ -427,7 +427,7 @@ function AgreementsPanel() {
                         Your library is currently empty. Upload your standard carrier contracts or use our industry templates to start the automation.
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-[14px] mt-[32px] w-full max-w-[820px]">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-[14px] mt-[24px] md:mt-[32px] w-full max-w-[820px]">
                         {AGREEMENT_HIGHLIGHTS.map((item) => (
                             <div key={item.key} className="text-left rounded-[14px] border border-[#eef1f6] p-[18px] bg-[#fbfcfe]">
                                 <div className="w-[34px] h-[34px] rounded-[9px] bg-[#EAF2FF] flex items-center justify-center mb-[14px]">
@@ -445,7 +445,7 @@ function AgreementsPanel() {
             {!loading && agreements.length > 0 && (
                 <div className="divide-y divide-[#eef1f6]">
                     {agreements.map((agreement) => (
-                        <div key={agreement.uuid} className="flex items-center justify-between px-[24px] py-[16px] hover:bg-[#fbfcfe]">
+                        <div key={agreement.uuid} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-[12px] px-[16px] sm:px-[20px] md:px-[24px] py-[14px] md:py-[16px] hover:bg-[#fbfcfe]">
 
                             <div className="flex items-center gap-[12px] min-w-0">
                                 <div className="w-[38px] h-[38px] rounded-[10px] bg-[#EBF5FF] flex items-center justify-center shrink-0">
@@ -485,7 +485,7 @@ function AgreementsPanel() {
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-[4px] shrink-0">
+                            <div className="flex items-center flex-wrap gap-[4px] shrink-0 sm:justify-end">
                                 {busyUuid === agreement.uuid ? (
                                     <CircularProgress size={18} className="mr-[8px]" />
                                 ) : (
@@ -757,16 +757,16 @@ function TemplatesPanel() {
     return (
         <div className="rounded-[16px] border border-[#d9e1ee] bg-white shadow-sm overflow-hidden">
 
-            <div className="flex items-center justify-between px-[24px] py-[18px] border-b border-[#d9e1ee]">
-                <div>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-[14px] px-[16px] sm:px-[20px] md:px-[24px] py-[16px] md:py-[18px] border-b border-[#d9e1ee]">
+                <div className="min-w-0">
                     <div className="text-[14px] font-[700] text-[#0f172a]">Email templates</div>
                     <div className="text-[12px] text-[#64748b] mt-[2px]">Emails sent automatically during carrier onboarding.</div>
                 </div>
-                <div className="flex items-center gap-[10px]">
+                <div className="flex flex-wrap sm:flex-nowrap items-center gap-[10px] shrink-0">
                     <select
                         value={typeFilter}
                         onChange={(e) => setTypeFilter(e.target.value)}
-                        className="h-[42px] rounded-[10px] border border-[#d9e1ee] bg-white px-[12px] text-[13px] font-[500] text-[#334155] outline-none"
+                        className="h-[42px] rounded-[10px] border border-[#d9e1ee] bg-white px-[12px] text-[13px] font-[500] text-[#334155] outline-none flex-1 sm:flex-none min-w-[120px]"
                     >
                         <option value="">All types</option>
                         {templateTypes.map((t) => (
@@ -776,7 +776,7 @@ function TemplatesPanel() {
                     <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
-                        className="h-[42px] rounded-[10px] border border-[#d9e1ee] bg-white px-[12px] text-[13px] font-[500] text-[#334155] outline-none"
+                        className="h-[42px] rounded-[10px] border border-[#d9e1ee] bg-white px-[12px] text-[13px] font-[500] text-[#334155] outline-none flex-1 sm:flex-none min-w-[120px]"
                     >
                         <option value="">All statuses</option>
                         <option value="active">Active</option>
@@ -784,7 +784,7 @@ function TemplatesPanel() {
                     </select>
                     <button
                         onClick={openNew}
-                        className="flex items-center gap-[8px] bg-[#164a99] text-white text-[13px] font-[500] px-[16px] py-[15px] rounded-[10px] hover:bg-[#164a99] transition-colors"
+                        className="flex items-center justify-center gap-[8px] bg-[#164a99] text-white text-[13px] font-[500] px-[16px] py-[11px] md:py-[15px] rounded-[10px] hover:bg-[#164a99] transition-colors flex-1 sm:flex-none whitespace-nowrap"
                     >
                         <Add className="!text-[18px]" />
                         New template
@@ -793,7 +793,7 @@ function TemplatesPanel() {
             </div>
 
             {listError && (
-                <div className="px-[24px] py-[12px] bg-[#fef2f2] text-[12.5px] text-[#dc2626] border-b border-[#fee2e2]">
+                <div className="px-[16px] sm:px-[20px] md:px-[24px] py-[12px] bg-[#fef2f2] text-[12.5px] text-[#dc2626] border-b border-[#fee2e2]">
                     {listError}
                 </div>
             )}
@@ -806,7 +806,7 @@ function TemplatesPanel() {
             )}
 
             {!loading && templates.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-[48px] text-center">
+                <div className="flex flex-col items-center justify-center py-[36px] md:py-[48px] text-center">
                     <MailOutline className="!text-[32px] !text-[#cbd5e1] mb-[10px]" />
                     <div className="text-[14px] font-[600] text-[#0f172a]">No templates yet</div>
                     <div className="text-[12px] text-[#64748b] mt-[4px]">Create your first email template to get started.</div>
@@ -816,14 +816,14 @@ function TemplatesPanel() {
             {!loading && templates.length > 0 && (
                 <div className="divide-y divide-[#eef1f6]">
                     {templates.map((template) => (
-                        <div key={template.uuid} className="flex items-center justify-between px-[24px] py-[16px] hover:bg-[#fbfcfe]">
+                        <div key={template.uuid} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-[12px] px-[16px] sm:px-[20px] md:px-[24px] py-[14px] md:py-[16px] hover:bg-[#fbfcfe]">
 
                             <div className="flex items-center gap-[12px] min-w-0">
                                 <div className="w-[38px] h-[38px] rounded-[10px] bg-[#fdf2e9] flex items-center justify-center shrink-0">
                                     <MailOutline className="!text-[18px] !text-[#d97706]" />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="flex items-center gap-[8px]">
+                                    <div className="flex items-center gap-[8px] flex-wrap">
                                         <span className="text-[13px] font-[600] text-[#0f172a] truncate">
                                             {template.name}
                                         </span>
@@ -854,7 +854,7 @@ function TemplatesPanel() {
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-[4px] shrink-0">
+                            <div className="flex items-center flex-wrap gap-[4px] shrink-0 sm:justify-end">
                                 {busyUuid === template.uuid ? (
                                     <CircularProgress size={18} className="mr-[8px]" />
                                 ) : (
@@ -1008,16 +1008,16 @@ function TemplateEditorDialog({ template, templateTypes, onClose, onSaved }) {
         <Dialog open onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: '20px', overflow: 'hidden' } }}>
 
             {/* ── Header ── */}
-            <div className="flex items-center justify-between px-[28px] py-[20px] bg-white border-b border-[#eef1f6]">
-                <div className="flex items-center gap-[14px]">
-                    <div className="w-[40px] h-[40px] rounded-[12px] bg-[#eaf2ff] flex items-center justify-center shrink-0">
+            <div className="flex items-center justify-between px-[18px] sm:px-[22px] md:px-[28px] py-[16px] sm:py-[18px] md:py-[20px] bg-white border-b border-[#eef1f6]">
+                <div className="flex items-center gap-[10px] sm:gap-[12px] md:gap-[14px] min-w-0">
+                    <div className="w-[36px] h-[36px] md:w-[40px] md:h-[40px] rounded-[12px] bg-[#eaf2ff] flex items-center justify-center shrink-0">
                         <MailOutline className="!text-[19px] !text-[#1c5dbe]" />
                     </div>
-                    <div>
-                        <div className="text-[16px] font-[700] text-[#0f172a]">
+                    <div className="min-w-0">
+                        <div className="text-[14.5px] md:text-[16px] font-[700] text-[#0f172a] truncate">
                             {isEdit ? 'Edit email template' : 'New email template'}
                         </div>
-                        <div className="text-[12.5px] text-[#94a3b8] mt-[1px]">
+                        <div className="text-[11.5px] md:text-[12.5px] text-[#94a3b8] mt-[1px] truncate">
                             Sent automatically during carrier onboarding
                         </div>
                     </div>
@@ -1027,9 +1027,9 @@ function TemplateEditorDialog({ template, templateTypes, onClose, onSaved }) {
                 </IconButton>
             </div>
 
-            <div className="px-[28px] py-[26px] bg-white overflow-y-auto" style={{ maxHeight: 620 }}>
+            <div className="px-[18px] sm:px-[22px] md:px-[28px] py-[20px] sm:py-[24px] md:py-[26px] bg-white overflow-y-auto" style={{ maxHeight: 620 }}>
 
-                <div className="mb-[24px]">
+                <div className="mb-[20px] md:mb-[24px]">
                     <label className="block text-[11px] font-[700] text-[#94a3b8] uppercase tracking-[0.08em] mb-[8px]">
                         Template name
                     </label>
@@ -1041,7 +1041,7 @@ function TemplateEditorDialog({ template, templateTypes, onClose, onSaved }) {
                     />
                 </div>
 
-                <div className="mb-[28px]">
+                <div className="mb-[22px] md:mb-[28px]">
                     <label className="block text-[11px] font-[700] text-[#94a3b8] uppercase tracking-[0.08em] mb-[8px]">
                         Subject line
                     </label>
@@ -1053,7 +1053,7 @@ function TemplateEditorDialog({ template, templateTypes, onClose, onSaved }) {
                     />
                 </div>
 
-                <div className="mb-[28px]">
+                <div className="mb-[22px] md:mb-[28px]">
                     <label className="block text-[11px] font-[700] text-[#94a3b8] uppercase tracking-[0.08em] mb-[8px]">
                         Template type
                     </label>

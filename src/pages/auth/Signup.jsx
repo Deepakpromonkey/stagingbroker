@@ -12,6 +12,9 @@ import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import LocalPhoneOutlinedIcon from '@mui/icons-material/LocalPhoneOutlined';
 import BusinessOutlinedIcon from '@mui/icons-material/BusinessOutlined';
+import ApartmentOutlinedIcon from '@mui/icons-material/ApartmentOutlined';
+import BadgeOutlinedIcon from '@mui/icons-material/BadgeOutlined';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 
@@ -30,6 +33,15 @@ const COUNTRY_CODES = [
     { code: 'US', dial: '+1', label: 'United States', digits: 10 },
     { code: 'CA', dial: '+1', label: 'Canada', digits: 10 },
     { code: 'MX', dial: '+52', label: 'Mexico', digits: 10 },
+];
+
+// Business type options — value is what gets sent to the backend
+const BUSINESS_TYPES = [
+    { value: '3pl_freight_broker', label: '3PL / Freight Broker' },
+    { value: 'freight_forwarder_shipper', label: 'Freight Forwarder / Shipper' },
+    { value: 'technology_vendor', label: 'Technology Vendor' },
+    { value: 'insurance_agency', label: 'Insurance Agency' },
+    { value: 'other', label: 'Other' },
 ];
 
 const CountryFlag = ({ code }) => (
@@ -65,7 +77,7 @@ const CountryCodeDropdown = ({ value, onChange }) => {
             <button
                 type="button"
                 onClick={() => setOpen((v) => !v)}
-                className="flex items-center gap-1.5 h-[54px] px-3 rounded-[14px] border cursor-pointer"
+                className="flex items-center gap-1.5 h-[46px] sm:h-[54px] px-2.5 sm:px-3 rounded-[14px] border cursor-pointer"
                 style={{ background: '#F7F8FA', borderColor: COLOR_BORDER }}
             >
                 <CountryFlag code={selected.code} />
@@ -92,6 +104,62 @@ const CountryCodeDropdown = ({ value, onChange }) => {
                         </button>
                     ))}
                 </div>
+            )}
+        </div>
+    );
+};
+
+const BusinessTypeDropdown = ({ value, onChange, error }) => {
+    const [open, setOpen] = useState(false);
+    const rootRef = useRef(null);
+    useOutsideClick(rootRef, () => setOpen(false));
+
+    const selected = BUSINESS_TYPES.find((b) => b.value === value);
+
+    return (
+        <div className="relative w-full" ref={rootRef}>
+            <button
+                type="button"
+                onClick={() => setOpen((v) => !v)}
+                className="flex items-center gap-2.5 w-full h-[46px] sm:h-[54px] px-3.5 rounded-[14px] border cursor-pointer text-left"
+                style={{
+                    background: '#F7F8FA',
+                    borderColor: error ? '#d32f2f' : COLOR_BORDER,
+                }}
+            >
+                <ApartmentOutlinedIcon sx={{ fontSize: 19 }} className="text-gray-400 shrink-0" />
+                <span className={`flex-1 text-[15px] truncate ${selected ? 'text-gray-900' : 'text-gray-400'}`}>
+                    {selected ? selected.label : 'Business Type'}
+                </span>
+                <KeyboardArrowDownIcon
+                    sx={{ fontSize: 20, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}
+                    className="text-gray-400 shrink-0"
+                />
+            </button>
+
+            {open && (
+                <div
+                    className="absolute z-20 mt-2 w-full rounded-xl border bg-white shadow-lg overflow-hidden"
+                    style={{ borderColor: COLOR_BORDER }}
+                >
+                    {BUSINESS_TYPES.map((b) => (
+                        <button
+                            type="button"
+                            key={b.value}
+                            onClick={() => { onChange(b.value); setOpen(false); }}
+                            className={`flex w-full items-center px-3.5 py-2.5 text-left text-sm hover:bg-gray-50 ${b.value === value ? 'bg-gray-50 font-semibold text-gray-900' : 'text-gray-700'
+                                }`}
+                        >
+                            {b.label}
+                        </button>
+                    ))}
+                </div>
+            )}
+
+            {error && (
+                <p className="mt-1 ml-1 text-xs" style={{ color: '#d32f2f' }}>
+                    Please select your business type
+                </p>
             )}
         </div>
     );
@@ -202,6 +270,8 @@ const Signup = () => {
     const [passwordConfirmation, setPasswordConfirmation] = useState('');
     const [phone, setPhone] = useState('');
     const [countryCode, setCountryCode] = useState('US'); 
+    const [businessType, setBusinessType] = useState('');
+    const [dotNumber, setDotNumber] = useState('');
     const [company, setCompany] = useState('');
 
     const [firstNameError, setFirstNameError] = useState(false);
@@ -210,6 +280,8 @@ const Signup = () => {
     const [passwordError, setPasswordError] = useState(false);
     const [passwordConfirmationError, setPasswordConfirmationError] = useState(false);
     const [phoneError, setPhoneError] = useState(false);
+    const [businessTypeError, setBusinessTypeError] = useState(false);
+    const [dotNumberError, setDotNumberError] = useState(false);
     const [companyError, setCompanyError] = useState(false);
 
     const signupSubmit = (event) => {
@@ -263,6 +335,25 @@ if(phone.trim() === '' || phoneDigitCount !== selectedCountry.digits){
     setPhoneError(false);
 }
 
+        if(businessType === ''){
+            setBusinessTypeError(true);
+            _has_error = true;
+        }else{
+            setBusinessTypeError(false);
+        }
+
+        // DOT# is mandatory only for 3PL / Freight Broker
+        if(businessType === '3pl_freight_broker'){
+            if(dotNumber.trim() === ''){
+                setDotNumberError(true);
+                _has_error = true;
+            }else{
+                setDotNumberError(false);
+            }
+        }else{
+            setDotNumberError(false);
+        }
+
         if(company.trim() === ''){
             setCompanyError(true);
             _has_error = true;
@@ -292,6 +383,8 @@ if(phone.trim() === '' || phoneDigitCount !== selectedCountry.digits){
                 phone_country_code: selectedCountry.dial,
                 password: password,
                 password_confirmation: passwordConfirmation,
+                business_type: businessType,
+                dot_number: businessType === '3pl_freight_broker' ? dotNumber.trim() : null,
                 company_name: company,
             }),
         })
@@ -330,6 +423,10 @@ if (userData) {
         localStorage.setItem('crm_company', JSON.stringify(userData.company));
     }
 }
+
+                // No pricing API yet — clear any stale plan flag so the
+                // guard on /dashboard forces a fresh plan selection.
+                localStorage.removeItem('crm_plan_selected');
         
                 toast.success({
                     title: 'Account Created',
@@ -337,7 +434,12 @@ if (userData) {
                     duration: 2500,
                 });
         
-                navigate('/dashboard');
+                // Send the new user to pick a plan before they can reach
+                // the dashboard. `fromSignup` tells the Subscription page
+                // to redirect to /dashboard once a plan is chosen.
+                // NOTE: this path must match the route registered in App.jsx
+                // (Route path="/subscribe"), not "/subscription".
+                navigate('/subscribe', { state: { fromSignup: true } });
             } else {
                 toast.error({
                     title: 'Signup Failed',
@@ -374,55 +476,55 @@ if (userData) {
         <div
             className="fixed inset-0 w-screen h-screen overflow-y-auto overflow-x-hidden z-[1000] bg-white"
         >
-            <div className="flex flex-col md:flex-row w-full min-h-full">
+            <div className="flex flex-col xl:flex-row w-full min-h-full">
 
-                <div className="relative order-2 md:order-1 w-full md:w-1/2 bg-[#178A54] flex items-center justify-center overflow-hidden min-h-[560px] md:min-h-full">
+                <div className="relative order-2 xl:order-1 w-full xl:w-1/2 bg-[#178A54] flex items-center justify-center overflow-hidden min-h-[420px] sm:min-h-[500px] md:min-h-[560px] lg:min-h-[600px] xl:min-h-full">
                     <GridBackground />
-                    <RingDecoration className="w-28 h-28 top-8 right-10" />
-                    <RingDecoration className="w-16 h-16 top-[42%] left-[8%]" />
-                    <RingDecoration className="w-14 h-14 top-[35%] left-1/2 -translate-x-1/2" />
+                    <RingDecoration className="hidden sm:block w-20 h-20 md:w-28 md:h-28 top-8 right-10" />
+                    <RingDecoration className="hidden sm:block w-12 h-12 md:w-16 md:h-16 top-[42%] left-[8%]" />
+                    <RingDecoration className="hidden sm:block w-10 h-10 md:w-14 md:h-14 top-[35%] left-1/2 -translate-x-1/2" />
 
-                    <div className="relative z-[2] w-full max-w-[520px] flex flex-col items-center px-8 py-12 box-border">
-                        <div className="text-center text-white mb-8">
-                            <h2 className="text-[28px] font-light leading-[36px] mb-4 max-w-[380px] mx-auto">
+                    <div className="relative z-[2] w-full max-w-[520px] flex flex-col items-center px-5 sm:px-6 md:px-8 py-8 sm:py-10 md:py-12 box-border">
+                        <div className="text-center text-white mb-6 md:mb-8">
+                            <h2 className="text-[20px] sm:text-[24px] md:text-[28px] font-light leading-[26px] sm:leading-[32px] md:leading-[36px] mb-3 md:mb-4 max-w-[380px] mx-auto">
                                 The easiest way to manage your Shipment.
                             </h2>
-                            <p className="text-base m-0 text-[#D9F2E5]">Join now!</p>
+                            <p className="text-sm md:text-base m-0 text-[#D9F2E5]">Join now!</p>
                         </div>
 
-                        <div className="relative w-[600px] max-w-[540px]">
+                        <div className="relative w-full max-w-[420px] sm:max-w-[480px] md:max-w-[560px] xl:w-[600px] xl:max-w-[540px]">
                             <div className="absolute inset-0 rounded-2xl bg-white/25 blur-[1px] rotate-[-4deg] translate-y-3 shadow-[0_20px_35px_rgba(0,0,0,0.18)]" />
                             <div className="absolute inset-0 rounded-2xl bg-white/45 blur-[0.5px] rotate-[3deg] translate-y-1.5 shadow-[0_20px_35px_rgba(0,0,0,0.2)]" />
                             <div className="relative rounded-2xl overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.28)] bg-white p-2">
                                 <img
                                     src={image}
                                     alt="Dashboard preview"
-                                    className="block w-full h-[420px] object-cover object-top rounded-lg"
+                                    className="block w-full h-[220px] sm:h-[300px] md:h-[420px] object-cover object-top rounded-lg"
                                 />
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="order-1 md:order-2 w-full md:w-1/2 bg-white flex items-center justify-center px-8 py-10 box-border">
+                <div className="order-1 xl:order-2 w-full xl:w-1/2 bg-white flex items-center justify-center px-5 sm:px-6 md:px-10 lg:px-12 xl:px-8 py-8 md:py-10 box-border">
                     <div className="w-full max-w-[520px]">
                         <img
                             src={logo}
                             alt="Logo"
-                            className="h-[42px] w-auto mb-10 block"
+                            className="h-9 md:h-[42px] w-auto mb-6 md:mb-10 block"
                         />
                         <div>
-                            <h1 className="text-[25px] leading-tight font-bold text-gray-900 m-0 mb-3 tracking-tight">
+                            <h1 className="text-[20px] sm:text-[22px] md:text-[25px] leading-tight font-bold text-gray-900 m-0 mb-2 md:mb-3 tracking-tight">
                                 Create Account
                             </h1>
-                            <p className="text-[15px] text-gray-500 m-0 mb-8">
+                            <p className="text-sm md:text-[15px] text-gray-500 m-0 mb-6 md:mb-8">
                                 Enter your details below to get started.
                             </p>
                         </div>
 
-                        <form onSubmit={signupSubmit} className="flex flex-col gap-5">
+                        <form onSubmit={signupSubmit} className="flex flex-col gap-4 md:gap-5">
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5">
 
                                 <IconField
                                     icon={<PersonOutlineIcon sx={{ fontSize: 19 }} />}
@@ -462,7 +564,7 @@ if (userData) {
 
 <div className="flex gap-2 items-start">
     <CountryCodeDropdown value={countryCode} onChange={setCountryCode} />
-    <div className="flex-1">
+    <div className="flex-1 min-w-0">
         <IconField
             icon={<LocalPhoneOutlinedIcon sx={{ fontSize: 19 }} />}
             placeholder="Phone"
@@ -535,6 +637,37 @@ if (userData) {
                                         </button>
                                     }
                                 />
+
+                                <div className="sm:col-span-2">
+                                    <BusinessTypeDropdown
+                                        value={businessType}
+                                        error={businessTypeError}
+                                        onChange={(val) => {
+                                            setBusinessType(val);
+                                            if (businessTypeError) setBusinessTypeError(false);
+                                            if (val !== '3pl_freight_broker') {
+                                                setDotNumber('');
+                                                setDotNumberError(false);
+                                            }
+                                        }}
+                                    />
+                                </div>
+
+                                {businessType === '3pl_freight_broker' && (
+                                    <div className="sm:col-span-2">
+                                        <IconField
+                                            icon={<BadgeOutlinedIcon sx={{ fontSize: 19 }} />}
+                                            placeholder="DOT Number"
+                                            value={dotNumber}
+                                            onChange={(e) => {
+                                                setDotNumber(e.target.value);
+                                                if (dotNumberError) setDotNumberError(false);
+                                            }}
+                                            error={dotNumberError}
+                                            helperText={dotNumberError ? 'DOT number is required for 3PL / Freight Broker' : ''}
+                                        />
+                                    </div>
+                                )}
                             </div>
 
                             <IconField

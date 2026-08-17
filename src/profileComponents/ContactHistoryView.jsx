@@ -43,7 +43,7 @@ function StatusBadge({ status }) {
 
   return (
     <span
-      className={`rounded-full px-[10px] py-[3px] text-[9px] font-[800] uppercase ${
+      className={`shrink-0 rounded-full px-[10px] py-[3px] text-[9px] font-[800] uppercase ${
         styles[status] || "bg-slate-100 text-slate-600"
       }`}
     >
@@ -54,7 +54,7 @@ function StatusBadge({ status }) {
 
 function AddressIcon({ type }) {
   const base =
-    "flex h-[36px] w-[36px] items-center justify-center rounded-[10px]";
+    "flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-[10px]";
 
   if (type === "Physical Address") {
     return (
@@ -156,10 +156,10 @@ export default function ContactHistoryView({ data = {} }) {
   };
 
   return (
-    <div className="space-y-[28px] rounded-[16px] border border-[#e5eaf1] bg-white p-[24px]">
-      <div className="flex items-start justify-between">
+    <div className="space-y-[20px] rounded-[16px] border border-[#e5eaf1] bg-white p-[14px] sm:p-[20px] lg:space-y-[28px] lg:p-[24px]">
+      <div className="flex items-start justify-between gap-[12px]">
         <div>
-          <h2 className="text-[18px] font-[800] text-[#0f172a]">
+          <h2 className="text-[15px] font-[800] text-[#0f172a] sm:text-[18px]">
             Audit Trail & Modifications
           </h2>
           {/* <p className="mt-[4px] flex items-center gap-[6px] text-[11px] text-[#64748b]">
@@ -177,12 +177,12 @@ export default function ContactHistoryView({ data = {} }) {
           Export History
         </button> */}
       </div>
-<div className="mt-[16px] rounded-[12px] border border-[#d9e1ee] bg-[#f8fafc] px-[20px] py-[24px] text-center">
-  <p className="text-[18px] font-[700] text-[#1e3a8a]">
+<div className="mt-[16px] rounded-[12px] border border-[#d9e1ee] bg-[#f8fafc] px-[14px] py-[20px] text-center sm:px-[20px] sm:py-[24px]">
+  <p className="text-[16px] font-[700] text-[#1e3a8a] sm:text-[18px]">
     WORKING ON IT
   </p>
 
-  <p className="mt-[6px] text-[13px] text-[#64748b]">
+  <p className="mt-[6px] text-[12px] text-[#64748b] sm:text-[13px]">
     This section is currently under development.
   </p>
 </div>
@@ -229,13 +229,13 @@ export default function ContactHistoryView({ data = {} }) {
       </div> */}
 
       <div className="space-y-[14px]">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-[10px] sm:flex-row sm:items-center sm:justify-between">
           <h3 className="text-[14px] font-[800] text-[#0f172a]">
             Address History Details
           </h3>
 
-          <div className="flex items-center gap-[8px] text-[10px]">
-            <span className="font-[700] uppercase text-[#94a3b8]">
+          <div className="flex flex-wrap items-center gap-[8px] text-[10px]">
+            <span className="shrink-0 font-[700] uppercase text-[#94a3b8]">
               Filter Status
             </span>
             <select
@@ -252,10 +252,18 @@ export default function ContactHistoryView({ data = {} }) {
           </div>
         </div>
 
+        {!filteredAddresses.length && (
+          <div className="rounded-[14px] border border-[#e5eaf1] bg-[#f8fafc] p-[24px] text-center">
+            <p className="text-[13px] font-[600] text-[#94a3b8]">
+              No {filter !== "ALL" ? `${filter.charAt(0)}${filter.slice(1).toLowerCase()} ` : ""}Entries Found
+            </p>
+          </div>
+        )}
+
         {filteredAddresses.map((item, idx) => (
           <div
             key={idx}
-            className={`flex items-start gap-[16px] rounded-[14px] border p-[18px] ${
+            className={`flex items-start gap-[12px] rounded-[14px] border p-[14px] sm:gap-[16px] sm:p-[18px] ${
               item.status === "PRIMARY"
                 ? "border-blue-300 bg-[#fbfdff]"
                 : "border-[#e5eaf1]"
@@ -263,15 +271,15 @@ export default function ContactHistoryView({ data = {} }) {
           >
             <AddressIcon type={item.type} />
 
-            <div className="flex-1">
-              <div className="flex items-center justify-between">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center justify-between gap-[8px]">
                 <p className="text-[11px] font-[800] uppercase text-[#0f172a]">
                   {item.type}
                 </p>
                 <StatusBadge status={item.status} />
               </div>
 
-              <p className="mt-[4px] text-[13px] font-[500] text-[#0f172a]">
+              <p className="mt-[4px] break-words text-[13px] font-[500] text-[#0f172a]">
                 {item.address}
               </p>
 

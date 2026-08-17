@@ -1,15 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 
 import {
-    ShieldOutlined
+    ShieldOutlined,
+    CloseOutlined
 } from '@mui/icons-material';
 
 import Skeleton from '@mui/material/Skeleton';
 
 import { apiFetch } from '../lib/api';
 
-// The OCR payload stores limits as a free-form label -> amount map, so pick the
-// most representative one rather than assuming a fixed key.
 const PREFERRED_LIMIT_KEYS = [
     'COMBINED SINGLE LIMIT (Ea accident)',
     'EACH OCCURRENCE',
@@ -30,8 +29,6 @@ function pickHeadlineLimit(limits) {
     return label ? { label, amount } : null;
 }
 
-// Newest extraction that actually produced coverages wins - rows come back
-// ordered by extracted_at desc, but a failed run still has a row.
 function extractCoverages(rows) {
     if (!Array.isArray(rows)) {
         return [];
@@ -47,8 +44,47 @@ function extractCoverages(rows) {
     return [];
 }
 
+function CoiDocumentModal({ url, onClose }) {
+    return (
+        <div
+            className='fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-[16px]'
+            onClick={onClose}
+        >
+            <div
+                onClick={(event) => event.stopPropagation()}
+                className='flex h-full w-full max-w-[900px] flex-col overflow-hidden rounded-[16px] bg-white shadow-xl'
+            >
+                <div className='flex items-center justify-between border-b border-[#e5e7eb] px-[16px] py-[12px]'>
+                    <h3 className='text-[15px] font-[700] text-[#111827]'>
+                        Certificate of Insurance
+                    </h3>
+
+                    <div className='flex items-center gap-[8px]'>
+                        <button
+                            type='button'
+                            onClick={onClose}
+                            className='flex items-center justify-center rounded-[8px] p-[6px] text-[#6b7280] transition-colors hover:bg-[#f1f5f9] hover:text-[#111827]'
+                        >
+                            <CloseOutlined sx={{ fontSize: 18 }} />
+                        </button>
+                    </div>
+                </div>
+
+                <div className='flex-1 bg-[#f8fafc]'>
+                    <iframe
+                        src={url}
+                        title='Certificate of Insurance'
+                        className='h-full w-full border-0'
+                    />
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function InsuranceCard(props) {
     const [coiDocument, setCoiDocument] = useState(null);
+    const [isCoiModalOpen, setIsCoiModalOpen] = useState(false);
     const dotNumber = props.data?.dot_number;
 
     const insuranceFilings = Array.isArray(
@@ -242,14 +278,21 @@ const coiUrl = coiDocument?.document_url
 
             </div>
 
-        <a
-  href={coiUrl || "#"}
-    target="_blank"
-    rel="noopener noreferrer"
-    className="mt-[18px] flex w-full items-center justify-center rounded-[10px] bg-white py-[14px] text-[14px] font-[700] text-[#334155] shadow-sm transition-all hover:underline xl:mt-[20px] xl:py-[16px] xl:text-[15px]"
->
-    View COI Document
-</a>
+        <button
+            type='button'
+            disabled={!coiUrl}
+            onClick={() => setIsCoiModalOpen(true)}
+            className="mt-[18px] flex w-full items-center justify-center rounded-[10px] bg-white py-[14px] text-[14px] font-[700] text-[#334155] shadow-sm transition-all hover:underline disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:no-underline xl:mt-[20px] xl:py-[16px] xl:text-[15px]"
+        >
+            View COI Document
+        </button>
+
+        {isCoiModalOpen && coiUrl && (
+            <CoiDocumentModal
+                url={coiUrl}
+                onClose={() => setIsCoiModalOpen(false)}
+            />
+        )}
 
         </div>
 

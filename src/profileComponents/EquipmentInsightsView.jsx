@@ -29,13 +29,13 @@ function getAssociationIcon(iconKey) {
     switch (iconKey) {
         case 'phone':
             return (
-                <div className='flex h-[20px] w-[20px] items-center justify-center rounded-full bg-[#eff6ff]'>
+                <div className='flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-full bg-[#eff6ff]'>
                     <PhoneOutlined className='!text-[13px] text-[#2563eb]' />
                 </div>
             );
         case 'email':
             return (
-                <div className='flex h-[20px] w-[20px] items-center justify-center rounded-full bg-[#eff6ff]'>
+                <div className='flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-full bg-[#eff6ff]'>
                     <EmailOutlined className='!text-[13px] text-[#2563eb]' />
                 </div>
             );
@@ -304,10 +304,10 @@ useEffect(function () {
                             return (
                                 <div
                                     key={i}
-                                    className='animate-pulse rounded-[18px] border border-[#d9e1ee] bg-white px-[20px] py-[22px]'
+                                    className='animate-pulse rounded-[18px] border border-[#d9e1ee] bg-white px-[14px] py-[16px] lg:px-[20px] lg:py-[22px]'
                                 >
-                                    <div className='h-[16px] w-[220px] rounded bg-[#e5e7eb]' />
-                                    <div className='mt-[18px] grid grid-cols-3 gap-[14px]'>
+                                    <div className='h-[16px] w-[220px] max-w-full rounded bg-[#e5e7eb]' />
+                                    <div className='mt-[18px] grid grid-cols-1 gap-[14px] sm:grid-cols-3'>
                                         <div className='h-[64px] rounded-[14px] bg-[#f1f5f9]' />
                                         <div className='h-[64px] rounded-[14px] bg-[#f1f5f9]' />
                                         <div className='h-[64px] rounded-[14px] bg-[#f1f5f9]' />
@@ -320,7 +320,7 @@ useEffect(function () {
 
                 ) : fetchError ? (
 
-                    <div className='rounded-[16px] border border-[#f0a5a5] bg-[#fcebeb] p-[40px] text-center'>
+                    <div className='rounded-[16px] border border-[#f0a5a5] bg-[#fcebeb] p-[24px] text-center lg:p-[40px]'>
                         <p className='text-[13px] font-[600] text-[#a32d2d]'>
                             {fetchError}
                         </p>
@@ -328,7 +328,7 @@ useEffect(function () {
 
                 ) : !paginatedCompanies.length ? (
 
-                    <div className='rounded-[16px] border border-[#d9e1ee] bg-white p-[40px] text-center'>
+                    <div className='rounded-[16px] border border-[#d9e1ee] bg-white p-[24px] text-center lg:p-[40px]'>
 
                         <p className='text-[13px] font-[600] text-[#94a3b8]'>
                             No Equipment Associations Found
@@ -351,10 +351,10 @@ useEffect(function () {
 
                             <div
                                 key={cardKey}
-                                className='rounded-[18px] border border-[#d9e1ee] bg-white px-[20px] py-[22px]'
+                                className='rounded-[18px] border border-[#d9e1ee] bg-white px-[14px] py-[16px] lg:px-[20px] lg:py-[22px]'
                             >
 
-                                <div className='flex items-start justify-between gap-[20px]'>
+                                <div className='flex flex-col gap-[16px] lg:flex-row lg:items-start lg:justify-between lg:gap-[20px]'>
 
                                     <div>
 
@@ -370,7 +370,7 @@ useEffect(function () {
 
                                     </div>
 
-                                    <div className='flex items-center gap-[40px]'>
+                                    <div className='flex items-center gap-[24px] lg:gap-[40px]'>
 
                                         <div>
                                             <p className='text-[9px] font-[600] uppercase tracking-[0.8px] text-[#94a3b8]'>
@@ -404,7 +404,7 @@ useEffect(function () {
 
                                     <div className='mt-[16px] overflow-hidden rounded-[14px] border border-[#e5e7eb]'>
 
-                                        <div className='flex items-center justify-between bg-[#f8fafc] px-[20px] py-[10px]'>
+                                        <div className='flex items-center justify-between bg-[#f8fafc] px-[14px] py-[10px] lg:px-[20px]'>
                                             <p className='text-[9px] font-[700] uppercase tracking-[1px] text-[#94a3b8]'>
                                                 VIN Number
                                             </p>
@@ -417,12 +417,12 @@ useEffect(function () {
                                             return (
                                                 <div
                                                     key={idx}
-                                                    className='flex items-center justify-between border-t border-[#eef2f7] px-[20px] py-[10px]'
+                                                    className='flex items-center justify-between gap-[10px] border-t border-[#eef2f7] px-[14px] py-[10px] lg:px-[20px]'
                                                 >
-                                                    <span className='text-[12px] font-[600] tracking-wide text-[#111827]'>
+                                                    <span className='truncate text-[12px] font-[600] tracking-wide text-[#111827]'>
                                                         {vin}
                                                     </span>
-                                                    <div className='rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-[10px] py-[3px] text-[9px] font-[700] text-[#2563eb]'>
+                                                    <div className='shrink-0 rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-[10px] py-[3px] text-[9px] font-[700] text-[#2563eb]'>
                                                         VIN
                                                     </div>
                                                 </div>
@@ -456,7 +456,7 @@ useEffect(function () {
 
                                 <div className='mt-[16px] overflow-hidden rounded-[14px] border border-[#e5e7eb]'>
 
-                                    <div className='grid grid-cols-12 bg-[#f8fafc] px-[28px] py-[10px]'>
+                                    <div className='hidden bg-[#f8fafc] px-[28px] py-[10px] sm:grid sm:grid-cols-12'>
                                         <div className='col-span-3'>
                                             <p className='text-[9px] font-[700] uppercase tracking-[1px] text-[#94a3b8]'>
                                                 Association Type
@@ -490,23 +490,23 @@ useEffect(function () {
 
                                                 <div
                                                     key={idx}
-                                                    className='grid grid-cols-12 items-center border-t border-[#eef2f7] px-[28px] py-[14px]'
+                                                    className='flex flex-col gap-[10px] border-t border-[#eef2f7] px-[14px] py-[12px] sm:grid sm:grid-cols-12 sm:items-center sm:gap-0 sm:px-[28px] sm:py-[14px]'
                                                 >
-                                                    <div className='col-span-3 flex items-center gap-[10px]'>
+                                                    <div className='flex items-center gap-[10px] sm:col-span-3'>
                                                         {getAssociationIcon(row.icon)}
                                                         <span className='text-[12px] font-[600] text-[#111827]'>
                                                             {row.label}
                                                         </span>
                                                     </div>
 
-                                                    <div className='col-span-7'>
-                                                        <p className='text-[12px] font-[500] text-[#334155]'>
+                                                    <div className='pl-[30px] sm:col-span-7 sm:pl-0'>
+                                                        <p className='break-words text-[12px] font-[500] text-[#334155]'>
                                                             {row.value}
                                                         </p>
                                                     </div>
 
-                                                    <div className='col-span-2 flex'>
-                                                        <div className='rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-[10px] py-[4px] text-[9px] font-[700] text-[#2563eb]'>
+                                                    <div className='pl-[30px] sm:col-span-2 sm:flex sm:pl-0'>
+                                                        <div className='inline-block rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-[10px] py-[4px] text-[9px] font-[700] text-[#2563eb]'>
                                                             VIN
                                                         </div>
                                                     </div>
@@ -530,14 +530,14 @@ useEffect(function () {
 
                 {totalPages > 1 && (
 
-                    <div className='flex items-center justify-between'>
+                    <div className='flex flex-col gap-[12px] sm:flex-row sm:items-center sm:justify-between'>
 
                         <p className='text-[11px] font-[600] text-[#94a3b8]'>
                             Showing {(currentPage - 1) * PAGE_SIZE + 1}-
                             {Math.min(currentPage * PAGE_SIZE, companies.length)} of {companies.length}
                         </p>
 
-                        <div className='flex items-center gap-[10px]'>
+                        <div className='flex items-center justify-end gap-[10px] sm:justify-start'>
 
                             <button
                                 onClick={function () {

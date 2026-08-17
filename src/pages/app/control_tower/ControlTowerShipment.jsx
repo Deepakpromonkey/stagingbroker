@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, Navigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Tabs from '@mui/material/Tabs';
@@ -12,20 +12,23 @@ import ListAltOutlinedIcon from '@mui/icons-material/ListAltOutlined';
 import ReceiptIcon from '@mui/icons-material/Receipt';
 import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined';
 import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
-import ChecklistOutlinedIcon from '@mui/icons-material/ChecklistOutlined';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import ShareIcon from '@mui/icons-material/Share';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import CheckIcon from '@mui/icons-material/Check';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
-
+import BadgeOutlinedIcon from '@mui/icons-material/BadgeOutlined';
+import MyLocationIcon from '@mui/icons-material/MyLocation';
 import InboxOutlinedIcon from '@mui/icons-material/InboxOutlined';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutlineOutlined';
 
 import ShipmentDetails from './ShipmentDetails';
 import ShipmentStops from './ShipmentStops';
 import LocationHistory from './LocationHistory';
-import { GoogleMap, useJsApiLoader, Polyline, Marker } from '@react-google-maps/api';
+import DriverActivity from './DriverActivity';
+import ShipmentChat from '../../../components/ShipmentChat';
+import { GoogleMap, Polyline, Marker, InfoWindow } from '@react-google-maps/api';
 
 import { apiFetch } from '../../../lib/api';
 
@@ -34,6 +37,37 @@ const containerStyle = {
     height: '100%',
     minHeight: '380px'
 };
+
+// Where the map sits when a load has neither stops nor a single driver ping.
+const FALLBACK_CENTER = { lat: 39.8283, lng: -98.5795 };
+
+/**
+ * True once the Google Maps API is on the page.
+ *
+ * index.html loads Maps (with the places library) for the address autocomplete
+ * on the trip sheet, so the script is already coming. Waiting for that global
+ * rather than injecting a second loader here avoids the "Loader must not be
+ * called again with different options" clash between the two — and does not
+ * depend on a VITE_GOOGLE_API_KEY that may not be set.
+ */
+function useGoogleMapsReady() {
+    const [ready, setReady] = useState(() => Boolean(window.google?.maps));
+
+    useEffect(() => {
+        if (ready) return undefined;
+
+        const timer = setInterval(() => {
+            if (window.google?.maps) {
+                setReady(true);
+                clearInterval(timer);
+            }
+        }, 200);
+
+        return () => clearInterval(timer);
+    }, [ready]);
+
+    return ready;
+}
 
 function EmptyState({ message, icon }) {
     return (
@@ -46,19 +80,84 @@ function EmptyState({ message, icon }) {
     );
 }
 
-const polylineOptions = {
-    strokeColor: '#2563EB',
-    strokeOpacity: 0.8,
-    strokeWeight: 4,
-    fillColor: '#2563EB',
-    fillOpacity: 0.35,
+/**
+ * The driver's replies to the custom events on a stop.
+ *
+ * Renders nothing until the driver has actually answered — an empty block on
+ * every stop of every load would just be noise.
+ */
+function StopEventAnswers({ answers }) {
+    if (!answers || answers.length === 0) return null;
+
+    return (
+        <div className="mt-2.5 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-2.5">
+            <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-[#94A3B8]">
+                Driver Answers
+            </p>
+            <div className="space-y-2">
+                {answers.map((answer) => (
+                    <div key={answer.id}>
+                        <p className="text-[11px] font-semibold text-[#475569]">
+                            {answer.question}
+                        </p>
+                        {answer.answer_image_url ? (
+                            <a
+                                href={answer.answer_image_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="mt-1 inline-block"
+                            >
+                                <img
+                                    src={answer.answer_image_url}
+                                    alt={answer.question}
+                                    className="h-16 w-16 rounded border border-[#E2E8F0] object-cover"
+                                />
+                            </a>
+                        ) : (
+                            <p className="text-[11px] font-medium text-[#0F172A]">
+                                {answer.answer_value || <span className="text-[#94A3B8]">No answer</span>}
+                            </p>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+// The route the broker planned: stop to stop, dashed, deliberately quiet so the
+// road the driver actually took reads on top of it.
+const plannedRouteOptions = {
+    strokeColor: '#94A3B8',
+    strokeOpacity: 0,
+    strokeWeight: 2,
     clickable: false,
-    draggable: false,
-    editable: false,
-    visible: true,
-    radius: 30000,
-    zIndex: 1
+    zIndex: 1,
+    icons: [
+        {
+            icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.7, scale: 3 },
+            offset: '0',
+            repeat: '14px'
+        }
+    ]
 };
+
+// Where the truck has actually been, from the driver app's GPS pings.
+const driverTrailOptions = {
+    strokeColor: '#2563EB',
+    strokeOpacity: 0.9,
+    strokeWeight: 4,
+    clickable: false,
+    zIndex: 3
+};
+
+const TAB_TRIPSHEET = 0;
+const TAB_LOCATIONS = 1;
+const TAB_DRIVER = 2;
+const TAB_LOAD = 3;
+const TAB_NOTES = 4;
+const TAB_CHAT = 5;
+const TAB_DOCS = 6;
 
 function ControlTowerShipment() {
     const { row_id: paramRowId } = useParams();
@@ -66,21 +165,18 @@ function ControlTowerShipment() {
     const [loading, setLoading] = useState(true);
     const [redirect, setRedirect] = useState(false);
     const [shipment, setShipment] = useState(false);
-    const [activeTab, setActiveTab] = useState(0);
-    const [route, setRoute] = useState([
-        { lat: 46.65725559308588, lng: -105.68787278650479 }
-    ]);
-    const [locationHistory, setLocationHistory] = useState([]);
+    const [activeTab, setActiveTab] = useState(TAB_TRIPSHEET);
+
+    // The point the broker asked to see. Drives the map camera and the info
+    // bubble; null means "frame the whole load".
+    const [focused, setFocused] = useState(null);
 
     const loadTimerRef = useRef(null);
-    const pulseTimerRef = useRef(null);
-    const lastPulseRef = useRef(false);
     const mapRef = useRef(null);
+    const mapWrapRef = useRef(null);
+    const hasFramedRef = useRef(false);
 
-    const { isLoaded } = useJsApiLoader({
-        id: 'google-map-script',
-        googleMapsApiKey: import.meta.env.VITE_GOOGLE_API_KEY
-    });
+    const isLoaded = useGoogleMapsReady();
 
     const init = async (row_id, initing) => {
         setLoading(initing);
@@ -89,122 +185,23 @@ function ControlTowerShipment() {
             const data = await apiFetch(`/shipments/${row_id}`);
 
             if (data.status) {
-                const shipmentData = data.data;
-                setShipment(shipmentData);
+                setShipment(data.data);
 
-                if (shipmentData.stops && shipmentData.stops.length > 0) {
-                    const orderedStops = [...shipmentData.stops].sort(
-                        (a, b) => a.stop_number - b.stop_number
-                    );
-
-                    const stopCoords = orderedStops
-                        .filter((stop) => stop.latitude && stop.longitude)
-                        .map((stop) => ({
-                            lat: parseFloat(stop.latitude),
-                            lng: parseFloat(stop.longitude)
-                        }));
-
-                    if (stopCoords.length > 0) {
-                        setRoute(stopCoords);
-                    }
-
-                    const stopLocationHistory = orderedStops
-                        .filter((stop) => stop.latitude && stop.longitude)
-                        .map((stop) => ({
-                            lat: parseFloat(stop.latitude),
-                            lng: parseFloat(stop.longitude),
-                            date: `${stop.start_date} ${stop.start_time}`
-                        }));
-
-                    setLocationHistory(stopLocationHistory);
-                }
-
-                if (shipmentData.status === 'in_transit' || shipmentData.status === 'draft') {
-                    if (loadTimerRef.current === null) {
-                        reloadShipment(row_id);
-                    }
-                } else if (shipmentData.status === 'delivered') {
-                    if (loadTimerRef.current) clearInterval(loadTimerRef.current);
+                // Keep a live load refreshing itself — the driver's pings and
+                // stop check-ins land while this page is open.
+                const status = data.data.status;
+                if ((status === 'in_transit' || status === 'draft') && loadTimerRef.current === null) {
+                    loadTimerRef.current = setInterval(() => init(row_id, false), 10000);
+                } else if (status === 'delivered' && loadTimerRef.current) {
+                    clearInterval(loadTimerRef.current);
                     loadTimerRef.current = null;
-                    if (pulseTimerRef.current === null) {
-                        reloadPulses(row_id);
-                    }
                 }
-
-                setLoading(false);
-            } else {
-                setLoading(false);
             }
         } catch (error) {
             console.error('Failed to load shipment:', error);
+        } finally {
             setLoading(false);
         }
-    };
-
-    const loadPulses = (row_id, initing) => {
-        setLoading(initing);
-
-        const params = new URLSearchParams({ row_id });
-        if (lastPulseRef.current !== false) {
-            params.append('last_pulse', lastPulseRef.current);
-        }
-
-        apiFetch(`/shipment/tracking/pulses?${params.toString()}`)
-            .then((data) => {
-                if (!data.status) {
-                    setLoading(false);
-                    return;
-                }
-
-                const numericCoords = data.coords.map((item) => ({
-                    lat: parseFloat(item.lat),
-                    lng: parseFloat(item.lng)
-                }));
-
-                if (lastPulseRef.current !== false) {
-                    setRoute((prev) => [...prev, ...numericCoords]);
-                } else {
-                    setRoute(numericCoords);
-                }
-
-                if (data.pulses.length > 0) {
-                    lastPulseRef.current = data.pulses[data.pulses.length - 1]['id'];
-                }
-
-                const location_history_coords = data.coords.map((item) => ({
-                    lat: parseFloat(item.lat),
-                    lng: parseFloat(item.lng),
-                    date: item.date
-                }));
-
-                if (lastPulseRef.current !== false) {
-                    setLocationHistory((prev) => [...prev, ...location_history_coords]);
-                } else {
-                    setLocationHistory(location_history_coords);
-                }
-
-                if (data.shipment.status == '4') {
-                    init(row_id, false);
-                    clearInterval(pulseTimerRef.current);
-                    pulseTimerRef.current = null;
-                }
-            })
-            .catch((err) => {
-                console.error('Failed to load pulses:', err);
-                setLoading(false);
-            });
-    };
-
-    const reloadShipment = (row_id) => {
-        loadTimerRef.current = setInterval(() => {
-            init(row_id, false);
-        }, 10000);
-    };
-
-    const reloadPulses = (row_id) => {
-        pulseTimerRef.current = setInterval(() => {
-            loadPulses(row_id, false);
-        }, 10000);
     };
 
     useEffect(() => {
@@ -216,65 +213,228 @@ function ControlTowerShipment() {
 
         return () => {
             if (loadTimerRef.current) clearInterval(loadTimerRef.current);
-            if (pulseTimerRef.current) clearInterval(pulseTimerRef.current);
             loadTimerRef.current = null;
-            pulseTimerRef.current = null;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    const orderedStops = useMemo(
+        () => [...(shipment.stops || [])].sort((a, b) => a.stop_number - b.stop_number),
+        [shipment.stops]
+    );
+
+    // The stops the broker planned, as map points.
+    const stopPoints = useMemo(
+        () =>
+            orderedStops
+                .filter((stop) => stop.latitude && stop.longitude)
+                .map((stop) => ({
+                    id: stop.id,
+                    lat: parseFloat(stop.latitude),
+                    lng: parseFloat(stop.longitude),
+                    stop_number: stop.stop_number,
+                    stop_type: stop.stop_type,
+                    stop_name: stop.stop_name
+                })),
+        [orderedStops]
+    );
+
+    // The GPS trail from the driver app, oldest first.
+    const driverPath = useMemo(
+        () =>
+            (shipment.location_pings || [])
+                .map((ping) => ({ lat: Number(ping.lat), lng: Number(ping.lng) }))
+                .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng)),
+        [shipment.location_pings]
+    );
+
+    // Same pings, shaped for the clickable Location History table.
+    const locationHistory = useMemo(
+        () =>
+            (shipment.location_pings || []).map((ping) => ({
+                id: ping.id,
+                lat: Number(ping.lat),
+                lng: Number(ping.lng),
+                accuracy: ping.accuracy,
+                date: ping.recorded_at || ping.created_at
+            })),
+        [shipment.location_pings]
+    );
+
+    const latestPing = locationHistory.length > 0 ? locationHistory[locationHistory.length - 1] : null;
+
+    // Where the driver said they arrived at each stop — usually a few metres
+    // off the planned pin, which is exactly what a broker wants to compare.
+    const arrivalPoints = useMemo(
+        () =>
+            orderedStops
+                .filter((stop) => stop.progress?.arrival_lat && stop.progress?.arrival_lng)
+                .map((stop) => ({
+                    id: `arrival-${stop.id}`,
+                    lat: Number(stop.progress.arrival_lat),
+                    lng: Number(stop.progress.arrival_lng),
+                    stop_number: stop.stop_number,
+                    stop_type: stop.stop_type,
+                    arrived_at: stop.progress.arrived_at
+                }))
+                .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng)),
+        [orderedStops]
+    );
+
+    // Every photo the driver app captured on this load — equipment shots,
+    // proof-of-delivery photos, and any images attached to event answers —
+    // each carrying a label so it reads clearly in the Documents tab.
+    const driverImages = useMemo(() => {
+        const images = [];
+        const equipment = shipment.equipment_verification;
+
+        if (equipment?.vin_image_url) {
+            images.push({ label: 'VIN Plate', url: equipment.vin_image_url });
+        }
+        if (equipment?.tractor_image_url) {
+            images.push({ label: 'Tractor Photo', url: equipment.tractor_image_url });
+        }
+        if (equipment?.trailer_image_url) {
+            images.push({ label: 'Trailer Photo', url: equipment.trailer_image_url });
+        }
+
+        if (shipment.journey?.pod_image_url) {
+            images.push({ label: 'Proof of Delivery', url: shipment.journey.pod_image_url });
+        }
+
+        orderedStops.forEach((stop) => {
+            if (stop.progress?.pod_image_url) {
+                images.push({
+                    label: `Proof of Delivery — Stop ${stop.stop_number}`,
+                    url: stop.progress.pod_image_url
+                });
+            }
+            (stop.event_answers || []).forEach((answer) => {
+                if (answer.answer_image_url) {
+                    images.push({
+                        label: `${answer.question} — Stop ${stop.stop_number}`,
+                        url: answer.answer_image_url
+                    });
+                }
+            });
+        });
+
+        return images;
+    }, [shipment.equipment_verification, shipment.journey, orderedStops]);
+
+    const mapCenter = focused || latestPing || stopPoints[0] || FALLBACK_CENTER;
+
+    /**
+     * Put a coordinate under the broker's nose.
+     *
+     * Called from the Location History rows and from every recorded coordinate
+     * in the Driver tab. The map lives above the tabs, so it is scrolled back
+     * into view — clicking a row and seeing nothing move would feel broken.
+     */
+    const focusLocation = (point) => {
+        if (!point || !Number.isFinite(Number(point.lat)) || !Number.isFinite(Number(point.lng))) return;
+
+        const target = {
+            ...point,
+            lat: Number(point.lat),
+            lng: Number(point.lng)
+        };
+
+        setFocused(target);
+
+        if (mapRef.current) {
+            mapRef.current.panTo({ lat: target.lat, lng: target.lng });
+            if ((mapRef.current.getZoom() ?? 0) < 15) mapRef.current.setZoom(16);
+        }
+
+        mapWrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+
+    /** Frame everything: the planned stops and the road actually driven. */
+    const fitToLoad = (map = mapRef.current) => {
+        if (!map || !window.google) return;
+
+        const points = [...driverPath, ...stopPoints, ...arrivalPoints];
+        if (points.length === 0) return;
+
+        if (points.length === 1) {
+            map.setCenter(points[0]);
+            map.setZoom(15);
+            return;
+        }
+
+        const bounds = new window.google.maps.LatLngBounds();
+        points.forEach((point) => bounds.extend({ lat: point.lat, lng: point.lng }));
+        map.fitBounds(bounds);
+    };
+
     const handleMapLoad = (map) => {
         mapRef.current = map;
-        if (route.length > 1 && window.google) {
-            const bounds = new window.google.maps.LatLngBounds();
-            route.forEach((point) => bounds.extend(point));
-            map.fitBounds(bounds);
-        }
+        if (!focused) fitToLoad(map);
     };
+
+    // Frame the load once its data has arrived — on first load the map mounts
+    // before the fetch resolves, so onLoad alone has nothing to fit.
+    useEffect(() => {
+        if (hasFramedRef.current || focused) return;
+        if (driverPath.length === 0 && stopPoints.length === 0) return;
+
+        fitToLoad();
+        hasFramedRef.current = true;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [driverPath.length, stopPoints.length]);
 
     if (redirect !== false) {
         return <Navigate to={redirect} />;
     }
 
-    let matchedDriverName = shipment.driver_phone_1
-        ? (shipment.driver_type === 'company_driver' ? 'Company Driver' : 'Driver')
-        : 'Unassigned';
-    let latestStatusLabel = shipment.status
+    // The driver app knows who is actually running the load; the shipment only
+    // holds the phone number the broker typed. Prefer the former.
+    const driverName =
+        shipment.driver?.name ||
+        (shipment.driver_phone_1
+            ? shipment.driver_type === 'company_driver'
+                ? 'Company Driver'
+                : 'Driver'
+            : 'Unassigned');
+    const driverPhone =
+        shipment.driver?.phone || `${shipment.country_code || ''} ${shipment.driver_phone_1 || ''}`.trim();
+    const latestStatusLabel = shipment.status
         ? shipment.status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
         : 'Unknown Status';
 
     return (
-        <div className="min-h-screen bg-[#F4F5F1] px-8 py-5 md:px-14 antialiased text-[#1E293B]">
+        <div className="min-h-screen bg-[#F4F5F1] px-4 py-5 sm:px-6 md:px-8 lg:px-14 antialiased text-[#1E293B]">
 
-            <div className="mb-6">
-                <h1 className="text-[32px] font-semibold tracking-tight text-slate-900">Control Tower</h1>
-                <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-slate-500">
+            <div className="mb-5 sm:mb-6">
+                <h1 className="text-[24px] sm:text-[28px] lg:text-[32px] font-semibold tracking-tight text-slate-900">Control Tower</h1>
+                <p className="mt-2 max-w-2xl text-sm sm:text-[15px] leading-relaxed text-slate-500">
                     Enter carrier details to activate live telemetry and predictive delivery windows.
                 </p>
             </div>
 
             {loading ? (
                 <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5">
                         <Skeleton variant="rounded" height={140} className="rounded-2xl" />
                         <Skeleton variant="rounded" height={140} className="rounded-2xl" />
                         <Skeleton variant="rounded" height={140} className="rounded-2xl" />
                         <Skeleton variant="rounded" height={140} className="rounded-2xl" />
                     </div>
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6">
                         <Skeleton variant="rounded" height={400} className="lg:col-span-1 rounded-2xl" />
                         <Skeleton variant="rounded" height={400} className="lg:col-span-2 rounded-2xl" />
                     </div>
                 </div>
             ) : (
-                <div className="space-y-6">
+                <div className="space-y-5 sm:space-y-6">
 
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-stretch">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-12 gap-4 sm:gap-5 items-stretch">
 
-                        <div className="bg-white p-6 rounded-2xl border border-[#E2E8F0] shadow-sm md:col-span-5 flex flex-col justify-between min-h-[180px]">
+                        <div className="bg-white p-5 sm:p-6 rounded-2xl border border-[#E2E8F0] shadow-sm sm:col-span-2 xl:col-span-5 flex flex-col justify-between min-h-[180px]">
                             <div>
-                                <div className="flex items-center gap-2.5">
-                                    <h2 className="text-xl font-bold text-[#0F172A]">
+                                <div className="flex items-center gap-2.5 flex-wrap">
+                                    <h2 className="text-xl font-bold text-[#0F172A] break-words">
                                         #{shipment.shipment_no}
                                     </h2>
 
@@ -296,11 +456,11 @@ function ControlTowerShipment() {
                             </div>
                         </div>
 
-                        <div className="bg-white p-6 rounded-2xl border border-[#E2E8F0] shadow-sm md:col-span-2 flex flex-col justify-between min-h-[150px]">
+                        <div className="bg-white p-5 sm:p-6 rounded-2xl border border-[#E2E8F0] shadow-sm xl:col-span-2 flex flex-col justify-between min-h-[150px]">
                             <div>
                                 <span className="text-[10px] font-bold uppercase tracking-widest text-[#94A3B8]">Carrier</span>
-                                <h3 className="text-sm font-bold text-[#0F172A] mt-1.5 leading-snug">
-                                    {shipment.carrier_name || 'Unassigned'}
+                                <h3 className="text-sm font-bold text-[#0F172A] mt-1.5 leading-snug break-words">
+                                    {shipment.carrier_name || shipment.driver?.carrier_name || 'Unassigned'}
                                 </h3>
                             </div>
                             <div className="text-[#94A3B8] flex justify-start">
@@ -308,12 +468,12 @@ function ControlTowerShipment() {
                             </div>
                         </div>
 
-                        <div className="bg-white p-6 rounded-2xl border border-[#E2E8F0] shadow-sm md:col-span-3 flex flex-col justify-between min-h-[150px]">
+                        <div className="bg-white p-5 sm:p-6 rounded-2xl border border-[#E2E8F0] shadow-sm xl:col-span-3 flex flex-col justify-between min-h-[150px]">
                             <div>
                                 <span className="text-[10px] font-bold uppercase tracking-widest text-[#94A3B8]">Driver Contact</span>
-                                <h3 className="text-sm font-bold text-[#0F172A] mt-1.5">{matchedDriverName}</h3>
+                                <h3 className="text-sm font-bold text-[#0F172A] mt-1.5">{driverName}</h3>
                                 <p className="text-xs text-[#64748B] mt-1.5 font-medium">
-                                    {shipment.country_code || ''} {shipment.driver_phone_1 || 'No Phone Link'}
+                                    {driverPhone || 'No Phone Link'}
                                 </p>
                                 {shipment.tracking_number && (
                                     <p className="text-[11px] text-[#94A3B8] mt-1 font-medium">
@@ -326,16 +486,27 @@ function ControlTowerShipment() {
                             </div>
                         </div>
 
-                        <div className="bg-white p-6 rounded-2xl border border-[#E2E8F0] shadow-sm md:col-span-2 flex flex-col justify-between min-h-[150px]">
+                        <div className="bg-white p-5 sm:p-6 rounded-2xl border border-[#E2E8F0] shadow-sm xl:col-span-2 flex flex-col justify-between min-h-[150px]">
                             <div>
-                                <span className="text-[10px] font-bold uppercase tracking-widest text-[#94A3B8]">Tracking Method</span>
-                                <h3 className="text-sm font-bold text-[#0F172A] mt-1.5 leading-snug">
-                                    {shipment.tracking_method
-                                        ? shipment.tracking_method.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-                                        : 'Not Set'}
-                                </h3>
-                                {shipment.truck_number && (
-                                    <p className="text-xs text-[#64748B] mt-1.5 font-medium">Truck: <span className="text-[#334155] font-semibold">{shipment.truck_number}</span></p>
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-[#94A3B8]">Last Position</span>
+                                {latestPing ? (
+                                    <>
+                                        <h3 className="text-sm font-bold text-[#0F172A] mt-1.5 leading-snug">
+                                            {latestPing.date}
+                                        </h3>
+                                        <button
+                                            type="button"
+                                            onClick={() => focusLocation({ ...latestPing, title: 'Latest position' })}
+                                            className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-bold text-[#2563EB]"
+                                        >
+                                            <MyLocationIcon sx={{ fontSize: 13 }} /> Show on map
+                                        </button>
+                                        <p className="text-[11px] text-[#94A3B8] mt-1 font-medium">
+                                            {shipment.location_ping_count} ping{shipment.location_ping_count === 1 ? '' : 's'}
+                                        </p>
+                                    </>
+                                ) : (
+                                    <h3 className="text-sm font-bold text-[#94A3B8] mt-1.5 leading-snug">No pings yet</h3>
                                 )}
                             </div>
                             <div className="text-[#94A3B8] flex justify-start">
@@ -344,96 +515,243 @@ function ControlTowerShipment() {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-start">
 
-                        <div className="bg-white p-6 rounded-2xl border border-[#E2E8F0] shadow-sm lg:col-span-4 flex flex-col sticky top-6 self-start">
-                            <h3 className="text-base font-bold text-[#0F172A] mb-6 tracking-tight">Progress Tracker</h3>
+                        <div className="bg-white p-5 sm:p-6 rounded-2xl border border-[#E2E8F0] shadow-sm lg:col-span-4 flex flex-col lg:sticky lg:top-6 self-start">
+                            <h3 className="text-base font-bold text-[#0F172A] mb-5 sm:mb-6 tracking-tight">Progress Tracker</h3>
 
-                            {!shipment.stops || shipment.stops.length === 0 ? (
+                            {orderedStops.length === 0 ? (
                                 <EmptyState message="Stop data not available." icon={<ListAltOutlinedIcon sx={{ fontSize: 28 }} />} />
                             ) : (
                                 <div className="relative pl-8 border-l border-[#E2E8F0] space-y-6 ml-4 my-auto">
-                                    {[...shipment.stops]
-                                        .sort((a, b) => a.stop_number - b.stop_number)
-                                        .map((stop, index, sortedStops) => {
-                                            const isCompleted =
-                                                shipment.status === 'delivered' ||
-                                                (shipment.status === 'in_transit' && index < sortedStops.length - 1);
-                                            const isActive =
-                                                shipment.status === 'in_transit' && index === sortedStops.length - 1;
+                                    {orderedStops.map((stop) => {
+                                        // The driver app is the source of truth here: a stop is
+                                        // done when they completed it, and current when they have
+                                        // arrived but not finished.
+                                        const isCompleted = Boolean(stop.progress?.completed_at);
+                                        const isActive = Boolean(stop.progress?.arrived_at) && !isCompleted;
 
-                                            return (
-                                                <div className="relative" key={stop.id}>
-                                                    {isCompleted ? (
-                                                        <div className="absolute -left-[45px] top-0 w-6 h-6 rounded-full bg-[#001A48] flex items-center justify-center z-10 border border-[#001A48]">
-                                                            <CheckIcon style={{ fontSize: '14px', color: '#FFFFFF' }} />
+                                        return (
+                                            <div className="relative" key={stop.id}>
+                                                {isCompleted ? (
+                                                    <div className="absolute -left-[45px] top-0 w-6 h-6 rounded-full bg-[#001A48] flex items-center justify-center z-10 border border-[#001A48]">
+                                                        <CheckIcon style={{ fontSize: '14px', color: '#FFFFFF' }} />
+                                                    </div>
+                                                ) : isActive ? (
+                                                    <div className="absolute -left-[45px] top-0 w-6 h-6 rounded-full bg-[#6366F1] flex items-center justify-center z-10 border border-[#6366F1] ring-4 ring-[#EEF2FF]">
+                                                        <LocalShippingIcon style={{ fontSize: '12px', color: '#FFFFFF' }} />
+                                                    </div>
+                                                ) : (
+                                                    <div className="absolute -left-[41px] top-1.5 w-3 h-3 rounded-full bg-white border-2 border-[#CBD5E1] z-10"></div>
+                                                )}
+
+                                                <div>
+                                                    <span className={`text-xs font-bold uppercase tracking-wider block ${isActive ? 'text-[#6366F1]' : 'text-[#0F172A]'}`}>
+                                                        Stop {stop.stop_number} — {stop.stop_type}
+                                                    </span>
+                                                    <span className={`text-xs mt-0.5 block font-semibold ${isActive ? 'text-[#334155]' : 'text-[#64748B]'}`}>
+                                                        {stop.stop_name}
+                                                    </span>
+                                                    <span className="text-[11px] mt-0.5 block text-[#94A3B8] font-medium">
+                                                        {stop.city}, {stop.state} {stop.zipcode}
+                                                    </span>
+                                                    {stop.start_date && (
+                                                        <div className="flex items-center gap-1.5 mt-1 text-[11px] text-[#94A3B8] font-medium">
+                                                            <CalendarMonthIcon style={{ fontSize: '13px', color: '#CBD5E1' }} />
+                                                            <span>
+                                                                {stop.start_date} {stop.start_time}
+                                                                {stop.end_date ? ` → ${stop.end_date} ${stop.end_time || ''}` : ''}
+                                                            </span>
                                                         </div>
-                                                    ) : isActive ? (
-                                                        <div className="absolute -left-[45px] top-0 w-6 h-6 rounded-full bg-[#6366F1] flex items-center justify-center z-10 border border-[#6366F1] ring-4 ring-[#EEF2FF]">
-                                                            <LocalShippingIcon style={{ fontSize: '12px', color: '#FFFFFF' }} />
-                                                        </div>
-                                                    ) : (
-                                                        <div className="absolute -left-[41px] top-1.5 w-3 h-3 rounded-full bg-white border-2 border-[#CBD5E1] z-10"></div>
                                                     )}
 
-                                                    <div>
-                                                        <span className={`text-xs font-bold uppercase tracking-wider block ${isActive ? 'text-[#6366F1]' : 'text-[#0F172A]'}`}>
-                                                            Stop {stop.stop_number} — {stop.stop_type}
-                                                        </span>
-                                                        <span className={`text-xs mt-0.5 block font-semibold ${isActive ? 'text-[#334155]' : 'text-[#64748B]'}`}>
-                                                            {stop.stop_name}
-                                                        </span>
-                                                        <span className="text-[11px] mt-0.5 block text-[#94A3B8] font-medium">
-                                                            {stop.city}, {stop.state} {stop.zipcode}
-                                                        </span>
-                                                        {stop.start_date && (
-                                                            <div className="flex items-center gap-1.5 mt-1 text-[11px] text-[#94A3B8] font-medium">
-                                                                <CalendarMonthIcon style={{ fontSize: '13px', color: '#CBD5E1' }} />
-                                                                <span>{stop.start_date} {stop.start_time}</span>
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                                    {/* When the driver actually got there, against the plan above. */}
+                                                    {stop.progress?.arrived_at && (
+                                                        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                                                            <span className="rounded bg-[#DCFCE7] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#15803D]">
+                                                                Arrived {stop.progress.arrived_at}
+                                                            </span>
+                                                            {stop.progress.arrival_lat && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        focusLocation({
+                                                                            lat: stop.progress.arrival_lat,
+                                                                            lng: stop.progress.arrival_lng,
+                                                                            title: `Stop ${stop.stop_number} arrival`,
+                                                                            subtitle: stop.progress.arrived_at
+                                                                        })
+                                                                    }
+                                                                    className="inline-flex items-center gap-1 text-[10px] font-bold text-[#2563EB]"
+                                                                >
+                                                                    <MyLocationIcon sx={{ fontSize: 12 }} /> Locate
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    {/* What the driver answered to the custom
+                                                        events added to this stop. Absent until
+                                                        they reach it. */}
+                                                    <StopEventAnswers answers={stop.event_answers} />
                                                 </div>
-                                            );
-                                        })}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
 
-                        <div className="lg:col-span-8 space-y-6">
+                        <div className="lg:col-span-8 space-y-5 sm:space-y-6">
 
-                            <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden relative h-[440px]">
+                            <div
+                                ref={mapWrapRef}
+                                className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden relative h-[320px] sm:h-[380px] lg:h-[440px]"
+                            >
                                 {isLoaded ? (
-                                    <GoogleMap
-                                        mapContainerStyle={containerStyle}
-                                        center={route[0]}
-                                        zoom={route.length > 1 ? 10 : 14}
-                                        onLoad={handleMapLoad}
-                                    >
-                                        <Polyline
-                                            path={route}
-                                            options={polylineOptions}
-                                        />
-                                        {shipment.stops && [...shipment.stops]
-                                            .sort((a, b) => a.stop_number - b.stop_number)
-                                            .filter((stop) => stop.latitude && stop.longitude)
-                                            .map((stop) => (
+                                    <>
+                                        <GoogleMap
+                                            mapContainerStyle={containerStyle}
+                                            center={mapCenter}
+                                            zoom={driverPath.length > 1 || stopPoints.length > 1 ? 10 : 14}
+                                            onLoad={handleMapLoad}
+                                            options={{ streetViewControl: false, mapTypeControl: false }}
+                                        >
+                                            {/* The plan */}
+                                            {stopPoints.length > 1 && (
+                                                <Polyline path={stopPoints} options={plannedRouteOptions} />
+                                            )}
+
+                                            {/* What actually happened */}
+                                            {driverPath.length > 1 && (
+                                                <Polyline path={driverPath} options={driverTrailOptions} />
+                                            )}
+
+                                            {stopPoints.map((stop) => (
                                                 <Marker
                                                     key={stop.id}
-                                                    position={{
-                                                        lat: parseFloat(stop.latitude),
-                                                        lng: parseFloat(stop.longitude)
-                                                    }}
+                                                    position={{ lat: stop.lat, lng: stop.lng }}
                                                     label={{
                                                         text: String(stop.stop_number),
                                                         color: '#FFFFFF',
                                                         fontSize: '11px',
                                                         fontWeight: 'bold'
                                                     }}
-                                                    title={`${stop.stop_type}: ${stop.stop_name}`}
+                                                    title={`${stop.stop_type}: ${stop.stop_name || ''}`}
+                                                    onClick={() =>
+                                                        focusLocation({
+                                                            lat: stop.lat,
+                                                            lng: stop.lng,
+                                                            title: `Stop ${stop.stop_number} — ${stop.stop_type}`,
+                                                            subtitle: stop.stop_name
+                                                        })
+                                                    }
                                                 />
                                             ))}
-                                    </GoogleMap>
+
+                                            {/* Where the driver checked in */}
+                                            {arrivalPoints.map((point) => (
+                                                <Marker
+                                                    key={point.id}
+                                                    position={{ lat: point.lat, lng: point.lng }}
+                                                    title={`Arrived at stop ${point.stop_number}: ${point.arrived_at}`}
+                                                    icon={{
+                                                        path: window.google.maps.SymbolPath.CIRCLE,
+                                                        scale: 7,
+                                                        fillColor: '#16A34A',
+                                                        fillOpacity: 1,
+                                                        strokeColor: '#FFFFFF',
+                                                        strokeWeight: 2
+                                                    }}
+                                                    onClick={() =>
+                                                        focusLocation({
+                                                            lat: point.lat,
+                                                            lng: point.lng,
+                                                            title: `Stop ${point.stop_number} arrival`,
+                                                            subtitle: point.arrived_at
+                                                        })
+                                                    }
+                                                />
+                                            ))}
+
+                                            {/* Latest reported position */}
+                                            {latestPing && (
+                                                <Marker
+                                                    position={{ lat: latestPing.lat, lng: latestPing.lng }}
+                                                    title={`Last seen ${latestPing.date}`}
+                                                    zIndex={999}
+                                                    icon={{
+                                                        path: window.google.maps.SymbolPath.CIRCLE,
+                                                        scale: 9,
+                                                        fillColor: '#2563EB',
+                                                        fillOpacity: 1,
+                                                        strokeColor: '#FFFFFF',
+                                                        strokeWeight: 3
+                                                    }}
+                                                    onClick={() =>
+                                                        focusLocation({ ...latestPing, title: 'Latest position' })
+                                                    }
+                                                />
+                                            )}
+
+                                            {focused && (
+                                                <InfoWindow
+                                                    position={{ lat: focused.lat, lng: focused.lng }}
+                                                    onCloseClick={() => setFocused(null)}
+                                                >
+                                                    <div className="min-w-[150px] px-0.5 py-0.5">
+                                                        <p className="text-[12px] font-bold text-[#0F172A]">
+                                                            {focused.title || 'Reported position'}
+                                                        </p>
+                                                        {focused.subtitle && (
+                                                            <p className="mt-0.5 text-[11px] font-medium text-[#475569]">
+                                                                {focused.subtitle}
+                                                            </p>
+                                                        )}
+                                                        {focused.date && (
+                                                            <p className="mt-0.5 text-[11px] font-medium text-[#475569]">
+                                                                {focused.date}
+                                                            </p>
+                                                        )}
+                                                        <p className="mt-1 font-mono text-[10px] text-[#64748B]">
+                                                            {focused.lat.toFixed(6)}, {focused.lng.toFixed(6)}
+                                                        </p>
+                                                        {focused.accuracy != null && (
+                                                            <p className="text-[10px] font-medium text-[#94A3B8]">
+                                                                accurate to ±{Math.round(focused.accuracy)} m
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </InfoWindow>
+                                            )}
+                                        </GoogleMap>
+
+                                        {/* Legend, plus a way back out of a focused point. */}
+                                        <div className="pointer-events-none absolute bottom-3 left-3 right-3 sm:right-auto flex flex-wrap items-center gap-2 sm:gap-3 rounded-xl bg-white/95 px-2.5 sm:px-3 py-2 shadow-sm backdrop-blur">
+                                            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-[#475569]">
+                                                <span className="h-0.5 w-4 bg-[#2563EB]" /> Driver trail
+                                            </span>
+                                            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-[#475569]">
+                                                <span className="h-0.5 w-4 border-t-2 border-dashed border-[#94A3B8]" /> Planned
+                                            </span>
+                                            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-[#475569]">
+                                                <span className="h-2 w-2 rounded-full bg-[#16A34A]" /> Arrival
+                                            </span>
+                                        </div>
+
+                                        {focused && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setFocused(null);
+                                                    fitToLoad();
+                                                }}
+                                                className="absolute top-3 right-3 rounded-xl bg-white/95 px-2.5 sm:px-3 py-2 text-[11px] font-bold text-[#0F172A] shadow-sm backdrop-blur hover:bg-white"
+                                            >
+                                                Fit whole route
+                                            </button>
+                                        )}
+                                    </>
                                 ) : (
                                     <div className="w-full h-full bg-[#F1F5F9] animate-pulse" />
                                 )}
@@ -472,68 +790,119 @@ function ControlTowerShipment() {
                                         }}
                                     >
                                         <Tab label="Tripsheet" icon={<ListAltOutlinedIcon style={{ fontSize: '16px' }} />} iconPosition="start" />
-                                        <Tab label="Location History" icon={<ReceiptIcon style={{ fontSize: '16px' }} />} iconPosition="start" />
+                                        <Tab
+                                            label={`Location History${locationHistory.length ? ` (${locationHistory.length})` : ''}`}
+                                            icon={<ReceiptIcon style={{ fontSize: '16px' }} />}
+                                            iconPosition="start"
+                                        />
+                                        <Tab label="Driver App" icon={<BadgeOutlinedIcon style={{ fontSize: '16px' }} />} iconPosition="start" />
                                         <Tab label="Load Details" icon={<DnsOutlinedIcon style={{ fontSize: '16px' }} />} iconPosition="start" />
                                         <Tab label="Notes" icon={<RateReviewOutlinedIcon style={{ fontSize: '16px' }} />} iconPosition="start" />
+                                        <Tab label="Driver Chat" icon={<ChatBubbleOutlineIcon style={{ fontSize: '16px' }} />} iconPosition="start" />
+                                        <Tab label="Documents" icon={<ReceiptLongIcon style={{ fontSize: '16px' }} />} iconPosition="start" />
                                     </Tabs>
                                 </div>
 
-                                <div className="p-6">
-                                    {activeTab === 0 && (
-                                        <ShipmentStops shipment={shipment} />
+                                <div className="p-4 sm:p-6">
+                                    {activeTab === TAB_TRIPSHEET && <ShipmentStops shipment={shipment} />}
+
+                                    {activeTab === TAB_LOCATIONS && (
+                                        <LocationHistory
+                                            location_history={locationHistory}
+                                            onSelect={(point) => focusLocation({ ...point, title: 'Reported position' })}
+                                            selectedId={focused?.id}
+                                        />
                                     )}
 
-                                    {activeTab === 1 && (
-                                        <>
-                                            {locationHistory.length > 0 ? (
-                                                <LocationHistory location_history={locationHistory} />
-                                            ) : (
-                                                <NoData size="small" message="Data not available." icon={<ReceiptIcon />} />
-                                            )}
-                                        </>
+                                    {activeTab === TAB_DRIVER && (
+                                        <DriverActivity shipment={shipment} onFocusLocation={focusLocation} />
                                     )}
 
-                                    {activeTab === 2 && (
+                                    {activeTab === TAB_LOAD && (
                                         <Box className="p-1">
                                             <ShipmentDetails shipment={shipment} />
                                         </Box>
                                     )}
 
-                                    {activeTab === 3 && (
+                                    {activeTab === TAB_NOTES && (
                                         <Box className="p-1">
                                             {shipment.notes ? (
                                                 <p className="text-sm text-[#475569] bg-[#F8F9FA] p-5 rounded-xl border border-[#E2E8F0] leading-relaxed font-medium">
                                                     {(shipment.notes || '').replace(/<[^>]*>/g, '').trim()}
                                                 </p>
                                             ) : (
-                                                <NoData size="small" message="Notes not available." icon={<RateReviewOutlinedIcon />} />
+                                                <EmptyState message="Notes not available." icon={<RateReviewOutlinedIcon sx={{ fontSize: 28 }} />} />
                                             )}
                                         </Box>
                                     )}
 
-                                    {activeTab === 4 && (
-                                        <NoData size="small" message="Status data not available." icon={<ChecklistOutlinedIcon />} />
+                                    {activeTab === TAB_CHAT && (
+                                        <Box className="p-1">
+                                            <ShipmentChat
+                                                shipmentUuid={shipment.uuid}
+                                                driverName={driverName}
+                                            />
+                                        </Box>
                                     )}
 
-                                    {activeTab === 5 && (
+                                    {activeTab === TAB_DOCS && (
                                         <Box className="p-1">
-                                            {shipment.documents?.length > 0 ? (
-                                                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-4">
-                                                    {shipment.documents.map((doc, idx) => (
-                                                        <a
-                                                            key={idx}
-                                                            href={doc.document_url}
-                                                            target="_blank"
-                                                            rel="noreferrer"
-                                                            className="flex flex-col items-center justify-center p-5 bg-[#F8F9FA] border border-[#E2E8F0] rounded-xl hover:bg-[#F1F5F9] transition text-[#94A3B8] hover:text-[#475569]"
-                                                        >
-                                                            <AttachFileIcon className="mb-1.5" style={{ fontSize: '20px' }} />
-                                                            <span className="text-[11px] font-bold text-[#64748B]">Document {idx + 1}</span>
-                                                        </a>
-                                                    ))}
+                                            {shipment.documents?.length > 0 || driverImages.length > 0 ? (
+                                                <div className="space-y-6">
+                                                    {shipment.documents?.length > 0 && (
+                                                        <div>
+                                                            <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-[#94A3B8]">
+                                                                Uploaded Documents
+                                                            </p>
+                                                            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-4">
+                                                                {shipment.documents.map((doc, idx) => (
+                                                                    <a
+                                                                        key={idx}
+                                                                        href={doc.document_url}
+                                                                        target="_blank"
+                                                                        rel="noreferrer"
+                                                                        className="flex flex-col items-center justify-center p-5 bg-[#F8F9FA] border border-[#E2E8F0] rounded-xl hover:bg-[#F1F5F9] transition text-[#94A3B8] hover:text-[#475569]"
+                                                                    >
+                                                                        <AttachFileIcon className="mb-1.5" style={{ fontSize: '20px' }} />
+                                                                        <span className="text-[11px] font-bold text-[#64748B]">Document {idx + 1}</span>
+                                                                    </a>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {driverImages.length > 0 && (
+                                                        <div>
+                                                            <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-[#94A3B8]">
+                                                                Driver App Photos
+                                                            </p>
+                                                            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-4">
+                                                                {driverImages.map((img, idx) => (
+                                                                    <a
+                                                                        key={idx}
+                                                                        href={img.url}
+                                                                        target="_blank"
+                                                                        rel="noreferrer"
+                                                                        className="group flex flex-col items-center gap-1.5"
+                                                                    >
+                                                                        <div className="h-20 w-20 overflow-hidden rounded-xl border border-[#E2E8F0] transition group-hover:border-[#93C5FD]">
+                                                                            <img
+                                                                                src={img.url}
+                                                                                alt={img.label}
+                                                                                className="h-full w-full object-cover transition group-hover:scale-105"
+                                                                            />
+                                                                        </div>
+                                                                        <span className="text-center text-[10px] font-semibold leading-tight text-[#64748B]">
+                                                                            {img.label}
+                                                                        </span>
+                                                                    </a>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             ) : (
-                                                <NoData size="small" message="Documents not available." icon={<ReceiptLongIcon />} />
+                                                <EmptyState message="Documents not available." icon={<ReceiptLongIcon sx={{ fontSize: 28 }} />} />
                                             )}
                                         </Box>
                                     )}

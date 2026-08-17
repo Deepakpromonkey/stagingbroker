@@ -11,11 +11,9 @@ const columnHelper = createColumnHelper();
 // The API doesn't return a per-stop status field yet, so this is inferred
 // from the shipment's overall status: delivered -> every stop is done,
 // in_transit -> every stop except the last is done, otherwise pending.
-function getStopStatus(shipment, index, totalStops) {
-    if (shipment.status === 'delivered') return 'Completed';
-    if (shipment.status === 'in_transit') {
-        return index < totalStops - 1 ? 'Completed' : 'In Progress';
-    }
+function getStopStatus(stop) {
+    if (stop.progress?.completed_at) return 'Completed';
+    if (stop.progress?.arrived_at) return 'In Progress';
     return 'Pending';
 }
 
@@ -102,16 +100,24 @@ function ShipmentStops({ shipment }) {
                 );
             },
         }),
-        columnHelper.display({
-            id: 'status',
-            header: 'Status',
-            cell: (info) => (
-                <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-[#EEF2FF] text-[#3730A3]">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#3730A3]" />
-                    {getStopStatus(shipment, info.row.index, sortedStops.length)}
-                </span>
-            ),
-        }),
+columnHelper.display({
+    id: 'status',
+    header: 'Status',
+    cell: (info) => {
+        const status = getStopStatus(info.row.original);
+        const styles = {
+            Completed: 'bg-[#DCFCE7] text-[#15803D]',
+            'In Progress': 'bg-[#EEF2FF] text-[#3730A3]',
+            Pending: 'bg-[#F1F5F9] text-[#64748B]',
+        };
+        return (
+            <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold ${styles[status]}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${status === 'Completed' ? 'bg-[#15803D]' : status === 'In Progress' ? 'bg-[#3730A3]' : 'bg-[#64748B]'}`} />
+                {status}
+            </span>
+        );
+    },
+}),
     ]), [shipment, sortedStops.length]);
 
     const table = useReactTable({
@@ -122,44 +128,46 @@ function ShipmentStops({ shipment }) {
 
     return (
         <div className="border border-[#E2E8F0] rounded-2xl overflow-hidden">
-            <table className="w-full border-collapse">
-                <thead>
-                    {table.getHeaderGroups().map((headerGroup) => (
-                        <tr key={headerGroup.id} className="bg-[#F8FAFC]">
-                            {headerGroup.headers.map((header) => (
-                                <th
-                                    key={header.id}
-                                    className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-[#64748B] border-b border-[#F1F5F9]"
-                                >
-                                    {flexRender(header.column.columnDef.header, header.getContext())}
-                                </th>
-                            ))}
-                        </tr>
-                    ))}
-                </thead>
-                <tbody>
-                    {sortedStops.length === 0 ? (
-                        <tr className="bg-white">
-                            {columns.map((col) => (
-                                <td key={col.id} className="px-4 py-6 text-sm text-[#64748B]">—</td>
-                            ))}
-                        </tr>
-                    ) : (
-                        table.getRowModel().rows.map((row, index) => (
-                            <tr
-                                key={row.id}
-                                className={index % 2 === 1 ? 'bg-[#F8FAFC]' : 'bg-white'}
-                            >
-                                {row.getVisibleCells().map((cell) => (
-                                    <td key={cell.id} className="px-4 py-4 align-top">
-                                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                    </td>
+            <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] sm:min-w-0 border-collapse">
+                    <thead>
+                        {table.getHeaderGroups().map((headerGroup) => (
+                            <tr key={headerGroup.id} className="bg-[#F8FAFC]">
+                                {headerGroup.headers.map((header) => (
+                                    <th
+                                        key={header.id}
+                                        className="text-left px-3 sm:px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-[#64748B] border-b border-[#F1F5F9] whitespace-nowrap"
+                                    >
+                                        {flexRender(header.column.columnDef.header, header.getContext())}
+                                    </th>
                                 ))}
                             </tr>
-                        ))
-                    )}
-                </tbody>
-            </table>
+                        ))}
+                    </thead>
+                    <tbody>
+                        {sortedStops.length === 0 ? (
+                            <tr className="bg-white">
+                                {columns.map((col) => (
+                                    <td key={col.id} className="px-3 sm:px-4 py-6 text-sm text-[#64748B]">—</td>
+                                ))}
+                            </tr>
+                        ) : (
+                            table.getRowModel().rows.map((row, index) => (
+                                <tr
+                                    key={row.id}
+                                    className={index % 2 === 1 ? 'bg-[#F8FAFC]' : 'bg-white'}
+                                >
+                                    {row.getVisibleCells().map((cell) => (
+                                        <td key={cell.id} className="px-3 sm:px-4 py-4 align-top">
+                                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                        </td>
+                                    ))}
+                                </tr>
+                            ))
+                        )}
+                    </tbody>
+                </table>
+            </div>
         </div>
     );
 }

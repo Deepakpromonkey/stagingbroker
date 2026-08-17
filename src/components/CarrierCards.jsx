@@ -1,108 +1,221 @@
 import React from 'react';
 
 import {
-    Verified,
-    GppMaybe,
     LocationOn,
     Phone,
     Email,
-    FiberManualRecord
+    FiberManualRecord,
+    Check,
+    Close,
+    Remove,
+    Badge,
+    ConfirmationNumber,
+    Fingerprint,
+    Groups,
+    Route
 } from '@mui/icons-material';
 
-function StatusBadge(props) {
+const BRAND_PRIMARY = '#2953E4';
+const BRAND_PRIMARY_DARK = '#1E3FB8';
+const BRAND_PRIMARY_TINT = '#EEF2FF';
+const BRAND_PRIMARY_BORDER = 'rgba(41,83,228,0.32)';
 
-    const isActive = props.active;
-    const type = props.type;
+const INK = '#101828';
+const SLATE = '#475569';
+const MUTED = '#667085';
+const BORDER = '#E4E7EC';
+const SURFACE = '#F9FAFB';
 
-    let icon = null;
-    let label = props.label;
+const GREEN = '#15924C';
+const GREEN_TEXT = '#15803D';
+const GREEN_TINT = '#E7FBEF';
+const GREEN_BORDER = 'rgba(21,146,76,0.38)';
 
-    let className =
-        'inline-flex items-center justify-center min-w-[165px] gap-[5px] px-[10px] py-[4px] rounded-full text-[11px] font-[700] tracking-[0.02em] whitespace-nowrap border leading-none uppercase ';
+const RED = '#DC2626';
+const RED_TEXT = '#B42318';
+const RED_TINT = '#FEECEB';
+const RED_BORDER = 'rgba(220,38,38,0.36)';
 
-    if (type === 'authority') {
+const AMBER = '#F59E0B';
+const AMBER_TEXT = '#B45309';
+const AMBER_TINT = '#FFF6E0';
+const AMBER_BORDER = 'rgba(245,158,11,0.40)';
 
-        if (isActive) {
+const NEUTRAL_TEXT = '#475569';
+const NEUTRAL_TINT = '#EEF1F5';
+const NEUTRAL_BORDER = 'rgba(71,85,105,0.30)';
 
-            icon = <Verified className='!text-[13px] !text-[#15924c]' />;
-            label = 'AUTHORITY VERIFIED';
+const SCORE_TIERS = [
+    { min: 80, label: 'STRONG', ring: '#16A34A', text: GREEN_TEXT, tint: GREEN_TINT, border: GREEN_BORDER },
+    { min: 50, label: 'MODERATE', ring: AMBER, text: AMBER_TEXT, tint: AMBER_TINT, border: AMBER_BORDER },
+    { min: 0, label: 'WEAK', ring: '#DC2626', text: '#B91C1C', tint: RED_TINT, border: RED_BORDER }
+];
 
-            className += 'bg-[#edfdf3] border-[#b7ebc6] text-[#15924c]';
-        }
-        else {
+function getScoreTier(score) {
 
-            icon = <GppMaybe className='!text-[13px] !text-[#dc2626]' />;
-            label = 'AUTHORITY UNVERIFIED';
+    const numeric = Number(score);
 
-            className += 'bg-[#fff1f1] border-[#fecaca] text-[#dc2626]';
-        }
+    if (score === undefined || score === null || score === '' || Number.isNaN(numeric)) {
+        return null;
     }
-    else if (type === 'insurance') {
 
-        if (isActive) {
-
-            icon = <Verified className='!text-[13px] !text-[#15924c]' />;
-
-            className += 'bg-[#edfdf3] border-[#b7ebc6] text-[#15924c]';
-        }
-        else {
-
-            icon = <GppMaybe className='!text-[13px] !text-[#dc2626]' />;
-
-            className += 'bg-[#fff1f1] border-[#fecaca] text-[#dc2626]';
-        }
-    }
-
-    return (
-        <span className={className}>
-            {icon}
-            {label}
-        </span>
-    );
+    return SCORE_TIERS.find(function (tier) {
+        return numeric >= tier.min;
+    });
 }
 
+function isUnratedValue(value) {
 
-function DTScoreRing(props) {
-    const size = 16;
-    const strokeWidth = 2;
+    if (value === undefined || value === null) return true;
+
+    const normalized = value.toString().trim().toLowerCase();
+
+    return normalized === '' || normalized === 'not rated' || normalized === 'unrated' || normalized === 'n/a';
+}
+
+function DTScorePanel(props) {
+
+    const score = props.score;
+    const tier = getScoreTier(score);
+
+    if (!tier) {
+
+        return (
+
+            <div className='flex flex-col items-center gap-[6px]'>
+
+                <span className='text-[9.5px] font-[800] tracking-[0.12em] text-[#98A2B3] uppercase'>
+                    DT Score
+                </span>
+
+                <div className='flex items-center justify-center w-[72px] h-[72px] rounded-full border-2 border-dashed border-[#CBD2DC] bg-white'>
+                    <Remove className='!text-[16px] text-[#98A2B3]' />
+                </div>
+
+                <span className='text-[10.5px] font-[700] text-[#98A2B3]'>
+                    Not yet scored
+                </span>
+
+            </div>
+        );
+    }
+
+    const size = 62;
+    const strokeWidth = 7;
     const radius = (size - strokeWidth) / 2;
     const circumference = 2 * Math.PI * radius;
-    const progress = Math.max(0, Math.min(100, Number(props.score) || 0));
+    const progress = Math.max(0, Math.min(100, Number(score)));
     const offset = circumference - (progress / 100) * circumference;
 
     return (
-        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className='shrink-0'>
-            <circle
-                cx={size / 2} cy={size / 2} r={radius}
-                fill='none' stroke='#e5e7eb' strokeWidth={strokeWidth}
-            />
-            <circle
-                cx={size / 2} cy={size / 2} r={radius}
-                fill='none' stroke='#2563eb' strokeWidth={strokeWidth}
-                strokeDasharray={circumference}
-                strokeDashoffset={offset}
-                strokeLinecap='round'
-                transform={`rotate(-90 ${size / 2} ${size / 2})`}
-            />
-        </svg>
+
+        <div className='flex flex-col items-center gap-[6px]'>
+
+            <span className='text-[9.5px] font-[800] tracking-[0.12em] text-[#98A2B3] uppercase'>
+                DT Score
+            </span>
+
+            <div className='relative' style={{ width: size, height: size }}>
+
+                <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className='-rotate-90'>
+
+                    <circle
+                        cx={size / 2} cy={size / 2} r={radius}
+                        fill='white' stroke='#E4E7EC' strokeWidth={strokeWidth}
+                    />
+
+                    <circle
+                        cx={size / 2} cy={size / 2} r={radius}
+                        fill='none' stroke={tier.ring} strokeWidth={strokeWidth}
+                        strokeDasharray={circumference}
+                        strokeDashoffset={offset}
+                        strokeLinecap='round'
+                    />
+
+                </svg>
+
+                <div className='absolute inset-0 flex flex-col items-center justify-center'>
+                    <span className='text-[20px] font-[800] leading-none tracking-[-0.01em]' style={{ color: INK }}>
+                        {score}
+                    </span>
+                    <span className='text-[8.5px] font-[600] text-[#98A2B3] mt-[1px]'>/ 100</span>
+                </div>
+
+            </div>
+
+            <span
+                className='text-[9.5px] font-[800] tracking-[0.05em] uppercase px-[8px] py-[2px] rounded-full'
+                style={{ color: tier.text, background: 'white', border: `1px solid ${tier.border}` }}
+            >
+                {tier.label}
+            </span>
+
+        </div>
     );
 }
 
-function DTScoreValue(props) {
-    const value = props.value;
+function CheckRow(props) {
 
-    if (value === undefined || value === null || value === '') {
-        return <div className='text-[13px] font-[600] text-[#374151]'>-</div>;
-    }
+    const active = props.active;
+    const label = props.label;
 
     return (
-        <div className='flex items-center gap-[6px]'>
-            <span className='text-[13px] font-[700] text-[#2563eb]'>
-                {value}
-                <span className='text-[11px] font-[400] text-[#6b7280]'>/100</span>
+
+        <div
+            className='w-full flex items-center justify-between gap-[8px] text-[10.5px] font-[700] px-[10px] py-[7px] rounded-[9px] whitespace-nowrap'
+            style={{
+                color: active ? GREEN_TEXT : RED_TEXT,
+                background: 'white',
+                border: `1px solid ${active ? GREEN_BORDER : RED_BORDER}`
+            }}
+        >
+
+            <span>{label}</span>
+
+            <span
+                className='flex items-center justify-center w-[16px] h-[16px] rounded-full shrink-0 text-white'
+                style={{ background: active ? GREEN : RED }}
+            >
+                {active
+                    ? <Check className='!text-[10px]' />
+                    : <Close className='!text-[10px]' />
+                }
             </span>
-            <DTScoreRing score={value} />
+
         </div>
+    );
+}
+
+function RiskButton(props) {
+
+    const rawRisk = props.risk;
+
+    if (isUnratedValue(rawRisk)) {
+
+        return (
+            <span
+                className='w-full text-center px-[9px] py-[8px] rounded-full text-[10px] font-[800] tracking-[0.05em] uppercase'
+                style={{ color: NEUTRAL_TEXT, background: 'white', border: `1px solid ${NEUTRAL_BORDER}` }}
+            >
+                Not rated
+            </span>
+        );
+    }
+
+    const risk = rawRisk.toLowerCase();
+
+    let text = AMBER_TEXT, border = AMBER_BORDER;
+
+    if (risk.includes('low')) { text = GREEN_TEXT; border = GREEN_BORDER; }
+    else if (risk.includes('high')) { text = RED_TEXT; border = RED_BORDER; }
+
+    return (
+        <span
+            className='w-full text-center px-[9px] py-[8px] rounded-full text-[10px] font-[800] tracking-[0.05em] uppercase'
+            style={{ color: text, background: 'white', border: `1px solid ${border}` }}
+        >
+            {rawRisk}
+        </span>
     );
 }
 
@@ -112,74 +225,103 @@ function CarrierOperationTag(props) {
 
     const tags = [];
 
-    const hasIntrastate =
-        value.includes('B') || value.includes('C');
+    const hasIntrastate = value.includes('B') || value.includes('C');
 
     if (value.includes('A')) {
-
-        tags.push({
-            label: 'INTERSTATE',
-            bg: 'bg-[#eef4ff]',
-            border: 'border-[#c7dbff]',
-            text: 'text-[#2563eb]',
-            dot: '#2563eb'
-        });
+        tags.push({ label: 'INTERSTATE', text: BRAND_PRIMARY_DARK, tint: BRAND_PRIMARY_TINT, border: BRAND_PRIMARY_BORDER });
     }
 
     if (hasIntrastate) {
-
-        tags.push({
-            label: 'INTRASTATE',
-            bg: 'bg-[#f1f5f9]',
-            border: 'border-[#dbe3ec]',
-            text: 'text-[#475569]',
-            dot: '#475569'
-        });
+        tags.push({ label: 'INTRASTATE', text: BRAND_PRIMARY_DARK, tint: BRAND_PRIMARY_TINT, border: BRAND_PRIMARY_BORDER });
     }
 
     if (value.includes('B')) {
-
-        tags.push({
-            label: 'HAZMAT',
-            bg: 'bg-[#edfdf3]',
-            border: 'border-[#b7ebc6]',
-            text: 'text-[#15924c]',
-            dot: '#22c55e'
-        });
+        tags.push({ label: 'HAZMAT', text: GREEN_TEXT, tint: GREEN_TINT, border: GREEN_BORDER });
     }
 
     if (value.includes('C')) {
-
-        tags.push({
-            label: 'NON-HAZMAT',
-            bg: 'bg-[#fff1f1]',
-            border: 'border-[#fecaca]',
-            text: 'text-[#dc2626]',
-            dot: '#ef4444'
-        });
+        tags.push({ label: 'NON-HAZMAT', text: RED_TEXT, tint: RED_TINT, border: RED_BORDER });
     }
+
+    return tags.map(function (tag, index) {
+
+        return (
+
+            <span
+                key={index}
+                className='inline-flex items-center px-[11px] py-[4px] rounded-full text-[10.5px] font-[800] tracking-[0.04em] uppercase leading-[1.5] whitespace-nowrap'
+                style={{ color: tag.text, background: tag.tint, border: `1px solid ${tag.border}` }}
+            >
+                {tag.label}
+            </span>
+        );
+    });
+}
+
+function AuthorityTag(props) {
+
+    const status = (props.active || '').toString().toUpperCase();
+    const isActive = status === 'A';
+
+    const text = isActive ? GREEN_TEXT : RED_TEXT;
+    const tint = isActive ? GREEN_TINT : RED_TINT;
+    const border = isActive ? GREEN_BORDER : RED_BORDER;
+    const dot = isActive ? GREEN : RED;
+
+    return (
+        <span
+            className='inline-flex items-center gap-[6px] px-[11px] py-[4px] rounded-full text-[10.5px] font-[800] tracking-[0.04em] leading-[1.5] uppercase whitespace-nowrap'
+            style={{ color: text, background: tint, border: `1px solid ${border}` }}
+        >
+            <FiberManualRecord className='!text-[7px]' style={{ color: dot }} />
+            {isActive ? 'ACTIVE AUTHORITY' : 'INACTIVE AUTHORITY'}
+        </span>
+    );
+}
+
+function IdentityGrid(props) {
+
+    const fields = props.fields;
 
     return (
 
-        <div className='flex flex-wrap gap-[8px]'>
+        <div className='w-full grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-3 md:grid-cols-5 gap-[8px] sm:gap-[10px]'>
 
-            {tags.map(function (tag, index) {
+            {fields.map(function (field) {
 
                 return (
 
-                    <span
-                        key={index}
-                        className={`inline-flex items-center gap-[6px] px-[10px] py-[4px] rounded-full text-[10px] font-[700] tracking-[0.02em] border uppercase leading-none ${tag.bg} ${tag.border} ${tag.text}`}
+                    <div
+                        key={field.key}
+                        className='min-w-0 rounded-[12px] px-[10px] sm:px-[12px] py-[9px] sm:py-[10px] flex flex-col gap-[6px] sm:gap-[8px] transition-colors duration-150'
+                        style={{ background: SURFACE, border: `1px solid ${BORDER}` }}
                     >
 
-                        <span
-                            className='w-[7px] h-[7px] rounded-full shrink-0'
-                            style={{ background: tag.dot }}
-                        />
+                        <div
+                            className='flex items-center justify-center w-[24px] h-[24px] rounded-[8px]'
+                            style={{ background: BRAND_PRIMARY_TINT, color: BRAND_PRIMARY_DARK }}
+                        >
+                            {field.icon}
+                        </div>
 
-                        {tag.label}
+                        <div>
 
-                    </span>
+                            <div className='text-[8.5px] font-[700] tracking-[0.07em] uppercase mb-[2px]' style={{ color: '#98A2B3' }}>
+                                {field.label}
+                            </div>
+
+                            <div className='text-[12.5px] sm:text-[13px] font-[800] truncate' style={{ color: INK }}>
+                                {field.value || '-'}
+                                {field.suffix && (
+                                    <span className='text-[10px] font-[500] ml-[3px]' style={{ color: MUTED }}>
+                                        {field.suffix}
+                                    </span>
+                                )}
+                            </div>
+
+                        </div>
+
+                    </div>
                 );
             })}
 
@@ -187,86 +329,62 @@ function CarrierOperationTag(props) {
     );
 }
 
-function RiskBadge(props) {
-
-    const risk = (props.risk || '').toLowerCase();
-
-    const map = {
-        low: {
-            dot: '#22c55e',
-            bg: 'bg-[#edfdf3]',
-            border: 'border-[#b7ebc6]',
-            color: 'text-[#15924c]'
-        },
-        medium: {
-            dot: '#f59e0b',
-            bg: 'bg-[#fff8e8]',
-            border: 'border-[#fde7a7]',
-            color: 'text-[#c27a07]'
-        },
-        high: {
-            dot: '#ef4444',
-            bg: 'bg-[#fff1f1]',
-            border: 'border-[#fecaca]',
-            color: 'text-[#dc2626]'
-        }
-    };
-
-    let status = map.medium;
-
-    if (risk.includes('low')) status = map.low;
-    else if (risk.includes('high')) status = map.high;
-    else if (risk.includes('medium')) status = map.medium;
-
-    const className =
-        'inline-flex items-center justify-center min-w-[165px] gap-[6px] px-[11px] py-[4px] rounded-full text-[11px] font-[700] tracking-[0.02em] whitespace-nowrap border uppercase leading-none ' +
-        status.bg + ' ' +
-        status.border + ' ' +
-        status.color;
+function ContactChip(props) {
 
     return (
-        <span className={className}>
-            <span
-                className='w-[7px] h-[7px] rounded-full shrink-0'
-                style={{ background: status.dot }}
-            />
-            {props.risk}
+
+        <span
+            className='flex items-center gap-[7px] text-[11.5px] sm:text-[12px] font-[600] px-[10px] sm:px-[12px] py-[6px] sm:py-[7px] rounded-full max-w-full'
+            style={{ color: SLATE, background: 'white', border: `1px solid ${BORDER}` }}
+        >
+            <span style={{ color: BRAND_PRIMARY }} className='flex items-center shrink-0'>
+                {props.icon}
+            </span>
+            <span className='truncate'>{props.text}</span>
         </span>
     );
 }
 
-function AuthorityTag(props) {
-
-    const status = (props.active || '').toString().toUpperCase();
-
-    const isActive = status === 'A';
-
-    let className =
-        'inline-flex items-center gap-[6px] px-[11px] py-[4px] rounded-full text-[10px] font-[700] tracking-[0.02em] leading-none border uppercase ';
-
-    let label = 'INACTIVE AUTHORITY';
-
-    if (isActive) {
-
-        className += 'bg-[#edfdf3] text-[#15924c] border-[#b7ebc6]';
-        label = 'ACTIVE AUTHORITY';
-    }
-    else {
-
-        className += 'bg-[#fff1f1] text-[#dc2626] border-[#fecaca]';
-    }
+function RemoveButton(props) {
 
     return (
-        <span className={className}>
-            <FiberManualRecord
-                className={`!text-[8px] ${
-                    isActive ? '!text-[#15924c]' : '!text-[#dc2626]'
-                }`}
-            />
-            {label}
-        </span>
+
+        <button
+            onClick={(e) => {
+                e.stopPropagation();
+                props.onRemove?.(props.carrierId);
+            }}
+            title='Remove from shortlist'
+            aria-label='Remove from shortlist'
+            className='
+                absolute -top-[10px] -right-[10px] sm:-top-[11px] sm:-right-[11px]
+                flex items-center justify-center
+                w-[26px] h-[26px] sm:w-[28px] sm:h-[28px]
+                rounded-full
+                bg-white
+                text-[#98A2B3]
+                shadow-[0_2px_6px_rgba(16,24,40,0.14)]
+                opacity-100 sm:opacity-0
+                scale-100 sm:scale-75
+                pointer-events-auto sm:pointer-events-none
+                group-hover:opacity-100
+                group-hover:scale-100
+                group-hover:pointer-events-auto
+                hover:bg-[#DC2626]
+                hover:text-white
+                hover:border-[#DC2626]
+                hover:shadow-[0_4px_10px_rgba(220,38,38,0.28)]
+                active:scale-90
+                transition-all duration-150 ease-out
+                z-20
+            '
+            style={{ border: `1.5px solid ${BORDER}` }}
+        >
+            <Close className='!text-[13px] sm:!text-[14px]' />
+        </button>
     );
 }
+
 function CarrierCard(props) {
 
     const carrier = props.carrier;
@@ -274,205 +392,119 @@ function CarrierCard(props) {
     const showRemove = props.showRemove;
     const onRemove = props.onRemove;
 
-const idFields = [
-    { key: 'mc', label: 'MC NUMBER', value: carrier.mc_number },
-    { key: 'dot', label: 'DOT NUMBER', value: carrier.dot_number },
-    { key: 'dt_score', label: 'DT SCORE', value: carrier.dt_score },
-    { key: 'duns', label: 'DUNS', value: carrier.duns }
-];
-
-    const contactItems = [
+    const idFields = [
+        { key: 'mc', label: 'MC NUMBER', value: carrier.mc_number, icon: <Badge className='!text-[14px]' /> },
+        { key: 'dot', label: 'DOT NUMBER', value: carrier.dot_number, icon: <ConfirmationNumber className='!text-[14px]' /> },
+        { key: 'duns', label: 'DUNS', value: carrier.duns, icon: <Fingerprint className='!text-[14px]' /> },
         {
-            icon: <LocationOn className='!text-[15px]' />,
-            text: carrier.address || '-'
+            key: 'fleet',
+            label: 'FLEET SIZE',
+            value: carrier.fleet_size || '-',
+            suffix: carrier.fleet_size ? 'units' : '',
+            icon: <Groups className='!text-[14px]' />
         },
         {
-            icon: <Phone className='!text-[15px]' />,
-            text: carrier.phone || '-'
-        },
-        {
-            icon: <Email className='!text-[15px]' />,
-            text: carrier.email || '-'
+            key: 'mileage',
+            label: 'MILEAGE',
+            value: carrier.mileage ? Number(carrier.mileage).toLocaleString() : '-',
+            suffix: carrier.mileage ? 'mi' : '',
+            icon: <Route className='!text-[14px]' />
         }
     ];
 
-    let cardClass =
-        'bg-white rounded-[14px] px-[22px] py-[18px] mb-[14px] shadow-[0_1px_3px_rgba(0,0,0,0.06)] transition-all duration-200 ';
+    const contactItems = [
+        { icon: <LocationOn className='!text-[14px]' />, text: carrier.address || '-' },
+        { icon: <Phone className='!text-[14px]' />, text: carrier.phone || '-' },
+        { icon: <Email className='!text-[14px]' />, text: carrier.email || '-' }
+    ];
 
-    if (typeof handleClick === 'function') {
-        cardClass += 'cursor-pointer hover:border-[#93c5fd] hover:shadow-[0_4px_16px_rgba(56,119,218,0.12)]';
-    }
-    else {
-        cardClass += 'cursor-default';
+    const tier = getScoreTier(carrier.dt_score);
+
+    const isClickable = typeof handleClick === 'function';
+
+    let outerClass = 'relative mb-[14px] sm:mb-[18px] transition-transform duration-200 group ';
+    outerClass += isClickable ? 'cursor-pointer hover:-translate-y-[2px]' : 'cursor-default';
+
+    let innerClass =
+        'relative bg-white rounded-[16px] sm:rounded-[20px] border border-[#E4E7EC] pt-[18px] px-[16px] pb-[18px] sm:pt-[22px] sm:px-[26px] sm:pb-[22px] overflow-hidden shadow-[0_1px_2px_rgba(16,24,40,0.04),0_6px_16px_rgba(16,24,40,0.05)] transition-all duration-200 ';
+
+    if (isClickable) {
+        innerClass += 'group-hover:shadow-[0_14px_30px_rgba(16,24,40,0.10)] group-hover:border-[#C7D3FB]';
     }
 
     function handleCardClick() {
-        if (typeof handleClick === 'function') {
+        if (isClickable) {
             handleClick(carrier);
         }
     }
-    
 
     return (
-                <div
-                    onClick={handleCardClick}
-                    className={`${cardClass} relative group`}
-                >
-                    
-          
-            {showRemove && (
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onRemove?.(carrier.carrier_id);
-                    }}
-                    title="Remove from shortlist"
-                    className="
-                        absolute -top-[12px] -right-[12px]
-                        flex items-center justify-center
-                        w-[30px] h-[30px]
-                        rounded-full
-                        bg-white
-                        border border-gray-200
-                        text-red-500
-                        shadow-md
 
-                        opacity-0
-                        scale-90
-                        group-hover:opacity-100
-                        group-hover:scale-100
+        <div className={outerClass}>
 
-                        hover:bg-red-100
-                        hover:border-red-300
-                        hover:text-red-600
+            <div
+                onClick={handleCardClick}
+                className={innerClass}
+            >
 
-                        transition-all duration-200 ease-out
-                        z-20
-                    "
-                >
-                    ✕
-                </button>
-            )}
+                <span
+                    className='absolute left-0 right-0 top-0 h-[4px] sm:h-[5px]'
+                    style={{ background: `linear-gradient(90deg, ${BRAND_PRIMARY} 0%, ${BRAND_PRIMARY_DARK} 100%)` }}
+                />
 
-            <div className='flex justify-between items-start gap-[28px]'>
+                <div className='flex flex-col lg:flex-row lg:items-stretch gap-[16px] lg:gap-[20px] mt-[6px]'>
 
-                <div className='flex-1 min-w-0'>
+                <div className='flex-1 min-w-0 flex flex-col justify-center gap-[16px] sm:gap-[20px] lg:gap-[25px]'>
 
-                    <div className='flex justify-between items-start gap-[28px] mb-[18px]'>
+                    <div className='flex items-center gap-[8px] sm:gap-[10px] flex-wrap'>
 
-                        <div>
+                        <h3 className='text-[15px] sm:text-[17px] font-[800] tracking-[-0.01em] m-0 break-words' style={{ color: INK }}>
+                            {carrier.company_name || '-'}
+                        </h3>
 
-                            <h3 className='flex items-center mb-[14px] text-[15px] font-[700] text-[#111827] tracking-[-0.01em]'>
-                                {carrier.company_name || '-'}
-                            </h3>
-
-                            <div className='flex flex-wrap gap-[8px]'>
-
-                               <CarrierOperationTag value={carrier.carrier_operation} />
-
-                                <AuthorityTag active={carrier.active_authority} />
-
-                            </div>
-
-                        </div>
-
-                        <div className='flex items-start gap-[26px] shrink-0'>
-
-                            <div className='text-left'>
-                                <div className='text-[9px] font-[700] text-[#9ca3af] uppercase tracking-[0.08em] mb-[4px]'>
-                                    Mileage
-                                </div>
-
-                                <div className='text-[15px] font-[700] text-[#111827]'>
-                                    {carrier.mileage ? Number(carrier.mileage).toLocaleString() : '-'}
-                                    <span className='text-[11px] font-[400] text-[#6b7280] ml-[3px]'>
-                                        mi
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div className='w-px h-[42px] bg-[#e5e7eb] mt-[2px]' />
-
-                            <div className='text-left'>
-                                <div className='text-[9px] font-[700] text-[#9ca3af] uppercase tracking-[0.08em] mb-[4px]'>
-                                    Fleet Size
-                                </div>
-
-                                <div className='text-[15px] font-[700] text-[#111827]'>
-                                    {carrier.fleet_size || '-'}
-                                    <span className='text-[11px] font-[400] text-[#6b7280] ml-[3px]'>
-                                        units
-                                    </span>
-                                </div>
-                            </div>
-
-                        </div>
+                        <CarrierOperationTag value={carrier.carrier_operation} />
+                        <AuthorityTag active={carrier.active_authority} />
 
                     </div>
 
-                    <div className='grid grid-cols-4 gap-y-[12px] gap-x-[24px] mb-[18px] px-[14px] py-[16px] rounded-[12px] border border-[#edf0f3] bg-[#fafafa] w-full'>
+                    <IdentityGrid fields={idFields} />
 
-           {idFields.map(function (field) {
-
-    return (
-        <div key={field.label}>
-            <div className='text-[9px] font-[700] text-[#9ca3af] uppercase tracking-[0.08em] mb-[4px]'>
-                {field.label}
-            </div>
-
-            {field.key === 'dt_score'
-                ? <DTScoreValue value={field.value} />
-                : (
-                    <div className='text-[13px] font-[600] text-[#374151]'>
-                        {field.value || '-'}
-                    </div>
-                )
-            }
-        </div>
-    );
-})}
-
-                    </div>
-
-                    <div className='flex flex-wrap gap-[24px] mt-[4px]'>
+                    <div className='flex flex-wrap gap-[8px] sm:gap-[10px]'>
 
                         {contactItems.map(function (item, index) {
-                            return (
-                                <span
-                                    key={index}
-                                    className='flex items-center gap-[5px] text-[12px] text-[#6b7280]'
-                                >
-                                    <span className='text-[#b0b7c3] flex items-center'>
-                                        {item.icon}
-                                    </span>
-                                    {item.text}
-                                </span>
-                            );
+                            return <ContactChip key={index} icon={item.icon} text={item.text} />;
                         })}
 
                     </div>
 
                 </div>
 
-                <div className='flex flex-col gap-[20px] items-end mt-4 shrink-0'>
+                <div
+                    className='w-full lg:w-[176px] lg:shrink-0 flex flex-col items-center gap-[7px] rounded-[16px] px-[14px] py-[12px]'
+                    style={{
+                        background: tier ? tier.tint : NEUTRAL_TINT,
+                        border: `1.5px solid ${tier ? tier.border : NEUTRAL_BORDER}`
+                    }}
+                >
 
-                    <StatusBadge
-                        active={carrier.authority_verified}
-                        label='AUTHORITY VERIFIED'
-                        type='authority'
-                    />
+                    <DTScorePanel score={carrier.dt_score} />
 
-                    <StatusBadge
-                        active={carrier.insurance_current}
-                        label='INSURANCE CURRENT'
-                        type='insurance'
-                    />
+                    <div className='w-full h-px' style={{ background: BORDER }} />
 
-                    <RiskBadge risk={carrier.risk_level} />
+                    <CheckRow active={carrier.authority_verified} label='Authority verified' />
+                    <CheckRow active={carrier.insurance_current} label='Insurance current' />
+
+                    <RiskButton risk={carrier.risk_level} />
+
+                </div>
 
                 </div>
 
             </div>
+
+            {showRemove && (
+                <RemoveButton carrierId={carrier.carrier_id} onRemove={onRemove} />
+            )}
 
         </div>
     );

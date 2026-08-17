@@ -1,4 +1,4 @@
-import { Fragment, useState, useEffect, useMemo } from "react";
+import { Fragment, useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
 import Skeleton from "@mui/material/Skeleton";
@@ -20,6 +20,11 @@ import DescriptionOutlined from "@mui/icons-material/DescriptionOutlined";
 import DownloadOutlined from "@mui/icons-material/DownloadOutlined";
 import DrawOutlined from "@mui/icons-material/DrawOutlined";
 import ReceiptLongOutlined from "@mui/icons-material/ReceiptLongOutlined";
+import FileUploadOutlined from "@mui/icons-material/FileUploadOutlined";
+import FileDownloadOutlined from "@mui/icons-material/FileDownloadOutlined";
+import CloseIcon from "@mui/icons-material/Close";
+import InsertDriveFileOutlined from "@mui/icons-material/InsertDriveFileOutlined";
+import CloudUploadOutlined from "@mui/icons-material/CloudUploadOutlined";
 
 import { apiFetch, apiDownload } from "../../../lib/api";
 
@@ -86,6 +91,50 @@ function formatDate(value) {
 }
 
 /**
+ * Shared modal shell — centered card over a dim backdrop, closes on
+ * backdrop click or the X button. Kept local since this is the only
+ * place that needs one right now.
+ */
+function Modal({ title, subtitle, onClose, children, footer }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+      onClick={onClose}
+    >
+      <div
+        onClick={(event) => event.stopPropagation()}
+        className="w-full max-w-lg rounded-2xl border border-[#E5E7EB] bg-white shadow-xl"
+      >
+        <div className="flex items-start justify-between border-b border-[#F1F5F9] px-5 py-4">
+          <div>
+            <h2 className="text-base font-bold text-[#111827]">{title}</h2>
+            {subtitle && (
+              <p className="mt-0.5 text-sm text-[#6B7280]">{subtitle}</p>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+          >
+            <CloseIcon sx={{ fontSize: 20 }} />
+          </button>
+        </div>
+
+        <div className="px-5 py-4">{children}</div>
+
+        {footer && (
+          <div className="flex items-center justify-end gap-2 border-t border-[#F1F5F9] px-5 py-4">
+            {footer}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
  * Every carrier this company has invited, and how far each one got.
  *
  * Scoped to the company by the API, so a teammate's invitations show up here
@@ -106,6 +155,37 @@ export default function ConnectedCarriers() {
 
   const [expanded, setExpanded] = useState(null);
   const [downloading, setDownloading] = useState(null);
+
+  // Import / Export modals — UI only for now, no API wired up yet.
+  const [importOpen, setImportOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [dragActive, setDragActive] = useState(false);
+  const [exportScope, setExportScope] = useState("filtered");
+  const fileInputRef = useRef(null);
+
+  const closeImportModal = () => {
+    setImportOpen(false);
+    setImportFile(null);
+    setDragActive(false);
+  };
+
+  const closeExportModal = () => {
+    setExportOpen(false);
+    setExportScope("filtered");
+  };
+
+  const handleFileChosen = (fileList) => {
+    const file = fileList?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      setErrorMessage("Please choose a .csv file.");
+      return;
+    }
+
+    setImportFile(file);
+  };
 
   const downloadCarrierFile = async (uuid, file) => {
     setDownloading(`${uuid}:${file.type}`);
@@ -165,7 +245,7 @@ export default function ConnectedCarriers() {
   }, [requests, stage, search]);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 md:px-8">
+    <div className="mx-auto max-w-7xl px-4 py-5 sm:py-6 md:px-8 md:py-8">
       <Snackbar
         open={!!errorMessage}
         autoHideDuration={6000}
@@ -178,9 +258,9 @@ export default function ConnectedCarriers() {
       </Snackbar>
 
       {/* Header */}
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#111827]">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#111827]">
             Connected Carriers
           </h1>
 
@@ -190,8 +270,8 @@ export default function ConnectedCarriers() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="relative">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative w-full sm:w-auto">
             <SearchIcon
               sx={{ fontSize: 18 }}
               className="absolute top-1/2 left-3 -translate-y-1/2 text-gray-400"
@@ -202,27 +282,47 @@ export default function ConnectedCarriers() {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search name, DOT or email"
-              className="h-10 w-64 rounded-lg border border-[#E5E7EB] bg-white pr-3 pl-9 text-sm text-[#1F2937] focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none"
+              className="h-10 w-full sm:w-64 rounded-lg border border-[#E5E7EB] bg-white pr-3 pl-9 text-sm text-[#1F2937] focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none"
             />
           </div>
 
-          <button
-            type="button"
-            onClick={() => load(true)}
-            disabled={refreshing}
-            className="flex h-10 items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-white px-3 text-sm font-semibold text-[#4B5563] transition-colors hover:bg-gray-50 disabled:opacity-50"
-          >
-            <RefreshIcon
-              sx={{ fontSize: 18 }}
-              className={refreshing ? "animate-spin" : ""}
-            />
-            Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setImportOpen(true)}
+              className="flex h-10 items-center justify-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-white px-3 text-sm font-semibold text-[#4B5563] transition-colors hover:bg-gray-50"
+            >
+              <FileUploadOutlined sx={{ fontSize: 18 }} />
+              Import
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setExportOpen(true)}
+              className="flex h-10 items-center justify-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-white px-3 text-sm font-semibold text-[#4B5563] transition-colors hover:bg-gray-50"
+            >
+              <FileDownloadOutlined sx={{ fontSize: 18 }} />
+              Export
+            </button>
+
+            <button
+              type="button"
+              onClick={() => load(true)}
+              disabled={refreshing}
+              className="flex h-10 items-center justify-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-white px-3 text-sm font-semibold text-[#4B5563] transition-colors hover:bg-gray-50 disabled:opacity-50"
+            >
+              <RefreshIcon
+                sx={{ fontSize: 18 }}
+                className={refreshing ? "animate-spin" : ""}
+              />
+              Refresh
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Stage tabs */}
-      <div className="mb-6 flex flex-wrap gap-2">
+      <div className="mb-6 flex flex-nowrap sm:flex-wrap gap-2 overflow-x-auto pb-1 sm:overflow-visible sm:pb-0 -mx-4 px-4 sm:mx-0 sm:px-0">
         {STAGES.map((item) => {
           const count = summary[item.key] ?? 0;
           const isActive = stage === item.key;
@@ -232,7 +332,7 @@ export default function ConnectedCarriers() {
               key={item.key}
               type="button"
               onClick={() => setStage(item.key)}
-              className={`flex items-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-semibold transition-all ${
+              className={`flex shrink-0 items-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-semibold transition-all ${
                 isActive
                   ? "border-[#1D4ED8] bg-[#EFF6FF] text-[#1E40AF]"
                   : "border-[#E5E7EB] bg-white text-[#4B5563] hover:border-[#CBD5E1]"
@@ -512,6 +612,186 @@ export default function ConnectedCarriers() {
         <p className="mt-3 text-xs text-[#9CA3AF]">
           Showing {visible.length} of {requests.length} carriers.
         </p>
+      )}
+
+      {/* Import modal — UI shell only, no API call wired up yet */}
+      {importOpen && (
+        <Modal
+          title="Import carriers"
+          subtitle="Upload a CSV to bulk-invite carriers."
+          onClose={closeImportModal}
+          footer={
+            <>
+              <button
+                type="button"
+                onClick={closeImportModal}
+                className="h-9 rounded-lg border border-[#E5E7EB] bg-white px-3.5 text-sm font-semibold text-[#4B5563] transition-colors hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                disabled={!importFile}
+                onClick={() => {
+                  // TODO: wire up to the import API once it exists.
+                  closeImportModal();
+                }}
+                className="h-9 rounded-lg bg-[#1D4ED8] px-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#1E40AF] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+              >
+                Import
+              </button>
+            </>
+          }
+        >
+          <div
+            onDragOver={(event) => {
+              event.preventDefault();
+              setDragActive(true);
+            }}
+            onDragLeave={() => setDragActive(false)}
+            onDrop={(event) => {
+              event.preventDefault();
+              setDragActive(false);
+              handleFileChosen(event.dataTransfer.files);
+            }}
+            onClick={() => fileInputRef.current?.click()}
+            className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-10 text-center transition-colors ${
+              dragActive
+                ? "border-[#1D4ED8] bg-[#EFF6FF]"
+                : "border-[#E5E7EB] bg-[#FAFBFD] hover:border-[#CBD5E1]"
+            }`}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv"
+              hidden
+              onChange={(event) => handleFileChosen(event.target.files)}
+            />
+
+            {importFile ? (
+              <>
+                <InsertDriveFileOutlined
+                  sx={{ fontSize: 32 }}
+                  className="text-[#1D4ED8]"
+                />
+                <p className="text-sm font-semibold text-[#1F2937]">
+                  {importFile.name}
+                </p>
+                <p className="text-xs text-[#9CA3AF]">
+                  {(importFile.size / 1024).toFixed(1)} KB — click to choose a
+                  different file
+                </p>
+              </>
+            ) : (
+              <>
+                <CloudUploadOutlined
+                  sx={{ fontSize: 32 }}
+                  className="text-gray-400"
+                />
+                <p className="text-sm font-semibold text-[#1F2937]">
+                  Drag and drop a CSV, or click to browse
+                </p>
+                <p className="text-xs text-[#9CA3AF]">
+                  Columns: legal_name, dot_number, email
+                </p>
+              </>
+            )}
+          </div>
+
+          <p className="mt-3 text-xs text-[#9CA3AF]">
+            Import isn't connected yet — this is a preview of the flow.
+          </p>
+        </Modal>
+      )}
+
+      {/* Export modal — UI shell only, no API call wired up yet */}
+      {exportOpen && (
+        <Modal
+          title="Export carriers"
+          subtitle="Download the carrier list as a CSV."
+          onClose={closeExportModal}
+          footer={
+            <>
+              <button
+                type="button"
+                onClick={closeExportModal}
+                className="h-9 rounded-lg border border-[#E5E7EB] bg-white px-3.5 text-sm font-semibold text-[#4B5563] transition-colors hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  // TODO: wire up to the export API once it exists.
+                  closeExportModal();
+                }}
+                className="flex h-9 items-center gap-1.5 rounded-lg bg-[#1D4ED8] px-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#1E40AF]"
+              >
+                <FileDownloadOutlined sx={{ fontSize: 16 }} />
+                Export CSV
+              </button>
+            </>
+          }
+        >
+          <div className="flex flex-col gap-2">
+            <label
+              className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-3 text-sm transition-colors ${
+                exportScope === "filtered"
+                  ? "border-[#1D4ED8] bg-[#EFF6FF]"
+                  : "border-[#E5E7EB] hover:border-[#CBD5E1]"
+              }`}
+            >
+              <input
+                type="radio"
+                name="export-scope"
+                checked={exportScope === "filtered"}
+                onChange={() => setExportScope("filtered")}
+                className="h-4 w-4"
+              />
+              <span>
+                <span className="block font-semibold text-[#1F2937]">
+                  Current view
+                </span>
+                <span className="block text-xs text-[#9CA3AF]">
+                  {visible.length} carrier{visible.length === 1 ? "" : "s"}{" "}
+                  matching the selected status and search
+                </span>
+              </span>
+            </label>
+
+            <label
+              className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3.5 py-3 text-sm transition-colors ${
+                exportScope === "all"
+                  ? "border-[#1D4ED8] bg-[#EFF6FF]"
+                  : "border-[#E5E7EB] hover:border-[#CBD5E1]"
+              }`}
+            >
+              <input
+                type="radio"
+                name="export-scope"
+                checked={exportScope === "all"}
+                onChange={() => setExportScope("all")}
+                className="h-4 w-4"
+              />
+              <span>
+                <span className="block font-semibold text-[#1F2937]">
+                  All carriers
+                </span>
+                <span className="block text-xs text-[#9CA3AF]">
+                  {requests.length} carrier{requests.length === 1 ? "" : "s"}{" "}
+                  total, ignoring filters
+                </span>
+              </span>
+            </label>
+          </div>
+
+          <p className="mt-3 text-xs text-[#9CA3AF]">
+            Export isn't connected yet — this is a preview of the flow.
+          </p>
+        </Modal>
       )}
     </div>
   );

@@ -6,10 +6,16 @@ import Skeleton from '@mui/material/Skeleton';
 import LocationOn from '@mui/icons-material/LocationOn';
 import Phone from '@mui/icons-material/Phone';
 import Email from '@mui/icons-material/Email';
-import WarningAmberRounded from '@mui/icons-material/WarningAmberRounded';
 import CheckCircle from '@mui/icons-material/CheckCircle';
 import ChevronLeft from '@mui/icons-material/ChevronLeft';
 import ChevronRight from '@mui/icons-material/ChevronRight';
+import Business from '@mui/icons-material/Business';
+import Badge from '@mui/icons-material/Badge';
+import TagRounded from '@mui/icons-material/TagRounded';
+import TravelExploreRounded from '@mui/icons-material/TravelExploreRounded';
+import SearchOffRounded from '@mui/icons-material/SearchOffRounded';
+import AutoAwesomeRounded from '@mui/icons-material/AutoAwesomeRounded';
+import ErrorOutlineRounded from '@mui/icons-material/ErrorOutlineRounded';
 
 import CarrierCard from '../../../components/CarrierCards';
 import SearchOverlay from '../../../components/SearchOverlay';
@@ -46,18 +52,65 @@ const SEARCH_PARAM_MAP = {
 
 const SEARCH_ENDPOINT = '/carrier/search';
 
-const HOW_TO_USE_ROWS = [
-    [
-        { label: 'MC', desc: "Search by the carrier's MC number." },
-        { label: 'DOT', desc: "Search by the carrier's USDOT number." },
-        { label: 'Company', desc: 'Search using the company name.' }
-    ],
-    [
-        { label: 'Phone', desc: 'Search using the registered phone number.' },
-        { label: 'Address', desc: 'Search using the registered address.' },
-        { label: 'Email', desc: 'Search using the registered email address.' }
-    ]
-];
+
+const SEARCH_TYPE_META = {
+    mc: {
+        label: 'MC Number',
+        short: 'MC',
+        desc: "Search by the carrier's MC number.",
+        icon: Badge,
+        color: '#4E73DF',
+        bg: '#eef2ff'
+    },
+    dot: {
+        label: 'DOT Number',
+        short: 'DOT',
+        desc: "Search by the carrier's USDOT number.",
+        icon: TagRounded,
+        color: '#7c3aed',
+        bg: '#f5f3ff'
+    },
+    company: {
+        label: 'Company Name',
+        short: 'Company',
+        desc: 'Search using the company name.',
+        icon: Business,
+        color: '#0891b2',
+        bg: '#ecfeff'
+    },
+    phone: {
+        label: 'Phone',
+        short: 'Phone',
+        desc: 'Search using the registered phone number.',
+        icon: Phone,
+        color: '#059669',
+        bg: '#ecfdf5'
+    },
+    address: {
+        label: 'Address',
+        short: 'Address',
+        desc: 'Search using the registered address.',
+        icon: LocationOn,
+        color: '#d97706',
+        bg: '#fffbeb'
+    },
+    email: {
+        label: 'Email',
+        short: 'Email',
+        desc: 'Search using the registered email address.',
+        icon: Email,
+        color: '#e11d48',
+        bg: '#fff1f2'
+    },
+    ein: {
+        label: 'EIN',
+        short: 'EIN',
+        desc: "Search by the carrier's EIN.",
+        icon: TagRounded,
+        color: '#4338ca',
+        bg: '#eef2ff'
+    }
+};
 
 function CarrierCardSkeleton() {
 
@@ -122,71 +175,65 @@ function Pagination(props) {
         </div>
     );
 }
-function ResultsFooter(props) {
 
-    const currentPage = props.currentPage;
-    const lastPage = props.lastPage;
-    const onPrev = props.onPrev;
-    const onNext = props.onNext;
-    const onPageSelect = props.onPageSelect;
+// "How To Use" — a plain-language checklist so it's obvious what each identifier
+// means and how to use it, on a soft gradient banner (no white card stack).
+function HowToUseFlow(props) {
+
+    const compact = props.compact;
+    const types = ['mc', 'dot', 'company', 'phone', 'address', 'email'];
 
     return (
 
-        <div className='flex flex-col gap-4 mt-1'>
+        <div
+            className='relative overflow-hidden rounded-[20px] border border-[#e5e7eb]'
+            style={{
+                background: 'linear-gradient(135deg, #f8fafc 0%, #eef2ff 55%, #f5f3ff 100%)'
+            }}
+        >
 
-            <Pagination
-                currentPage={currentPage}
-                lastPage={lastPage}
-                onPrev={onPrev}
-                onNext={onNext}
-                onPageSelect={onPageSelect}
-            />
+            <div className='absolute -top-10 -right-10 w-[160px] h-[160px] rounded-full bg-white/40 blur-2xl pointer-events-none' />
+            <div className='absolute -bottom-14 -left-10 w-[180px] h-[180px] rounded-full bg-[#c7d2fe]/30 blur-2xl pointer-events-none' />
 
-            <div className='bg-white rounded-[14px] px-[22px] py-[18px] shadow-[0_1px_3px_rgba(0,0,0,0.06)]'>
+            <div className={`relative ${compact ? 'px-5 py-5' : 'px-6 py-7 md:px-8 md:py-8'}`}>
 
-                <div className='flex items-center gap-2 mb-[14px]'>
-
-                    <WarningAmberRounded className='!text-[16px] text-[#ef4444]' />
-
-                    <span className='text-[12px] font-[700] text-[#111827] tracking-[0.02em] uppercase'>
-                        How To Use
+                <div className='flex items-center gap-2 mb-1'>
+                    <AutoAwesomeRounded className='!text-[18px] text-[#4E73DF]' />
+                    <span className='text-[11px] font-[800] tracking-[0.12em] text-[#4E73DF] uppercase'>
+                        Quick Guide
                     </span>
-
                 </div>
 
-                <div className='flex flex-col'>
+                <h3 className='text-[18px] md:text-[19px] font-[800] text-[#111827] mb-1'>
+                    Search carriers your way
+                </h3>
+                <p className='text-[13px] text-[#6b7280] mb-5 max-w-[560px]'>
+                    Use any of the identifiers below — results update instantly as soon as you run a search.
+                </p>
 
-                    {HOW_TO_USE_ROWS.map(function (row, rowIndex) {
+                <div className={`grid grid-cols-1 ${compact ? 'sm:grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-3'} gap-x-8 gap-y-4`}>
 
-                        const isLastRow = rowIndex === HOW_TO_USE_ROWS.length - 1;
+                    {types.map(function (typeKey) {
+
+                        const meta = SEARCH_TYPE_META[typeKey];
+                        const Icon = meta.icon;
 
                         return (
 
-                            <div
-                                key={rowIndex}
-                                className={`grid grid-cols-1 sm:grid-cols-3 gap-x-[24px] gap-y-[10px] ${
-                                    isLastRow ? '' : 'pb-[12px] mb-[12px] border-b border-[#f1f5f9]'
-                                }`}
-                            >
+                            <div key={typeKey} className='flex items-start gap-3'>
 
-                                {row.map(function (item, itemIndex) {
+                                <div
+                                    className='w-[30px] h-[30px] rounded-full flex items-center justify-center shrink-0'
+                                    style={{ backgroundColor: meta.bg, border: `1.5px solid ${meta.color}33` }}
+                                >
+                                    <Icon style={{ fontSize: 16, color: meta.color }} />
+                                </div>
 
-                                    return (
-
-                                        <div
-                                            key={itemIndex}
-                                            className='flex items-start gap-[8px] text-[12px] text-[#4b5563]'
-                                        >
-
-                                            <CheckCircle className='!text-[14px] text-[#15924c] mt-[1px] shrink-0' />
-
-                                            <span>
-                                                <strong className='text-[#111827] font-[600]'>{item.label}</strong> – {item.desc}
-                                            </span>
-
-                                        </div>
-                                    );
-                                })}
+                                <p className='text-[13px] leading-[1.5] text-[#4b5563] pt-1'>
+                                    <span className='font-[700] text-[#111827]'>{meta.label}</span>
+                                    <span className='text-[#9ca3af]'> — </span>
+                                    {meta.desc}
+                                </p>
 
                             </div>
                         );
@@ -200,6 +247,175 @@ function ResultsFooter(props) {
     );
 }
 
+// Shown before any search has been performed — fills the empty space with
+// a real hero instead of a blank page.
+function EmptyState(props) {
+
+    const onOpenOverlay = props.onOpenOverlay;
+
+    return (
+
+        <div className='flex flex-col gap-8'>
+
+            <div className='flex flex-col items-center text-center gap-4 pt-6 pb-2'>
+
+                <div
+                    className='w-[76px] h-[76px] rounded-full flex items-center justify-center'
+                    style={{ background: 'linear-gradient(135deg, #4E73DF 0%, #7c3aed 100%)' }}
+                >
+                    <TravelExploreRounded style={{ fontSize: 36, color: '#fff' }} />
+                </div>
+
+                <div className='flex flex-col gap-1.5'>
+                    <h2 className='text-[24px] md:text-[26px] font-[800] text-[#111827]'>
+                        Find any carrier, instantly
+                    </h2>
+                    <p className='text-[14px] text-[#6b7280] max-w-[420px] mx-auto'>
+                        Search by MC number, DOT number, company name, phone, address, email, or EIN.
+                    </p>
+                </div>
+
+                <button
+                    onClick={onOpenOverlay}
+                    className='mt-1 inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-[700] text-white shadow-[0_6px_16px_rgba(78,115,223,0.35)] hover:shadow-[0_8px_20px_rgba(78,115,223,0.45)] transition-shadow'
+                    style={{ background: 'linear-gradient(135deg, #4E73DF 0%, #7c3aed 100%)' }}
+                >
+                    <TravelExploreRounded className='!text-[16px]' />
+                    Start a search
+                </button>
+
+            </div>
+
+            <HowToUseFlow />
+
+        </div>
+    );
+}
+
+// Shown after a search runs but returns nothing.
+function NoResultsState(props) {
+
+    const query = props.query;
+    const searchType = props.searchType;
+    const onOpenOverlay = props.onOpenOverlay;
+    const onClear = props.onClear;
+
+    const meta = SEARCH_TYPE_META[searchType] || SEARCH_TYPE_META.mc;
+
+    return (
+
+        <div className='flex flex-col gap-8'>
+
+            <div className='flex flex-col items-center text-center gap-4 py-10 px-6 bg-white rounded-[20px] border border-[#f1f5f9]'>
+
+                <div className='w-[64px] h-[64px] rounded-full bg-[#fef2f2] flex items-center justify-center'>
+                    <SearchOffRounded style={{ fontSize: 30, color: '#ef4444' }} />
+                </div>
+
+                <div className='flex flex-col gap-1.5'>
+                    <h2 className='text-[19px] font-[800] text-[#111827]'>
+                        No carriers found
+                    </h2>
+                    <p className='text-[13px] text-[#6b7280] max-w-[380px] mx-auto'>
+                        We couldn't find a match for <span className='font-[700] text-[#111827]'>"{query}"</span> using {meta.label}. Try a different identifier or double-check for typos.
+                    </p>
+                </div>
+
+                <div className='flex items-center gap-3 mt-1'>
+                    <button
+                        onClick={onOpenOverlay}
+                        className='inline-flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-[700] text-white'
+                        style={{ background: 'linear-gradient(135deg, #4E73DF 0%, #7c3aed 100%)' }}
+                    >
+                        Try another search
+                    </button>
+                    <button
+                        onClick={onClear}
+                        className='px-4 py-2 rounded-full text-[13px] font-[700] text-[#4b5563] border border-[#e5e7eb] hover:bg-[#f8fafc] transition-colors'
+                    >
+                        Clear
+                    </button>
+                </div>
+
+            </div>
+
+            <HowToUseFlow compact />
+
+        </div>
+    );
+}
+
+// Slim summary bar shown above the results list — total count, query, search-type badge.
+function ResultsHeader(props) {
+
+    const total = props.total;
+    const query = props.query;
+    const searchType = props.searchType;
+    const onOpenOverlay = props.onOpenOverlay;
+
+    const meta = SEARCH_TYPE_META[searchType] || SEARCH_TYPE_META.mc;
+    const Icon = meta.icon;
+
+    return (
+
+        <div className='flex items-center justify-between gap-3 flex-wrap bg-white rounded-[14px] px-[18px] py-[14px] border border-[#f1f5f9]'>
+
+            <div className='flex items-center gap-3 min-w-0'>
+
+                <div
+                    className='w-[38px] h-[38px] rounded-full flex items-center justify-center shrink-0'
+                    style={{ backgroundColor: meta.bg }}
+                >
+                    <Icon style={{ fontSize: 18, color: meta.color }} />
+                </div>
+
+                <div className='flex flex-col min-w-0'>
+                    <span className='text-[15px] font-[800] text-[#111827] truncate'>
+                        {total.toLocaleString()} {total === 1 ? 'result' : 'results'}
+                    </span>
+                    <span className='text-[12px] text-[#6b7280] truncate'>
+                        {meta.label} · "{query}"
+                    </span>
+                </div>
+
+            </div>
+
+            <button
+                onClick={onOpenOverlay}
+                className='text-[12px] font-[700] text-[#4E73DF] hover:text-[#3b5bc4] shrink-0'
+            >
+                Refine search
+            </button>
+
+        </div>
+    );
+}
+
+function ResultsFooter(props) {
+
+    const currentPage = props.currentPage;
+    const lastPage = props.lastPage;
+    const onPrev = props.onPrev;
+    const onNext = props.onNext;
+    const onPageSelect = props.onPageSelect;
+
+    return (
+
+        <div className='flex flex-col gap-6 mt-2'>
+
+            <Pagination
+                currentPage={currentPage}
+                lastPage={lastPage}
+                onPrev={onPrev}
+                onNext={onNext}
+                onPageSelect={onPageSelect}
+            />
+
+            <HowToUseFlow compact />
+
+        </div>
+    );
+}
 
 function CarrierSearch() {
 
@@ -219,12 +435,13 @@ function CarrierSearch() {
     const [selectedRisk, setSelectedRisk] = useState('');
     const [authorityVerified, setAuthorityVerified] = useState('');
     const [overlayOpen, setOverlayOpen] = useState(false);
+    const [hasSearched, setHasSearched] = useState(false);
 	const navigate = useNavigate();
     const [searchParams] = useSearchParams();
 
     const searchRequestId = React.useRef(0);
 
- 
+
     useEffect(function () {
 
         const token = localStorage.getItem(import.meta.env.VITE_ACCOUNT_TOKEN);
@@ -235,7 +452,7 @@ function CarrierSearch() {
 
     }, []);
 
- 
+
     useEffect(function () {
 
         const q = searchParams.get('q');
@@ -300,12 +517,14 @@ function CarrierSearch() {
             setTotal(0);
             setCurrentPage(1);
             setLastPage(1);
+            setHasSearched(false);
             return;
         }
 
         const requestId = ++searchRequestId.current;
 
         setLoading(true);
+        setHasSearched(true);
 
         const params = new URLSearchParams();
 
@@ -337,12 +556,14 @@ function CarrierSearch() {
                 setTotal(payload ? payload.total || 0 : 0);
                 setCurrentPage(payload ? payload.current_page || pageNumber : pageNumber);
                 setLastPage(payload ? payload.last_page || 1 : 1);
+                setErrorMessage('');
             })
             .catch(function (err) {
                 if (requestId !== searchRequestId.current) return;
                 console.log(err);
                 setCarriers([]);
                 setTotal(0);
+                setErrorMessage('Something went wrong while searching. Please try again.');
             })
             .finally(function () {
                 if (requestId !== searchRequestId.current) return;
@@ -353,7 +574,6 @@ function CarrierSearch() {
     function handleKeyDown(event) {
 
         if (event.key === 'Enter') {
-
             runSearch(query, 1, sortBy, searchType);
         }
     }
@@ -366,6 +586,7 @@ function CarrierSearch() {
         setErrorMessage('');
         setCurrentPage(1);
         setLastPage(1);
+        setHasSearched(false);
     }
 
     function handlePrevPage() {
@@ -383,7 +604,6 @@ function CarrierSearch() {
             runSearch(query, currentPage + 1, sortBy, searchType);
         }
     }
-
     function handlePageSelect(page) {
 
         if (page !== currentPage) {
@@ -393,6 +613,7 @@ function CarrierSearch() {
     }
 
     function handleSortChange(event) {
+
         const value = event.target.value;
 
         setSortBy(value);
@@ -432,17 +653,25 @@ function CarrierSearch() {
 
     return (
 
-<div>
+      <div>
 
             <Grid container spacing={3}>
 
                 <Grid size={12}>
 
-                    <div className='min-h-screen p-3 md:p-4 lg:p-6'>
+                    <div className='min-h-screen p-3 md:p-4 lg:p-6' style={{ background: '#f8fafc' }}>
 
                         <div className='max-w-[1100px] mx-auto'>
 
-                            <div className='flex flex-col gap-4 mt-9'>
+                            <div className='flex flex-col gap-5 mt-9'>
+
+                                {errorMessage && (
+
+                                    <div className='flex items-center gap-2 bg-[#fef2f2] border border-[#fecaca] text-[#b91c1c] text-[13px] font-[600] rounded-[12px] px-4 py-3'>
+                                        <ErrorOutlineRounded className='!text-[18px]' />
+                                        {errorMessage}
+                                    </div>
+                                )}
 
                                 {loading && (
 
@@ -459,30 +688,47 @@ function CarrierSearch() {
                                     </div>
                                 )}
 
+                                {!loading && !hasSearched && (
 
-                                {!loading && carriers.length === 0 && (
-
-                                    <div className='text-center py-[50px] text-sm text-gray-500'>
-                                        No data found
-                                    </div>
+                                    <EmptyState onOpenOverlay={() => setOverlayOpen(true)} />
                                 )}
 
+                                {!loading && hasSearched && carriers.length === 0 && (
 
-                                {!loading && carriers.length > 0 && (
+                                    <NoResultsState
+                                        query={query}
+                                        searchType={searchType}
+                                        onOpenOverlay={() => setOverlayOpen(true)}
+                                        onClear={handleClearSearch}
+                                    />
+                                )}
+
+                                {!loading && hasSearched && carriers.length > 0 && (
 
                                     <>
 
-                                        {carriers.map(function (carrier) {
+                                        <ResultsHeader
+                                            total={total}
+                                            query={query}
+                                            searchType={searchType}
+                                            onOpenOverlay={() => setOverlayOpen(true)}
+                                        />
 
-                                            return (
+                                        <div className='flex flex-col gap-4'>
 
-                                                <CarrierCard
-													key={carrier.id}
-													carrier={carrier}
-													onClick={handleCarrierClick}
-												/>
-                                            );
-                                        })}
+                                            {carriers.map(function (carrier) {
+
+                                                return (
+
+                                                    <CarrierCard
+                                                        key={carrier.id}
+                                                        carrier={carrier}
+                                                        onClick={handleCarrierClick}
+                                                    />
+                                                );
+                                            })}
+
+                                        </div>
 
                                         <ResultsFooter
                                             currentPage={currentPage}

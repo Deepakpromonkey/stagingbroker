@@ -171,10 +171,10 @@ function FleetDetails({ data }) {
 
     return (
             <div className="rounded-[18px] border border-[#d9e1ee] bg-white overflow-hidden shadow-sm pb-[24px]">
-            <div className="px-[28px] pt-[26px]">
+            <div className="px-4 pt-5 sm:px-[28px] sm:pt-[26px]">
 
                 <div className="flex items-center gap-2 mt-2">
-                    <div className="h-[7px] w-[7px] rounded-full bg-emerald-500" />
+                    <div className="h-[7px] w-[7px] rounded-full bg-emerald-500 shrink-0" />
                     <h2 className="text-[14px] font-[800] tracking-[1px] text-[#0f172a] uppercase">
                         Fleet Details
                     </h2>
@@ -186,7 +186,7 @@ function FleetDetails({ data }) {
                     even if power units are reported.
                 </p>
 
-                <div className="grid grid-cols-3 gap-[14px] mt-[24px]">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-[14px] mt-5 sm:mt-[24px]">
                     {(
                     fleet?.topCards || [
                         {
@@ -230,13 +230,13 @@ function FleetDetails({ data }) {
                         return (
                             <div
                                 key={card.id}
-                                className={`rounded-[14px] border border-[#edf2f7] px-[18px] py-[18px] ${theme.bg}`}
+                                className={`rounded-[14px] border border-[#edf2f7] px-4 py-4 sm:px-[18px] sm:py-[18px] ${theme.bg}`}
                             >
                                 <div className="flex items-start justify-between">
                                     <p className={`text-[9px] font-[800] tracking-[1px] uppercase ${theme.title}`}>
                                         {card.title}
                                     </p>
-                                  <div className={`h-[30px] w-[30px] flex items-center justify-center`}>
+                                  <div className={`h-[30px] w-[30px] flex items-center justify-center shrink-0`}>
                                         {card.type === 'blue' && (
                                             <div className="text-[#2563eb]">
                                                 <Search sx={{ fontSize: 20 }} />
@@ -270,7 +270,7 @@ function FleetDetails({ data }) {
                                 </div>
 
                                 <div className="flex items-end gap-1 mt-[14px]">
-                                    <h3 className={`text-[30px] leading-none font-[800] ${theme.value}`}>
+                                    <h3 className={`text-[26px] sm:text-[30px] leading-none font-[800] ${theme.value}`}>
                                         {card.value}
                                     </h3>
                                     {card.unit && (
@@ -292,9 +292,9 @@ function FleetDetails({ data }) {
 
             </div>
 
-          <div className="mx-[28px] mt-[22px] rounded-[16px] border border-[#d9e1ee] p-[18px]">
+          <div className="mx-4 sm:mx-[28px] mt-4 sm:mt-[22px] rounded-[16px] border border-[#d9e1ee] p-4 sm:p-[18px]">
 
-    <div className="flex items-start justify-between gap-[20px]">
+    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 sm:gap-[20px]">
 
         <div className="flex-1">
             <p className="text-[9px] font-[800] tracking-[1px] text-[#94a3b8] uppercase mb-[8px]">
@@ -317,7 +317,7 @@ function FleetDetails({ data }) {
             </div>
         </div>
 
- <div className="w-[200px]">
+ <div className="w-full sm:w-[200px]">
     <div className="flex items-center justify-between mb-[8px]">
         <p className="text-[9px] font-[800] tracking-[1px] text-[#94a3b8] uppercase">
             Sort By
@@ -448,7 +448,7 @@ function FleetDetails({ data }) {
         </table>
     </div>
 
-    <div className="flex items-center justify-end gap-[18px] px-[28px] py-[8px]">
+    <div className="flex items-center justify-center sm:justify-end gap-[18px] px-4 sm:px-[28px] py-3 sm:py-[8px]">
         <button
             disabled={page === 1}
             onClick={() => setPage((prev) => prev - 1)}

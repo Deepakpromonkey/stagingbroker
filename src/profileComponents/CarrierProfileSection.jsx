@@ -24,7 +24,7 @@ function CarrierProfileSection(props) {
                     <div className='min-w-0 flex flex-col justify-center'>
 
                         <div className='mb-[10px] text-[10px] font-[700] uppercase tracking-[0.14em] text-white/55 sm:text-[11px]'>
-                             DBM: {renderValue(props.subtitle)}
+                             DBA: {renderValue(props.subtitle)}
                         </div>
 
                        <div className='text-[28px] leading-[1.1] font-[800] tracking-[-0.03em] text-white sm:text-[34px] lg:text-[38px] xl:text-[42px] break-words whitespace-normal'>

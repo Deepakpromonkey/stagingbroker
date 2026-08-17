@@ -1030,12 +1030,19 @@ function CarrierProfile() {
               <div className="overflow-hidden rounded-[16px] border border-[#d9e1ee] bg-white shadow-sm">
                 <div className="sticky top-0 z-10 border-b border-[#d9e1ee] bg-[#EBF5FF]">
                   <div className="overflow-x-auto">
-                    <div className="flex w-full px-[24px]">
+                    {/* Mobile: buttons keep their natural width (shrink-0 +
+                        min-width) and whitespace-nowrap so the row scrolls
+                        horizontally instead of squeezing flex-1 columns into
+                        two-line labels ("RISK" / "FACTORS" wrapping, etc).
+                        sm: and up resets every one of these back to the
+                        original unprefixed classes, so desktop
+                        layout/behavior is unchanged. */}
+                    <div className="flex gap-x-3 px-[24px] sm:gap-x-0 sm:w-full">
                       {tabs.map((tab) => (
                         <button
                           key={tab}
                           onClick={() => setActiveTab(tab)}
-                          className={`relative flex-1 py-[22px] text-center text-[11px] font-[700] uppercase tracking-[1px] transition-all ${
+                          className={`relative shrink-0 sm:flex-1 min-w-[128px] sm:min-w-0 whitespace-nowrap sm:whitespace-normal px-[6px] sm:px-0 py-[18px] sm:py-[22px] text-center text-[11px] font-[700] uppercase tracking-[1px] transition-all ${
                             activeTab === tab
                               ? "text-[#1c5dbe]"
                               : "text-[#7c8fac] hover:text-[#111827]"

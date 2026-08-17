@@ -276,7 +276,7 @@ const OtpModal = ({ email, otpSession, rememberDevice, onClose, onVerified, onRe
 
     return (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
-            <div className="relative w-full max-w-[400px] bg-white rounded-2xl shadow-[0_30px_60px_rgba(0,0,0,0.25)] p-7">
+            <div className="relative w-full max-w-[400px] bg-white rounded-2xl shadow-[0_30px_60px_rgba(0,0,0,0.25)] p-5 sm:p-7">
                 <button
                     type="button"
                     onClick={handleClose}
@@ -290,12 +290,12 @@ const OtpModal = ({ email, otpSession, rememberDevice, onClose, onVerified, onRe
                     <ShieldOutlinedIcon sx={{ fontSize: 22, color: COLOR_BLUE }} />
                 </div>
 
-                <h2 className="text-[20px] font-bold text-gray-900 m-0 mb-1.5">Verify it's you</h2>
-                <p className="text-[13.5px] text-gray-500 m-0 mb-6 leading-relaxed">
+                <h2 className="text-[18px] sm:text-[20px] font-bold text-gray-900 m-0 mb-1.5">Verify it's you</h2>
+                <p className="text-[13px] sm:text-[13.5px] text-gray-500 m-0 mb-6 leading-relaxed break-words">
                     Enter the 6-digit code sent to <span className="font-semibold text-gray-700">{email}</span>
                 </p>
 
-                <div className="flex justify-between gap-2 mb-2" onPaste={handlePaste}>
+                <div className="flex justify-between gap-1.5 sm:gap-2 mb-2" onPaste={handlePaste}>
                     {digits.map((d, i) => (
                         <input
                             key={i}
@@ -308,7 +308,7 @@ const OtpModal = ({ email, otpSession, rememberDevice, onClose, onVerified, onRe
                             maxLength={6}
                             autoComplete={i === 0 ? 'one-time-code' : 'off'}
                             disabled={verifying}
-                            className="w-[46px] h-[54px] text-center text-[20px] font-semibold rounded-xl border outline-none"
+                            className="flex-1 min-w-0 max-w-[46px] h-[44px] sm:h-[54px] text-center text-[16px] sm:text-[20px] font-semibold rounded-xl border outline-none"
                             style={{
                                 borderColor: error ? '#F0997B' : COLOR_BORDER,
                                 background: verifying ? '#F7F8FA' : '#FFFFFF',
@@ -559,7 +559,7 @@ const submitOtp = useCallback(async (code) => {
 
     return (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
-            <div className="relative w-full max-w-[400px] bg-white rounded-2xl shadow-[0_30px_60px_rgba(0,0,0,0.25)] p-7">
+            <div className="relative w-full max-w-[400px] bg-white rounded-2xl shadow-[0_30px_60px_rgba(0,0,0,0.25)] p-5 sm:p-7">
                 <button
                     type="button"
                     onClick={onClose}
@@ -575,12 +575,12 @@ const submitOtp = useCallback(async (code) => {
                             <ShieldOutlinedIcon sx={{ fontSize: 22, color: COLOR_BLUE }} />
                         </div>
 
-                        <h2 className="text-[20px] font-bold text-gray-900 m-0 mb-1.5">Verify it's you</h2>
-                        <p className="text-[13.5px] text-gray-500 m-0 mb-6 leading-relaxed">
+                        <h2 className="text-[18px] sm:text-[20px] font-bold text-gray-900 m-0 mb-1.5">Verify it's you</h2>
+                        <p className="text-[13px] sm:text-[13.5px] text-gray-500 m-0 mb-6 leading-relaxed break-words">
                             Enter the 6-digit code sent to <span className="font-semibold text-gray-700">{email}</span>
                         </p>
 
-                        <div className="flex justify-between gap-2 mb-2" onPaste={handlePaste}>
+                        <div className="flex justify-between gap-1.5 sm:gap-2 mb-2" onPaste={handlePaste}>
                             {digits.map((d, i) => (
                                 <input
                                     key={i}
@@ -593,7 +593,7 @@ const submitOtp = useCallback(async (code) => {
                                     maxLength={6}
                                     autoComplete={i === 0 ? 'one-time-code' : 'off'}
                                     disabled={verifying}
-                                    className="w-[46px] h-[54px] text-center text-[20px] font-semibold rounded-xl border outline-none"
+                                    className="flex-1 min-w-0 max-w-[46px] h-[44px] sm:h-[54px] text-center text-[16px] sm:text-[20px] font-semibold rounded-xl border outline-none"
                                     style={{
                                         borderColor: otpError ? '#F0997B' : COLOR_BORDER,
                                         background: verifying ? '#F7F8FA' : '#FFFFFF',
@@ -642,8 +642,8 @@ const submitOtp = useCallback(async (code) => {
                             <LockOutlinedIcon sx={{ fontSize: 22, color: COLOR_BLUE }} />
                         </div>
 
-                        <h2 className="text-[20px] font-bold text-gray-900 m-0 mb-1.5">Set a new password</h2>
-                        <p className="text-[13.5px] text-gray-500 m-0 mb-6 leading-relaxed">
+                        <h2 className="text-[18px] sm:text-[20px] font-bold text-gray-900 m-0 mb-1.5">Set a new password</h2>
+                        <p className="text-[13px] sm:text-[13.5px] text-gray-500 m-0 mb-6 leading-relaxed break-words">
                             Choose a new password for <span className="font-semibold text-gray-700">{email}</span>
                         </p>
 
@@ -913,50 +913,50 @@ const Login  = () => {
 
     return (
         <div className="fixed inset-0 w-screen h-screen overflow-y-auto overflow-x-hidden z-[1000] bg-white">
-            <div className="flex flex-col md:flex-row w-full min-h-full">
-                <div className="relative order-2 md:order-1 w-full md:w-1/2 bg-[#2F5CFB] flex items-center justify-center overflow-hidden min-h-[560px] md:min-h-full">
+            <div className="flex flex-col xl:flex-row w-full min-h-full">
+                <div className="relative order-2 xl:order-1 w-full xl:w-1/2 bg-[#2F5CFB] flex items-center justify-center overflow-hidden min-h-[420px] sm:min-h-[500px] md:min-h-[560px] lg:min-h-[600px] xl:min-h-full">
                     <GridBackground />
-                    <RingDecoration className="w-28 h-28 top-8 right-10" />
-                    <RingDecoration className="w-16 h-16 top-[42%] left-[8%]" />
-                    <RingDecoration className="w-14 h-14 top-[35%] left-1/2 -translate-x-1/2" />
+                    <RingDecoration className="hidden sm:block w-20 h-20 md:w-28 md:h-28 top-8 right-10" />
+                    <RingDecoration className="hidden sm:block w-12 h-12 md:w-16 md:h-16 top-[42%] left-[8%]" />
+                    <RingDecoration className="hidden sm:block w-10 h-10 md:w-14 md:h-14 top-[35%] left-1/2 -translate-x-1/2" />
 
-                    <div className="relative z-[2] w-full max-w-[520px] flex flex-col items-center px-8 py-12 box-border">
-                        <div className="text-center text-white mb-8">
-                            <h2 className="text-[28px] font-light leading-[36px] mb-4 max-w-[380px] mx-auto">
+                    <div className="relative z-[2] w-full max-w-[520px] flex flex-col items-center px-5 sm:px-6 md:px-8 py-8 sm:py-10 md:py-12 box-border">
+                        <div className="text-center text-white mb-6 md:mb-8">
+                            <h2 className="text-[20px] sm:text-[24px] md:text-[28px] font-light leading-[26px] sm:leading-[32px] md:leading-[36px] mb-3 md:mb-4 max-w-[380px] mx-auto">
                                 The easiest way to manage your Shipment.
                             </h2>
-                            <p className="text-base m-0 text-[#DBEAFE]">Join the DollarTraq now!</p>
+                            <p className="text-sm md:text-base m-0 text-[#DBEAFE]">Join the DollarTraq now!</p>
                         </div>
 
-                        <div className="relative w-[600px] max-w-[540px]">
+                        <div className="relative w-full max-w-[420px] sm:max-w-[480px] md:max-w-[560px] xl:w-[600px] xl:max-w-[540px]">
                             <div className="absolute inset-0 rounded-2xl bg-white/25 blur-[1px] rotate-[-4deg] translate-y-3 shadow-[0_20px_35px_rgba(0,0,0,0.18)]" />
                             <div className="absolute inset-0 rounded-2xl bg-white/45 blur-[0.5px] rotate-[3deg] translate-y-1.5 shadow-[0_20px_35px_rgba(0,0,0,0.2)]" />
                             <div className="relative rounded-2xl overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.28)] bg-white p-2">
                                 <img
                                     src={image}
                                     alt="DollarTraq dashboard preview"
-                                    className="block w-full h-[420px] object-cover object-top rounded-lg"
+                                    className="block w-full h-[220px] sm:h-[300px] md:h-[420px] object-cover object-top rounded-lg"
                                 />
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="order-1 md:order-2 w-full md:w-1/2 bg-white flex items-center justify-center px-8 py-10 box-border">
+                <div className="order-1 xl:order-2 w-full xl:w-1/2 bg-white flex items-center justify-center px-5 sm:px-6 md:px-10 lg:px-12 xl:px-8 py-8 md:py-10 box-border">
                     <div className="w-full max-w-[440px]">
-                        <img src={logo} alt="DollarTraq" className="h-[42px] w-auto mb-10 block" />
+                        <img src={logo} alt="DollarTraq" className="h-9 md:h-[42px] w-auto mb-6 md:mb-10 block" />
                         <div>
-                            <h1 className="text-[25px] leading-tight font-bold text-gray-900 m-0 mb-3 tracking-tight">
+                            <h1 className="text-[20px] sm:text-[22px] md:text-[25px] leading-tight font-bold text-gray-900 m-0 mb-2 md:mb-3 tracking-tight">
                                 {forgotPassword ? 'Reset your password.' : 'Log in to your account.'}
                             </h1>
-                            <p className="text-[15px] text-gray-500 m-0 mb-8">
+                            <p className="text-sm md:text-[15px] text-gray-500 m-0 mb-6 md:mb-8">
                                 {forgotPassword
                                     ? 'Enter your email address and we will send you a reset link.'
                                     : 'Enter your email address and password to log in.'}
                             </p>
                         </div>
 
-                        <form onSubmit={loginSubmit} className="flex flex-col gap-5">
+                        <form onSubmit={loginSubmit} className="flex flex-col gap-4 md:gap-5">
                             <div className="relative w-full">
                                 <span className="absolute left-3.5 top-[27px] -translate-y-1/2 flex items-center justify-center pointer-events-none z-[2] text-gray-400">
                                     <EmailOutlinedIcon sx={{ fontSize: 19 }} />
@@ -1016,7 +1016,7 @@ const Login  = () => {
                             )}
 
                             {!forgotPassword && (
-                                <div className="flex justify-between items-center -mt-1">
+                                <div className="flex flex-col xs:flex-row sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0 -mt-1">
                                     <label className="flex items-center gap-2 cursor-pointer select-none">
                                         <input
                                             type="checkbox"

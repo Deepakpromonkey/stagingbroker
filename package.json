@@ -24,6 +24,8 @@
     "dayjs": "^1.11.21",
     "jodit": "^4.13.10",
     "jodit-react": "^5.3.21",
+    "laravel-echo": "^2.4.0",
+    "pusher-js": "^8.6.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-hook-form": "^7.81.0",

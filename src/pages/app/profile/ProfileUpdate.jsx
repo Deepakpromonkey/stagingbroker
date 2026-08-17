@@ -8,7 +8,6 @@ import {
     WorkspacePremium as BadgeIconMui,
     CalendarToday as CalendarIconMui,
     AccessTime as ClockIconMui,
-    FactCheck as ChecklistIconMui,
     Lock as LockIconMui,
     Edit as PencilIconMui,
     Close as CloseIconMui,
@@ -17,8 +16,11 @@ import {
     ArrowForward as ArrowRightIconMui,
 } from '@mui/icons-material';
 import { apiFetch, getToken } from '../../../lib/api';
-import { toast, ToastContainer} from '../../../components/ui/Toaster'
+import { toast, ToastContainer } from '../../../components/ui/Toaster'
 
+// ---------------------------------------------------------------------
+// Design tokens — back to your original navy / indigo / blue palette.
+// ---------------------------------------------------------------------
 const NAVY = '#0F1B33';
 const NAVY_LIGHT = '#1B2C52';
 const INDIGO = '#4F46E5';
@@ -26,6 +28,7 @@ const ACCENT = '#2563EB';
 const ACCENT_DARK = '#1D4ED8';
 const BORDER = '#E3E7EC';
 const FIELD_BG = '#F7F8FA';
+const PAGE_BG = '#F4F5F1';
 
 const TOKEN_KEY = 'crm_auth_token';
 const USER_KEY = 'crm_user';
@@ -33,76 +36,69 @@ const USER_KEY = 'crm_user';
 const EyeIcon = ({ show }) =>
     show ? <VisibilityIcon sx={{ fontSize: 15 }} /> : <VisibilityOffIcon sx={{ fontSize: 15 }} />;
 
-const UserIcon = () => <UserIconMui sx={{ fontSize: 15 }} />;
-
-const MailIcon = () => <MailIconMui sx={{ fontSize: 15 }} />;
-
-const PhoneIcon = () => <PhoneIconMui sx={{ fontSize: 15 }} />;
-
-const BadgeIcon = () => <BadgeIconMui sx={{ fontSize: 15 }} />;
-
-const CalendarIcon = () => <CalendarIconMui sx={{ fontSize: 15 }} />;
-
-const ClockIcon = () => <ClockIconMui sx={{ fontSize: 15 }} />;
-
-const ChecklistIcon = () => <ChecklistIconMui sx={{ fontSize: 16 }} />;
-
-const LockIcon = ({ size = 14 }) => <LockIconMui sx={{ fontSize: size }} />;
-
-const PencilIcon = ({ color = '#fff' }) => <PencilIconMui sx={{ fontSize: 13, color }} />;
-
+const UserIcon = () => <UserIconMui sx={{ fontSize: 14 }} />;
+const MailIcon = () => <MailIconMui sx={{ fontSize: 14 }} />;
+const PhoneIcon = () => <PhoneIconMui sx={{ fontSize: 14 }} />;
+const BadgeIcon = () => <BadgeIconMui sx={{ fontSize: 14 }} />;
+const CalendarIcon = () => <CalendarIconMui sx={{ fontSize: 14 }} />;
+const ClockIcon = () => <ClockIconMui sx={{ fontSize: 14 }} />;
+const LockIcon = ({ size = 13 }) => <LockIconMui sx={{ fontSize: size }} />;
+const PencilIcon = ({ color = '#fff', size = 13 }) => <PencilIconMui sx={{ fontSize: size, color }} />;
 const CloseIcon = () => <CloseIconMui sx={{ fontSize: 16 }} />;
-
 const CheckCircleIcon = () => <CheckCircleIconMui sx={{ fontSize: 9, color: '#fff' }} />;
-
-const ShieldIcon = () => <ShieldIconMui sx={{ fontSize: 20, color: '#fff' }} />;
-
+const ShieldIcon = ({ color = '#fff', size = 18 }) => <ShieldIconMui sx={{ fontSize: size, color }} />;
 const ArrowRightIcon = () => <ArrowRightIconMui sx={{ fontSize: 12 }} />;
 
-const CHIP_THEMES = {
-    indigo: { bg: '#EEF2FF', fg: '#4F46E5' },
-    emerald: { bg: '#ECFDF5', fg: '#059669' },
-    amber: { bg: '#FFFBEB', fg: '#D97706' },
-    sky: { bg: '#F0F9FF', fg: '#0284C7' },
-    rose: { bg: '#FFF1F2', fg: '#E11D48' },
-    slate: { bg: '#F8FAFC', fg: '#475569' },
-};
-
-function InfoBlock({ label, value, icon, theme = 'indigo' }) {
-    const c = CHIP_THEMES[theme];
+// ---------------------------------------------------------------------
+// A single ledger row — label left, value right, hairline divider.
+// ---------------------------------------------------------------------
+function DetailRow({ label, value, icon }) {
     return (
-        <div className="group flex items-start gap-3.5 p-4 rounded-2xl border border-gray-100 bg-white hover:border-gray-200 hover:shadow-[0_4px_16px_rgba(15,27,51,0.06)] transition-all">
-            <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105"
-                style={{ background: c.bg, color: c.fg }}
-            >
-                {icon}
-            </div>
-            <div className="flex flex-col gap-0.5 min-w-0 pt-0.5">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{label}</span>
-                <span className="text-[15px] font-semibold text-gray-900 break-all leading-snug">{value || '—'}</span>
-            </div>
+        <div className="flex items-center justify-between gap-4 py-3.5 border-b border-[#EEF0F3] last:border-0">
+            <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400 flex-shrink-0">
+                <span style={{ color: INDIGO }}>{icon}</span>
+                {label}
+            </span>
+            <span className="text-[14px] sm:text-[15px] font-semibold text-gray-900 text-right break-all">
+                {value || '—'}
+            </span>
         </div>
     );
 }
 
 function TextInput({ label, icon, ...inputProps }) {
+    const [focused, setFocused] = useState(false);
+    const hasValue = Boolean(inputProps.value);
+
     return (
-        <div className="flex flex-col gap-1.5">
-            <label className="text-[10.5px] font-semibold uppercase tracking-wide text-gray-400">
-                {label}
-            </label>
-            <div className="flex items-center gap-2.5 rounded-xl px-3.5 py-3 bg-[#F7F8FA] border border-[#E3E7EC] focus-within:border-[#4F46E5] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#EEF2FF] transition-all">
-                <span className="text-gray-400 flex-shrink-0">{icon}</span>
+        <div className="flex items-center gap-3">
+            <div
+                className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors"
+                style={{
+                    background: focused ? INDIGO : '#EEF2FF',
+                    color: focused ? '#fff' : INDIGO,
+                }}
+            >
+                {icon}
+            </div>
+            <div className="flex-1 min-w-0 relative">
+                <label
+                    className="block text-[10px] font-semibold uppercase tracking-wide mb-1 transition-colors"
+                    style={{ color: focused ? INDIGO : '#9CA3AF' }}
+                >
+                    {label}
+                </label>
                 <input
                     {...inputProps}
-                    className="flex-1 min-w-0 border-none outline-none bg-transparent text-sm font-medium text-gray-900 placeholder:text-gray-400"
+                    onFocus={(e) => { setFocused(true); inputProps.onFocus?.(e); }}
+                    onBlur={(e) => { setFocused(false); inputProps.onBlur?.(e); }}
+                    className="w-full border-0 border-b-2 outline-none bg-transparent text-[15px] font-semibold text-gray-900 placeholder:text-gray-300 placeholder:font-medium pb-1.5 transition-colors"
+                    style={{ borderColor: focused ? INDIGO : hasValue ? '#D7DCE3' : '#E3E7EC' }}
                 />
             </div>
         </div>
     );
 }
-
 
 function RequirementRow({ met, children }) {
     return (
@@ -142,61 +138,72 @@ const STRENGTH_META = [
 
 function PasswordField({ label, value, onChange, error, show, onToggle, placeholder, name, autoComplete, meter }) {
     const strength = meter ? getPasswordStrength(value) : 0;
+    const [focused, setFocused] = useState(false);
+    const borderColor = error ? '#D92D20' : focused ? INDIGO : value ? '#D7DCE3' : '#E3E7EC';
+    const chipColor = error ? '#D92D20' : focused ? INDIGO : '#9CA3AF';
+    const chipBg = error ? '#FEF3F2' : focused ? '#EEF2FF' : '#F7F8FA';
 
     return (
-        <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-                <label className="text-[10.5px] font-semibold uppercase tracking-wide text-gray-400">
-                    {label}
-                </label>
-                {meter && value.length > 0 && (
-                    <span className="text-[10.5px] font-bold" style={{ color: STRENGTH_META[strength].color }}>
-                        {STRENGTH_META[strength].label}
-                    </span>
-                )}
-            </div>
+        <div className="flex items-start gap-3">
             <div
-                className="flex items-center gap-2.5 rounded-xl px-3.5 py-3 transition-all"
-                style={{
-                    backgroundColor: error ? '#FEF3F2' : FIELD_BG,
-                    border: `1.5px solid ${error ? '#D92D20' : BORDER}`,
-                    boxShadow: !error && value ? `0 0 0 4px ${INDIGO}0D` : 'none',
-                }}
+                className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 mt-5 transition-colors"
+                style={{ background: chipBg, color: chipColor }}
             >
-                <span className="text-gray-400 flex-shrink-0"><LockIcon /> </span>
-                <input
-                    type={show ? 'text' : 'password'}
-                    value={value}
-                    onChange={(e) => onChange(e.target.value)}
-                    placeholder={placeholder}
-                    name={name}
-                    autoComplete={autoComplete}
-                    className="flex-1 min-w-0 border-none outline-none bg-transparent text-sm font-medium text-gray-900 placeholder:text-gray-400"
-                />
-                <button
-                    type="button"
-                    onClick={onToggle}
-                    className="text-gray-400 hover:text-[#0F1B33] flex-shrink-0"
-                >
-                    <EyeIcon show={show} />
-                </button>
+                <LockIcon />
             </div>
-
-            {meter && value.length > 0 && (
-                <div className="flex gap-1 mt-0.5">
-                    {[0, 1, 2].map((i) => (
-                        <div
-                            key={i}
-                            className="h-1 flex-1 rounded-full transition-colors"
-                            style={{ background: i < strength ? STRENGTH_META[strength].color : '#E3E7EC' }}
-                        />
-                    ))}
+            <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1">
+                    <label
+                        className="text-[10px] font-semibold uppercase tracking-wide transition-colors"
+                        style={{ color: focused ? INDIGO : '#9CA3AF' }}
+                    >
+                        {label}
+                    </label>
+                    {meter && value.length > 0 && (
+                        <span className="text-[10.5px] font-bold" style={{ color: STRENGTH_META[strength].color }}>
+                            {STRENGTH_META[strength].label}
+                        </span>
+                    )}
                 </div>
-            )}
 
-            {error && (
-                <p className="text-[11.5px] font-medium text-red-600 m-0">{error}</p>
-            )}
+                <div
+                    className="flex items-center gap-2 border-b-2 pb-1.5 transition-colors"
+                    style={{ borderColor }}
+                >
+                    <input
+                        type={show ? 'text' : 'password'}
+                        value={value}
+                        onChange={(e) => onChange(e.target.value)}
+                        onFocus={() => setFocused(true)}
+                        onBlur={() => setFocused(false)}
+                        placeholder={placeholder}
+                        name={name}
+                        autoComplete={autoComplete}
+                        className="flex-1 min-w-0 border-none outline-none bg-transparent text-[15px] font-semibold text-gray-900 placeholder:text-gray-300 placeholder:font-medium"
+                    />
+                    <button
+                        type="button"
+                        onClick={onToggle}
+                        className="text-gray-400 hover:text-[#0F1B33] flex-shrink-0"
+                    >
+                        <EyeIcon show={show} />
+                    </button>
+                </div>
+
+                {meter && value.length > 0 && (
+                    <div className="flex gap-1 mt-2">
+                        {[0, 1, 2].map((i) => (
+                            <div
+                                key={i}
+                                className="h-1 flex-1 rounded-full transition-colors"
+                                style={{ background: i < strength ? STRENGTH_META[strength].color : '#E3E7EC' }}
+                            />
+                        ))}
+                    </div>
+                )}
+
+                {error && <p className="text-[11.5px] font-medium text-red-600 mt-1.5 mb-0">{error}</p>}
+            </div>
         </div>
     );
 }
@@ -473,12 +480,12 @@ const ProfileUpdate = () => {
 
             const result = rawResult?.original ? rawResult.original : rawResult;
 
-if (result?.status) {
-    toast.success(result.message || "Password updated successfully.");
+            if (result?.status) {
+                toast.success(result.message || "Password updated successfully.");
 
-    resetPasswordFields();
-    setPasswordOpen(false);
-} else {
+                resetPasswordFields();
+                setPasswordOpen(false);
+            } else {
                 toast.error(result?.message || 'Failed to update password.');
             }
         } catch (error) {
@@ -491,7 +498,7 @@ if (result?.status) {
     };
 
     return (
-        <div className="min-h-screen bg-[#F4F5F1] px-8 py-5 md:px-14">
+        <div className="min-h-screen px-4 py-5 sm:px-6 md:px-8 lg:px-14" style={{ background: PAGE_BG }}>
 
             {/* Remove this if <ToastContainer /> is already mounted once
                 globally (e.g. in your root layout) — mounting it twice just
@@ -499,104 +506,125 @@ if (result?.status) {
                 but one is enough. */}
             <ToastContainer />
 
-            <div className="mb-8">
-                <h1 className="text-[40px] font-semibold tracking-tight text-slate-900">My Profile</h1>
-                <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-slate-500">
+            <div className="mb-6 sm:mb-8">
+                <h1 className="text-[26px] sm:text-[32px] md:text-[40px] font-semibold tracking-tight text-slate-900">My Profile</h1>
+                <p className="mt-2 max-w-2xl text-sm sm:text-[15px] leading-relaxed text-slate-500">
                     View your account details, update your personal information, and manage your password and security settings.
                 </p>
             </div>
 
-            <div className="max-w-5xl mx-auto flex flex-col gap-6">
+            <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-[300px_1fr] gap-5 sm:gap-6 items-start">
 
+                {/* ---------------------------------------------------------
+                    Sticky identity card — gradient avatar ring, soft
+                    shadow, stacked full-width actions.
+                --------------------------------------------------------- */}
                 <div
-                    className="relative overflow-hidden rounded-[28px] px-7 py-8 md:px-10 md:py-10"
-                    style={{ background: `linear-gradient(120deg, ${NAVY} 0%, ${NAVY_LIGHT} 55%, ${INDIGO} 130%)` }}
+                    className="md:sticky md:top-6 relative bg-white rounded-[24px] border border-[#edf2f7] pt-8 pb-6 px-6 flex flex-col items-center text-center"
+                    style={{ boxShadow: '0 8px 30px rgba(15,27,51,0.06)' }}
                 >
-
-                    <div className="absolute -top-20 -right-16 w-64 h-64 rounded-full bg-white/5 blur-2xl pointer-events-none" />
-                    <div className="absolute -bottom-24 left-1/3 w-72 h-72 rounded-full bg-indigo-400/10 blur-3xl pointer-events-none" />
-
-                    <div className="relative flex flex-col md:flex-row md:items-center gap-6">
-
-                        <div className="flex items-center gap-5 flex-1 min-w-0">
-                            <div className="relative flex-shrink-0">
-                                <div className="p-[3px] rounded-[22px]" style={{ background: 'linear-gradient(135deg, #818CF8, #38BDF8)' }}>
-                                    {user.profile_pic_url && !avatarError ? (
-                                        <img
-                                            src={user.profile_pic_url}
-                                            alt="Profile"
-                                            onError={() => setAvatarError(true)}
-                                            className="w-20 h-20 md:w-24 md:h-24 rounded-[19px] object-cover border-[3px] border-[#0F1B33]"
-                                        />
-                                    ) : (
-                                        <div className="w-20 h-20 md:w-24 md:h-24 rounded-[19px] border-[3px] border-[#0F1B33] bg-white/10 flex items-center justify-center">
-                                            <span className="text-2xl font-bold text-white">{getInitials()}</span>
-                                        </div>
-                                    )}
+                    <div className="relative mb-4">
+                        <div className="p-[3px] rounded-full" style={{ background: `linear-gradient(135deg, ${INDIGO}, #38BDF8)` }}>
+                            {user.profile_pic_url && !avatarError ? (
+                                <img
+                                    src={user.profile_pic_url}
+                                    alt="Profile"
+                                    onError={() => setAvatarError(true)}
+                                    className="w-24 h-24 rounded-full object-cover border-[3px] border-white"
+                                />
+                            ) : (
+                                <div className="w-24 h-24 rounded-full border-[3px] border-white flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${NAVY}, ${NAVY_LIGHT})` }}>
+                                    <span className="text-2xl font-bold text-white">{getInitials()}</span>
                                 </div>
-                                <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-400 border-[3px] border-[#0F1B33]" />
-                            </div>
-
-                            <div className="min-w-0">
-                                <h2 className="text-white font-bold text-xl md:text-2xl tracking-tight truncate">
-                                    {user.first_name || user.last_name
-                                        ? `${user.first_name || ''} ${user.last_name || ''}`.trim()
-                                        : 'Your Name'}
-                                </h2>
-                                <p className="text-indigo-200/80 text-sm mt-0.5 truncate">{user.email || 'your.email@company.com'}</p>
-
-                                <div className="flex flex-wrap items-center gap-2 mt-3">
-                                    <div className="inline-flex items-center gap-1.5 bg-white/10 border border-white/10 rounded-full px-3 py-1">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                                        <span className="text-white text-[11px] font-semibold tracking-wide uppercase">
-                                            Active session
-                                        </span>
-                                    </div>
-                                    {getRoleLabel() && (
-                                        <div className="inline-flex items-center gap-1.5 bg-white/10 border border-white/10 rounded-full px-3 py-1">
-                                            <span className="text-indigo-200"><BadgeIcon /></span>
-                                            <span className="text-white text-[11px] font-semibold tracking-wide uppercase">
-                                                {getRoleLabel()}
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
+                            )}
                         </div>
+                        <div className="absolute bottom-1 right-1 w-4 h-4 rounded-full bg-emerald-400 border-[3px] border-white" />
+                    </div>
 
-                        <div className="flex gap-2.5 flex-shrink-0">
-                            <button
-                                onClick={() => { resetPasswordFields(); setPasswordOpen(true); }}
-                                className="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/15 text-white font-semibold text-sm px-4 py-2.5 rounded-xl transition-colors"
-                            >
-                                <LockIcon />
-                                <span className="hidden sm:inline">Change Password</span>
-                            </button>
-                            <button
-                                onClick={() => setEditOpen(true)}
-                                className="flex items-center gap-2 bg-white text-[#0F1B33] font-semibold text-sm px-4 py-2.5 rounded-xl hover:bg-indigo-50 transition-colors shadow-lg shadow-black/10"
-                            >
-                                <PencilIcon color="#0F1B33" />
-                                Edit Profile
-                            </button>
+                    <h2 className="font-bold text-lg text-slate-900 tracking-tight truncate max-w-full">
+                        {user.first_name || user.last_name
+                            ? `${user.first_name || ''} ${user.last_name || ''}`.trim()
+                            : 'Your Name'}
+                    </h2>
+                    <p className="text-gray-400 text-[13px] mt-0.5 truncate max-w-full">{user.email || 'your.email@company.com'}</p>
+
+                    <div className="flex flex-wrap items-center justify-center gap-2 mt-3">
+                        <div className="inline-flex items-center gap-1.5 bg-emerald-50 rounded-full px-3 py-1">
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            <span className="text-emerald-700 text-[10.5px] font-semibold tracking-wide uppercase">
+                                Active
+                            </span>
                         </div>
+                        {getRoleLabel() && (
+                            <div className="inline-flex items-center gap-1.5 rounded-full px-3 py-1" style={{ background: '#EEF2FF' }}>
+                                <span style={{ color: INDIGO }}><BadgeIcon /></span>
+                                <span className="text-[10.5px] font-semibold tracking-wide uppercase" style={{ color: INDIGO }}>
+                                    {getRoleLabel()}
+                                </span>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="w-full h-px my-5" style={{ background: BORDER }} />
+
+                    <div className="flex flex-col gap-2.5 w-full">
+                        <button
+                            onClick={() => setEditOpen(true)}
+                            className="flex items-center justify-center gap-2 text-white font-semibold text-sm px-4 py-2.5 rounded-xl shadow-md shadow-indigo-900/10 transition-transform hover:-translate-y-0.5"
+                            style={{ background: `linear-gradient(120deg, ${NAVY}, ${INDIGO})` }}
+                        >
+                            <PencilIcon />
+                            Edit Profile
+                        </button>
+                        <button
+                            onClick={() => { resetPasswordFields(); setPasswordOpen(true); }}
+                            className="flex items-center justify-center gap-2 font-semibold text-sm px-4 py-2.5 rounded-xl border border-[#E3E7EC] text-[#0F1B33] hover:bg-gray-50 transition-colors"
+                        >
+                            <LockIcon />
+                            Change Password
+                        </button>
                     </div>
                 </div>
 
-                <div className="bg-white rounded-[28px] border border-[#edf2f7] shadow-sm px-6 py-6 md:px-8 md:py-8">
-                    <div className="flex items-center gap-2 text-gray-900 font-bold text-base mb-5">
-                        <span className="text-[#4F46E5]"><ChecklistIcon /></span>
-                        Personal Details
+                {/* ---- Main column ---- */}
+                <div className="flex flex-col gap-5 sm:gap-6">
+
+                    <div className="bg-white rounded-[24px] border border-[#edf2f7] px-5 py-5 sm:px-7 sm:py-6" style={{ boxShadow: '0 8px 30px rgba(15,27,51,0.04)' }}>
+                        <div className="text-gray-900 font-bold text-sm sm:text-base mb-1">Personal Details</div>
+                        <p className="text-[12.5px] text-gray-400 mb-2">Information on record for your account.</p>
+
+                        <div className="mt-2">
+                            <DetailRow label="Display Name" value={`${user.first_name || ''} ${user.last_name || ''}`.trim()} icon={<UserIcon />} />
+                            <DetailRow label="Corporate Email" value={user.email} icon={<MailIcon />} />
+                            <DetailRow label="Access Level" value={getRoleLabel() || '—'} icon={<BadgeIcon />} />
+                            <DetailRow label="Mobile Contact" value={user.phone ?? user.contact} icon={<PhoneIcon />} />
+                            <DetailRow label="Onboarding Date" value={user.added_on_formatted} icon={<CalendarIcon />} />
+                            <DetailRow label="Last Updated" value={user.updated_on_formatted || user.added_on_formatted} icon={<ClockIcon />} />
+                        </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <InfoBlock label="Display Name" value={`${user.first_name || ''} ${user.last_name || ''}`.trim()} icon={<UserIcon />} theme="indigo" />
-                        <InfoBlock label="Corporate Email" value={user.email} icon={<MailIcon />} theme="sky" />
-                        <InfoBlock label="Access Level" value={getRoleLabel() || '—'} icon={<BadgeIcon />} theme="amber" />
-                        <InfoBlock label="Mobile Contact" value={user.phone ?? user.contact} icon={<PhoneIcon />} theme="rose" />
-                        <InfoBlock label="Onboarding Date" value={user.added_on_formatted} icon={<CalendarIcon />} theme="emerald" />
-                        <InfoBlock label="Last Updated" value={user.updated_on_formatted || user.added_on_formatted} icon={<ClockIcon />} theme="slate" />
+                    <div
+                        className="relative overflow-hidden rounded-[24px] px-5 py-5 sm:px-7 sm:py-6 flex items-center justify-between gap-4 flex-wrap"
+                        style={{ background: `linear-gradient(120deg, ${NAVY} 0%, ${NAVY_LIGHT} 60%, ${INDIGO} 150%)` }}
+                    >
+                        <div className="flex items-start gap-3 min-w-0 relative">
+                            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(255,255,255,0.12)' }}>
+                                <ShieldIcon />
+                            </div>
+                            <div className="min-w-0">
+                                <div className="text-white font-bold text-sm sm:text-base">Password &amp; Security</div>
+                                <p className="text-indigo-200/70 text-[12.5px] mt-0.5">Keep your account secure with a strong, unique password.</p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => { resetPasswordFields(); setPasswordOpen(true); }}
+                            className="flex items-center gap-2 bg-white text-[#0F1B33] font-semibold text-sm px-4 py-2.5 rounded-xl flex-shrink-0 hover:bg-indigo-50 transition-colors relative"
+                        >
+                            <LockIcon />
+                            Change Password
+                        </button>
                     </div>
+
                 </div>
 
             </div>
@@ -608,13 +636,13 @@ if (result?.status) {
                         onClick={() => setEditOpen(false)}
                     />
 
-                    <div className="absolute inset-y-0 right-0 max-w-full flex">
-                        <div className="w-screen max-w-lg bg-white shadow-2xl flex flex-col h-full">
+                    <div className="absolute inset-0 flex items-center justify-center p-4 sm:inset-y-0 sm:right-0 sm:left-auto sm:top-0 sm:bottom-0 sm:p-0 sm:items-stretch sm:justify-end sm:max-w-full">
+                        <div className="w-full max-w-md max-h-[90vh] rounded-[24px] overflow-hidden sm:w-screen sm:max-w-lg sm:max-h-full sm:h-full sm:rounded-none bg-white shadow-2xl flex flex-col">
                             <form onSubmit={handleSubmit} className="flex flex-col h-full overflow-y-auto">
 
                                 {/* ---- Gradient header with overlapping avatar ---- */}
                                 <div
-                                    className="relative px-8 pt-7 pb-16 flex-shrink-0 overflow-hidden"
+                                    className="relative px-5 pt-6 pb-14 sm:px-8 sm:pt-7 sm:pb-16 flex-shrink-0 overflow-hidden"
                                     style={{ background: `linear-gradient(120deg, ${NAVY} 0%, ${NAVY_LIGHT} 55%, ${INDIGO} 140%)` }}
                                 >
                                     <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/5 blur-2xl pointer-events-none" />
@@ -622,7 +650,7 @@ if (result?.status) {
                                     <button
                                         type="button"
                                         onClick={() => setEditOpen(false)}
-                                        className="absolute top-5 right-6 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
+                                        className="absolute top-4 right-5 sm:top-5 sm:right-6 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
                                     >
                                         <CloseIcon />
                                     </button>
@@ -630,7 +658,7 @@ if (result?.status) {
                                     <p className="text-[10.5px] font-bold uppercase tracking-widest text-indigo-200/80 m-0">
                                         Account
                                     </p>
-                                    <h2 className="text-white text-xl font-bold mt-1 m-0">
+                                    <h2 className="text-white text-lg sm:text-xl font-bold mt-1 m-0">
                                         Edit Profile
                                     </h2>
                                     {user.updated_on_formatted && (
@@ -640,20 +668,20 @@ if (result?.status) {
                                     )}
                                 </div>
 
-                                <div className="flex-1 px-8">
+                                <div className="flex-1 px-5 sm:px-8">
 
-                                    <div className="-mt-12 mb-8 flex flex-col items-center">
+                                    <div className="-mt-10 sm:-mt-12 mb-6 sm:mb-8 flex flex-col items-center">
                                         <div className="relative">
-                                            <div className="p-[3px] rounded-2xl" style={{ background: 'linear-gradient(135deg, #818CF8, #38BDF8)' }}>
+                                            <div className="p-[3px] rounded-full" style={{ background: `linear-gradient(135deg, ${INDIGO}, #38BDF8)` }}>
                                                 {formData.profile_pic_url ? (
                                                     <img
                                                         src={formData.profile_pic_url}
                                                         alt="Preview"
-                                                        className="w-24 h-24 rounded-[15px] object-cover border-[3px] border-white shadow-lg"
+                                                        className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] border-white shadow-lg"
                                                     />
                                                 ) : (
-                                                    <div className="w-24 h-24 rounded-[15px] bg-[#EEF2FF] border-[3px] border-white shadow-lg flex items-center justify-center">
-                                                        <span className="text-xl font-bold text-[#4F46E5]">{getInitials()}</span>
+                                                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#EEF2FF] border-[3px] border-white shadow-lg flex items-center justify-center">
+                                                        <span className="text-lg sm:text-xl font-bold text-[#4F46E5]">{getInitials()}</span>
                                                     </div>
                                                 )}
                                             </div>
@@ -684,7 +712,7 @@ if (result?.status) {
                                             Contact Information
                                         </p>
 
-                                        <div className="grid grid-cols-2 gap-4 mb-4">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-5">
                                             <TextInput
                                                 label="First Name"
                                                 icon={<UserIcon />}
@@ -717,18 +745,18 @@ if (result?.status) {
                                     </div>
                                 </div>
 
-                                <div className="border-t border-gray-100 bg-white px-8 py-4 flex gap-3 items-center flex-shrink-0">
+                                <div className="border-t border-gray-100 bg-white px-5 py-4 sm:px-8 flex gap-3 items-center flex-shrink-0">
                                     <button
                                         type="button"
                                         onClick={() => setEditOpen(false)}
-                                        className="px-6 py-2.5 border border-gray-200 text-xs font-bold text-gray-500 rounded-full hover:bg-gray-50 transition-colors uppercase tracking-wider"
+                                        className="px-5 sm:px-6 py-2.5 border border-gray-200 text-xs font-bold text-gray-500 rounded-full hover:bg-gray-50 transition-colors uppercase tracking-wider"
                                     >
                                         Cancel
                                     </button>
                                     <button
                                         type="submit"
                                         disabled={isSubmitting}
-                                        className="flex-1 flex items-center justify-center gap-2 text-white text-xs font-bold px-6 py-2.5 rounded-full shadow transition-colors uppercase tracking-wider disabled:opacity-50"
+                                        className="flex-1 flex items-center justify-center gap-2 text-white text-xs font-bold px-5 sm:px-6 py-2.5 rounded-full shadow transition-colors uppercase tracking-wider disabled:opacity-50"
                                         style={{ background: `linear-gradient(120deg, ${NAVY}, ${INDIGO})` }}
                                     >
                                         {isSubmitting ? 'Saving...' : 'Save Changes'}
@@ -748,10 +776,10 @@ if (result?.status) {
                         onClick={() => !passwordSubmitting && setPasswordOpen(false)}
                     />
 
-                    <div className="relative bg-white rounded-[24px] shadow-2xl w-full max-w-md overflow-hidden">
+                    <div className="relative bg-white rounded-[24px] shadow-2xl w-full max-w-md overflow-hidden max-h-[90vh] overflow-y-auto">
 
                         <div
-                            className="relative px-6 py-6 overflow-hidden"
+                            className="relative px-5 py-5 sm:px-6 sm:py-6 overflow-hidden"
                             style={{ background: `linear-gradient(120deg, ${NAVY} 0%, ${NAVY_LIGHT} 55%, ${INDIGO} 140%)` }}
                         >
                             <div className="absolute -top-10 -right-6 w-32 h-32 rounded-full bg-white/5 blur-2xl pointer-events-none" />
@@ -765,18 +793,18 @@ if (result?.status) {
                             </button>
 
                             <div
-                                className="w-11 h-11 rounded-xl flex items-center justify-center mb-3"
+                                className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center mb-3"
                                 style={{ background: 'rgba(255,255,255,0.12)' }}
                             >
                                 <ShieldIcon />
                             </div>
-                            <h2 className="text-white text-lg font-bold m-0">Update your password</h2>
+                            <h2 className="text-white text-base sm:text-lg font-bold m-0">Update your password</h2>
                             <p className="text-indigo-200/70 text-xs mt-1 m-0">
                                 You'll be signed out on every device once it's changed.
                             </p>
                         </div>
 
-                        <form onSubmit={handlePasswordSubmit} className="px-6 py-6 flex flex-col gap-5">
+                        <form onSubmit={handlePasswordSubmit} className="px-5 py-5 sm:px-6 sm:py-6 flex flex-col gap-5">
 
                             <PasswordField
                                 label="Current password"

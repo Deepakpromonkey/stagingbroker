@@ -81,21 +81,58 @@ useEffect(() => {
                     from { opacity: 0; transform: translateY(-12px); }
                     to { opacity: 1; transform: translateY(0); }
                 }
+
+                /* ---- Desktop values (default / unchanged) ---- */
+                .so-close { top: 28px; right: 32px; padding: 8px; }
+                .so-content { padding: 0 24px; }
+                .so-tabs { gap: 6px; margin-bottom: 28px; }
+                .so-tab { font-size: 12px; padding: 8px 16px; }
+                .so-field { gap: 14px; padding-bottom: 14px; }
+                .so-search-icon { font-size: 28px; }
+                .so-input { font-size: 28px; }
+                .so-submit { padding: 10px 22px; font-size: 13px; }
+                .so-hint { margin-top: 16px; font-size: 12px; }
+
+                /* ---- Tablet (<=1024px) ---- */
+                @media (max-width: 1024px) {
+                    .so-close { top: 22px; right: 22px; }
+                    .so-tabs { margin-bottom: 24px; }
+                    .so-search-icon { font-size: 24px; }
+                    .so-input { font-size: 22px; }
+                }
+
+                /* ---- Mobile (<=640px) ---- */
+                @media (max-width: 640px) {
+                    .so-close { top: 14px; right: 14px; padding: 6px; }
+                    .so-content { padding: 0 16px; }
+                    .so-tabs { gap: 5px; margin-bottom: 20px; }
+                    .so-tab { font-size: 10.5px; padding: 6px 12px; letter-spacing: 0.03em; }
+                    .so-field { gap: 10px; padding-bottom: 10px; }
+                    .so-search-icon { font-size: 20px; }
+                    .so-input { font-size: 17px; }
+                    .so-submit { padding: 8px 14px; font-size: 11px; }
+                    .so-hint { margin-top: 12px; font-size: 11px; }
+                }
+
+                /* ---- Very small screens (<=380px) ---- */
+                @media (max-width: 380px) {
+                    .so-tab { font-size: 9.5px; padding: 5px 10px; }
+                    .so-input { font-size: 15px; }
+                    .so-submit { padding: 7px 10px; font-size: 10px; }
+                }
             `}</style>
 
             <button
                 onClick={onClose}
                 aria-label="Close search"
+                className="so-close"
                 style={{
                     position: 'absolute',
-                    top: 28,
-                    right: 32,
                     background: 'none',
                     border: 'none',
                     color: 'rgba(255,255,255,0.6)',
                     cursor: 'pointer',
                     display: 'flex',
-                    padding: 8,
                     borderRadius: 8,
                     transition: 'color 0.15s, background-color 0.15s',
                 }}
@@ -106,13 +143,13 @@ useEffect(() => {
             </button>
 
             <div
+                className="so-content"
                 style={{
                     flex: 1,
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    padding: '0 24px',
                     animation: 'searchOverlaySlideDown 0.22s ease-out',
                 }}
             >
@@ -122,12 +159,11 @@ useEffect(() => {
                     <div
                         role="tablist"
                         aria-label="Search by"
+                        className="so-tabs"
                         style={{
                             display: 'flex',
                             flexWrap: 'wrap',
                             justifyContent: 'center',
-                            gap: 6,
-                            marginBottom: 28,
                         }}
                     >
                         {SEARCH_TABS.map((tab) => {
@@ -137,19 +173,18 @@ useEffect(() => {
                                     key={tab.key}
                                     role="tab"
                                     aria-selected={active}
-                                  onClick={() => {
-    console.log("Clicked tab:", tab.key);
+                                    className="so-tab"
+                                    onClick={() => {
+                                        console.log("Clicked tab:", tab.key);
 
-    setActiveTab(tab.key);
+                                        setActiveTab(tab.key);
 
-    onTabChange?.(tab.key);
-}}
+                                        onTabChange?.(tab.key);
+                                    }}
                                     style={{
-                                        fontSize: 12,
                                         fontWeight: 700,
                                         letterSpacing: '0.04em',
                                         textTransform: 'uppercase',
-                                        padding: '8px 16px',
                                         borderRadius: 999,
                                         border: active ? '1px solid #4F8EF7' : '1px solid rgba(255,255,255,0.12)',
                                         backgroundColor: active ? 'rgba(79, 142, 247, 0.16)' : 'transparent',
@@ -166,15 +201,14 @@ useEffect(() => {
 
                     {/* Search field */}
                     <div
+                        className="so-field"
                         style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: 14,
                             borderBottom: '2px solid rgba(255,255,255,0.18)',
-                            paddingBottom: 14,
                         }}
                     >
-                        <Search style={{ color: 'rgba(255,255,255,0.45)', fontSize: 28, flexShrink: 0 }} />
+                        <Search className="so-search-icon" style={{ color: 'rgba(255,255,255,0.45)', flexShrink: 0 }} />
                         <input
                             ref={inputRef}
                             type="text"
@@ -186,26 +220,26 @@ useEffect(() => {
                                 if (e.key === 'Enter') submit();
                             }}
                             placeholder={activeTabData.placeholder}
+                            className="so-input"
                             style={{
                                 flex: 1,
+                                minWidth: 0,
                                 background: 'transparent',
                                 border: 'none',
                                 outline: 'none',
                                 color: '#fff',
-                                fontSize: 28,
                                 fontWeight: 500,
                             }}
                         />
                         <button
                             onClick={submit}
                             disabled={!query.trim()}
+                            className="so-submit"
                             style={{
                                 backgroundColor: query.trim() ? '#4F8EF7' : 'rgba(255,255,255,0.08)',
                                 color: query.trim() ? '#fff' : 'rgba(255,255,255,0.35)',
                                 border: 'none',
                                 borderRadius: 10,
-                                padding: '10px 22px',
-                                fontSize: 13,
                                 fontWeight: 700,
                                 letterSpacing: '0.03em',
                                 textTransform: 'uppercase',
@@ -218,9 +252,7 @@ useEffect(() => {
                         </button>
                     </div>
 
-                    <p style={{
-                        marginTop: 16,
-                        fontSize: 12,
+                    <p className="so-hint" style={{
                         color: 'rgba(255,255,255,0.35)',
                         textAlign: 'center',
                     }}>

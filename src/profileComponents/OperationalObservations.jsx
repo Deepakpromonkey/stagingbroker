@@ -6,9 +6,13 @@ import ApartmentIcon         from '@mui/icons-material/Apartment';
 import ReportProblemIcon     from '@mui/icons-material/ReportProblem';   
 import WarningAmberIcon      from '@mui/icons-material/WarningAmber';    
 import CheckCircleOutline from '@mui/icons-material/CheckCircleOutlineOutlined';
+
+// Fills whatever height the wrapping div is given via Tailwind classes below,
+// so the map itself can shrink on mobile/tablet without touching the
+// original fixed 480px desktop height.
 const containerStyle = {
     width: '100%',
-    height: '480px'
+    height: '100%'
 };
 
 const MARKER_ICONS = {
@@ -346,7 +350,7 @@ function OperationalObservations({ data }) {
                         <button
                             key={tf}
                             onClick={() => setTimeframe(tf)}
-                            className={`flex-1 rounded-[6px] px-[12px] py-[7px] text-[10px] font-[700] transition-all sm:flex-none sm:px-[16px] ${
+                            className={`flex-1 rounded-[6px] px-[8px] py-[7px] text-[9.5px] font-[700] transition-all sm:flex-none sm:px-[16px] sm:text-[10px] ${
                                 timeframe === tf
                                     ? 'bg-[#3b82f6] text-white shadow-sm'
                                     : 'text-[#64748b] hover:bg-gray-50'
@@ -359,25 +363,25 @@ function OperationalObservations({ data }) {
             </div>
 
             <div className='relative border-t border-[#d9e1ee]'>
-                <div className='overflow-hidden'>
+                <div className='overflow-hidden h-[240px] sm:h-[340px] xl:h-[480px]'>
                     {isLoaded ? (
                        <GoogleMap
-    mapContainerStyle={containerStyle}
-    onLoad={handleMapLoad}
-    onClick={() => setActiveWindow(null)}
-    options={{
-        gestureHandling: 'cooperative'
-    }}
->
+                            mapContainerStyle={containerStyle}
+                            onLoad={handleMapLoad}
+                            onClick={() => setActiveWindow(null)}
+                            options={{
+                                gestureHandling: 'cooperative'
+                            }}
+                        >
                             {mapPoints.map((point) => (
                                <MarkerF
-    key={point.id}
-    position={point.position}
-    icon={point.icon}
-    onClick={() => {
-        setActiveWindow(point);
-    }}
-/>
+                                    key={point.id}
+                                    position={point.position}
+                                    icon={point.icon}
+                                    onClick={() => {
+                                        setActiveWindow(point);
+                                    }}
+                                />
                             ))}
 
                             {activeWindow && (
@@ -385,7 +389,7 @@ function OperationalObservations({ data }) {
                                     position={activeWindow.position}
                                     onCloseClick={() => setActiveWindow(null)}
                                 >
-                                   <div className='w-[310px] rounded-[16px] bg-white text-slate-800 overflow-hidden'>
+                                   <div className='w-[250px] sm:w-[310px] rounded-[16px] bg-white text-slate-800 overflow-hidden'>
                                         {/* Type badge */}
                                         <div className='flex items-center gap-1.5 mb-1.5'>
                                             <span className={`flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wider text-white
@@ -399,10 +403,10 @@ function OperationalObservations({ data }) {
                                             </span>
                                         </div>
 
-                                        <h4 className='text-[15px] font-[800] text-slate-900 leading-tight'>
+                                        <h4 className='text-[14px] sm:text-[15px] font-[800] text-slate-900 leading-tight'>
                                             {activeWindow.title}
                                         </h4>
-                                       <p className='mt-[4px] text-[12px] text-slate-500'>
+                                       <p className='mt-[4px] text-[11.5px] sm:text-[12px] text-slate-500'>
                                             {activeWindow.subtitle}
                                         </p>
 
@@ -452,11 +456,11 @@ function OperationalObservations({ data }) {
                             )}
                         </GoogleMap>
                     ) : (
-                        <div style={containerStyle} className='animate-pulse bg-gray-50' />
+                        <div className='h-full w-full animate-pulse bg-gray-50' />
                     )}
                 </div>
 
-                <div className='absolute left-[12px] right-[12px] top-[100%] z-10 -translate-y-1/2 sm:left-[18px] sm:right-[18px] xl:left-[24px] xl:right-[24px]'>
+                <div className='relative z-10 -mt-[14px] px-[12px] sm:-mt-[18px] sm:px-[18px] lg:absolute lg:inset-x-[24px] lg:top-full lg:z-10 lg:-translate-y-1/2 lg:mt-0 lg:px-0'>
                     <div className='rounded-[14px] border border-[#e5e7eb] bg-[#f8fafc] px-[14px] py-[16px] sm:px-[18px] sm:py-[18px] xl:px-[22px]'>
                         <div className='grid grid-cols-1 gap-[18px] lg:grid-cols-12 lg:items-center'>
 
@@ -499,30 +503,30 @@ function OperationalObservations({ data }) {
                             <div className='lg:col-span-6'>
                                 <div className='grid grid-cols-3 items-center rounded-[12px] border border-[#e5e7eb] bg-[#f8fafc] px-[8px] py-[10px] sm:px-[10px]'>
                                     <div className='text-center'>
-                                        <p className='text-[20px] font-[800] leading-none text-[#0f172a] sm:text-[24px]'>
+                                        <p className='text-[18px] font-[800] leading-none text-[#0f172a] sm:text-[20px] xl:text-[24px]'>
                                             {totalInspectionsCount}
                                         </p>
-                                        <p className='mt-[4px] text-[9px] font-[800] uppercase leading-[1.2] tracking-[0.5px] text-[#94a3b8] sm:text-[10px]'>
+                                        <p className='mt-[4px] text-[8.5px] font-[800] uppercase leading-[1.2] tracking-[0.5px] text-[#94a3b8] sm:text-[9px] xl:text-[10px]'>
                                             Total <br /> Insp
                                         </p>
                                     </div>
                                     <div className='flex items-center justify-center'>
-                                        <div className='h-[42px] w-[1px] bg-[#dbe2ea]' />
+                                        <div className='h-[36px] w-[1px] bg-[#dbe2ea] xl:h-[42px]' />
                                         <div className='mx-auto text-center'>
-                                            <p className='text-[20px] font-[800] leading-none text-[#0f172a] sm:text-[24px]'>
+                                            <p className='text-[18px] font-[800] leading-none text-[#0f172a] sm:text-[20px] xl:text-[24px]'>
                                                 {cleanRatePercentage}
                                             </p>
-                                            <p className='mt-[4px] text-[9px] font-[800] uppercase leading-[1.2] tracking-[0.5px] text-[#94a3b8] sm:text-[10px]'>
+                                            <p className='mt-[4px] text-[8.5px] font-[800] uppercase leading-[1.2] tracking-[0.5px] text-[#94a3b8] sm:text-[9px] xl:text-[10px]'>
                                                 Clean <br /> Rate
                                             </p>
                                         </div>
-                                        <div className='h-[42px] w-[1px] bg-[#dbe2ea]' />
+                                        <div className='h-[36px] w-[1px] bg-[#dbe2ea] xl:h-[42px]' />
                                     </div>
                                     <div className='text-center'>
-                                        <p className='text-[20px] font-[800] leading-none text-[#f97316] sm:text-[24px]'>
+                                        <p className='text-[18px] font-[800] leading-none text-[#f97316] sm:text-[20px] xl:text-[24px]'>
                                             {combinedOos}
                                         </p>
-                                        <p className='mt-[4px] text-[9px] font-[800] uppercase leading-[1.2] tracking-[0.5px] text-[#94a3b8] sm:text-[10px]'>
+                                        <p className='mt-[4px] text-[8.5px] font-[800] uppercase leading-[1.2] tracking-[0.5px] text-[#94a3b8] sm:text-[9px] xl:text-[10px]'>
                                             Out of <br /> Svc
                                         </p>
                                     </div>
@@ -534,7 +538,7 @@ function OperationalObservations({ data }) {
                 </div>
             </div>
 
-            <div className='h-[190px] sm:h-[120px]' />
+            <div className='hidden lg:block lg:h-[120px]' />
         </div>
     );
 }

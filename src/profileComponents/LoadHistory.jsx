@@ -226,9 +226,9 @@ function LoadHistory({ data }) {
     };
 
     return (
-        <div className="rounded-[8px] border border-[#dfe5ec] bg-[#fbfbfc] p-[18px]">
+        <div className="rounded-[8px] border border-[#dfe5ec] bg-[#fbfbfc] p-[14px] lg:p-[18px]">
             <div className="flex items-center mt-2 gap-2">
-                <div className="h-[6px] w-[6px] rounded-full bg-[#22c55e]" />
+                <div className="h-[6px] w-[6px] shrink-0 rounded-full bg-[#22c55e]" />
                 <h2 className="text-[13px] font-[800] tracking-[0.8px] text-[#111827] uppercase">
                     Load History
                 </h2>
@@ -239,7 +239,7 @@ function LoadHistory({ data }) {
                 the road. Note: If the carrier has no recent observations,
                 equipment may not be shown — even if power units are reported.
             </p>
-            <div className="mt-[20px] grid grid-cols-4 gap-[14px]">
+            <div className="mt-[20px] grid grid-cols-1 gap-[14px] sm:grid-cols-2 lg:grid-cols-4">
                 {(history?.summaryCards || []).map((card, index) => {
                     const title = card?.title?.toLowerCase?.() || '';
                     const isStrong = title.includes('strong');
@@ -260,7 +260,7 @@ function LoadHistory({ data }) {
                             {/* Header */}
                             <div className="flex items-center gap-[6px]">
                                 {isStrong && (
-                                    <div className="flex h-[20px] w-[20px] items-center justify-center rounded-[4px] border border-[#cfe0ff] bg-[#f5f9ff]">
+                                    <div className="flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-[4px] border border-[#cfe0ff] bg-[#f5f9ff]">
                                         {getSummaryCardIcon(card, index)}
                                     </div>
                                 )}
@@ -287,7 +287,7 @@ function LoadHistory({ data }) {
                             {/* Value */}
                             {isStrong ? (
                                 <div className="mt-[10px] flex items-end gap-[8px]">
-                                    <h3 className="text-[30px] leading-none font-[800] text-[#111827]">
+                                    <h3 className="text-[26px] leading-none font-[800] text-[#111827] sm:text-[30px]">
                                         {card.value}
                                     </h3>
 
@@ -297,10 +297,10 @@ function LoadHistory({ data }) {
                                 </div>
                             ) : (
                                 <>
-                                    <div className="h-[36px]" />
+                                    <div className="h-[24px] sm:h-[36px]" />
 
                                     <h3
-                                        className={`text-[30px] leading-none font-[800] ${
+                                        className={`text-[26px] leading-none font-[800] sm:text-[30px] ${
                                             isDeadhead
                                                 ? 'text-[#b91c1c]'
                                                 : 'text-[#111827]'
@@ -368,7 +368,7 @@ function LoadHistory({ data }) {
             </div>
         </div>
 
-        <div className="p-[14px]">
+        <div className="p-[10px] sm:p-[14px]">
             {/* --- CHECK IF INSIGHTS ARE EMPTY --- */}
             {!history?.insights || history.insights.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-[32px] px-[16px] text-center bg-[#f8fafc] rounded-[6px] border border-dashed border-[#cbd5e1]">
@@ -398,7 +398,7 @@ function LoadHistory({ data }) {
                                 key={item.id}
                                 className="rounded-[6px] border border-[#eceff5] bg-[#f7f8fc] px-[12px] py-[16px]"
                             >
-                                <div className="flex items-center gap-[15px]">
+                                <div className="flex items-center gap-[12px] sm:gap-[15px]">
                                     <div 
                                         className="relative h-[40px] w-[34px] flex-shrink-0 rounded-[8px] flex items-center justify-center"
                                         style={{ backgroundColor: insightMeta.bg }}

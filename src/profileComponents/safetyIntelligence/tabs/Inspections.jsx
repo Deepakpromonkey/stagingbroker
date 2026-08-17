@@ -272,99 +272,99 @@ if (totalPages <= 5) {
 }
 
         return (
-            <div className="px-[28px] py-[30px] bg-[#f8fafc]">
-                <div className="flex items-start justify-between mb-8">
+            <div className="px-[16px] sm:px-[22px] md:px-[28px] py-[20px] sm:py-[24px] md:py-[30px] bg-[#f8fafc]">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 md:mb-8">
                     <div>
-                        <h2 className="text-[24px] leading-[38px] font-[600] tracking-[-0.04em] text-[#111827]">
+                        <h2 className="text-[19px] sm:text-[21px] md:text-[24px] leading-[28px] sm:leading-[32px] md:leading-[38px] font-[600] tracking-[-0.04em] text-[#111827]">
                             Inspection Analysis
                         </h2>
-                        <p className="mt-1 text-[13px] font-[500] text-[#94a3b8]">
+                        <p className="mt-1 text-[12.5px] sm:text-[13px] font-[500] text-[#94a3b8]">
                             Real-time safety compliance and vehicle performance metrics
                         </p>
                     </div>
 
                     <button
                         onClick={this.exportPDF}
-                        className="h-[42px] px-3 rounded-[14px] border border-[#dbe3ef] bg-white flex items-center gap-2 text-[12px] font-[700] text-[#334155] shadow-sm hover:bg-[#f8fafc] transition-all"
+                        className="h-[38px] md:h-[42px] px-3 rounded-[14px] border border-[#dbe3ef] bg-white flex items-center justify-center gap-2 text-[12px] font-[700] text-[#334155] shadow-sm hover:bg-[#f8fafc] transition-all self-start sm:self-auto"
                     >
                         <FileDownloadOutlined sx={{ fontSize: 17 }} />
                         Export PDF
                     </button>
                 </div>
 
-                <div className="grid grid-cols-4 gap-5 mb-8">
-                    <div className="bg-white border border-[#dbe3ef] rounded-[26px] px-6 py-6">
-                        <div className="flex items-center justify-between mb-8">
-                            <div className="w-[42px] h-[42px] rounded-full flex items-center justify-center bg-[#eff6ff]">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5 mb-6 lg:mb-8">
+                    <div className="bg-white border border-[#dbe3ef] rounded-[20px] md:rounded-[26px] px-4 sm:px-5 md:px-6 py-4 sm:py-5 md:py-6">
+                        <div className="flex items-center justify-between gap-1.5 min-w-0 mb-5 sm:mb-6 md:mb-8">
+                            <div className="w-[36px] h-[36px] md:w-[42px] md:h-[42px] rounded-full flex items-center justify-center bg-[#eff6ff] shrink-0">
                                 <div className="flex items-center justify-center">
-                                    <CheckCircle className="!text-[#2563eb] !text-[19px]" />
+                                    <CheckCircle className="!text-[#2563eb] !text-[17px] md:!text-[19px]" />
                                 </div>
                             </div>
-                            <div className="px-3 py-[6px] rounded-full text-[9px] font-[800] tracking-[0.08em] uppercase bg-[#eff6ff] text-[#2563eb]">
+                            <div className="px-2 md:px-2.5 py-[4px] md:py-[5px] rounded-full text-[7px] sm:text-[7.5px] md:text-[8px] font-[800] tracking-[0.03em] md:tracking-[0.05em] uppercase whitespace-nowrap shrink truncate max-w-[110px] sm:max-w-[130px] md:max-w-[150px] bg-[#eff6ff] text-[#2563eb]">
                                 TOP PERFORMER
                             </div>
                         </div>
-                      <h3 className="text-[23px] leading-none font-[800] tracking-[-0.04em] text-[#0f172a]">
+                      <h3 className="text-[19px] sm:text-[21px] md:text-[23px] leading-none font-[800] tracking-[-0.04em] text-[#0f172a]">
     {cleanInspectionsCount}
 </h3>
-                        <p className="mt-3 text-[10px] font-[800] tracking-[0.08em] uppercase text-[#94a3b8]">
+                        <p className="mt-2.5 md:mt-3 text-[9px] md:text-[10px] font-[800] tracking-[0.08em] uppercase text-[#94a3b8]">
                             CLEAN INSPECTION RATE
                         </p>
                     </div>
 
-                    <div className="bg-white border border-[#dbe3ef] rounded-[26px] px-6 py-6">
-                        <div className="flex items-center justify-between mb-8">
-                            <div className="w-[42px] h-[42px] rounded-full flex items-center justify-center bg-[#fff7ed]">
+                    <div className="bg-white border border-[#dbe3ef] rounded-[20px] md:rounded-[26px] px-4 sm:px-5 md:px-6 py-4 sm:py-5 md:py-6">
+                        <div className="flex items-center justify-between gap-1.5 min-w-0 mb-5 sm:mb-6 md:mb-8">
+                            <div className="w-[36px] h-[36px] md:w-[42px] md:h-[42px] rounded-full flex items-center justify-center bg-[#fff7ed] shrink-0">
                                 <div className="flex items-center justify-center">
-                                    <LocalShipping className="!text-[#c2410c] !text-[19px]" />
+                                    <LocalShipping className="!text-[#c2410c] !text-[17px] md:!text-[19px]" />
                                 </div>
                             </div>
-                            <div className="px-3 py-[6px] rounded-full text-[9px] font-[800] tracking-[0.08em] uppercase bg-[#fff7ed] text-[#c2410c]">
+                            <div className="px-2 md:px-2.5 py-[4px] md:py-[5px] rounded-full text-[7px] sm:text-[7.5px] md:text-[8px] font-[800] tracking-[0.03em] md:tracking-[0.05em] uppercase whitespace-nowrap shrink truncate max-w-[110px] sm:max-w-[130px] md:max-w-[150px] bg-[#fff7ed] text-[#c2410c]">
                                 AT RISK
                             </div>
                         </div>
-                        <h3 className="text-[23px] leading-none font-[800] tracking-[-0.04em] text-[#0f172a]">
+                        <h3 className="text-[19px] sm:text-[21px] md:text-[23px] leading-none font-[800] tracking-[-0.04em] text-[#0f172a]">
                             {vehicleOosRate}
                         </h3>
-                        <p className="mt-3 text-[10px] font-[800] tracking-[0.08em] uppercase text-[#94a3b8]">
+                        <p className="mt-2.5 md:mt-3 text-[9px] md:text-[10px] font-[800] tracking-[0.08em] uppercase text-[#94a3b8]">
                             VEHICLE OOS RATE
                         </p>
                     </div>
 
-                    <div className="bg-white border border-[#dbe3ef] rounded-[26px] px-6 py-6">
-                        <div className="flex items-center justify-between mb-8">
-                            <div className="w-[42px] h-[42px] rounded-full flex items-center justify-center bg-[#f0fdf4]">
+                    <div className="bg-white border border-[#dbe3ef] rounded-[20px] md:rounded-[26px] px-4 sm:px-5 md:px-6 py-4 sm:py-5 md:py-6">
+                        <div className="flex items-center justify-between gap-1.5 min-w-0 mb-5 sm:mb-6 md:mb-8">
+                            <div className="w-[36px] h-[36px] md:w-[42px] md:h-[42px] rounded-full flex items-center justify-center bg-[#f0fdf4] shrink-0">
                                 <div className="flex items-center justify-center">
-                                    <PersonOutlined className="!text-[#16a34a] !text-[19px]" />
+                                    <PersonOutlined className="!text-[#16a34a] !text-[17px] md:!text-[19px]" />
                                 </div>
                             </div>
-                            <div className="px-3 py-[6px] rounded-full text-[9px] font-[800] tracking-[0.08em] uppercase bg-[#f0fdf4] text-[#16a34a]">
+                            <div className="px-2 md:px-2.5 py-[4px] md:py-[5px] rounded-full text-[7px] sm:text-[7.5px] md:text-[8px] font-[800] tracking-[0.03em] md:tracking-[0.05em] uppercase whitespace-nowrap shrink truncate max-w-[110px] sm:max-w-[130px] md:max-w-[150px] bg-[#f0fdf4] text-[#16a34a]">
                                 STABLE
                             </div>
                         </div>
-                        <h3 className="text-[23px] leading-none font-[800] tracking-[-0.04em] text-[#0f172a]">
+                        <h3 className="text-[19px] sm:text-[21px] md:text-[23px] leading-none font-[800] tracking-[-0.04em] text-[#0f172a]">
                             {driverOosRate}
                         </h3>
-                        <p className="mt-3 text-[10px] font-[800] tracking-[0.08em] uppercase text-[#94a3b8]">
+                        <p className="mt-2.5 md:mt-3 text-[9px] md:text-[10px] font-[800] tracking-[0.08em] uppercase text-[#94a3b8]">
                             DRIVER OOS RATE
                         </p>
                     </div>
 
-                    <div className="bg-white border border-[#dbe3ef] rounded-[26px] px-6 py-6">
-                        <div className="flex items-center justify-between mb-8">
-                            <div className="w-[42px] h-[42px] rounded-full flex items-center justify-center bg-[#f8fafc]">
+                    <div className="bg-white border border-[#dbe3ef] rounded-[20px] md:rounded-[26px] px-4 sm:px-5 md:px-6 py-4 sm:py-5 md:py-6">
+                        <div className="flex items-center justify-between gap-1.5 min-w-0 mb-5 sm:mb-6 md:mb-8">
+                            <div className="w-[36px] h-[36px] md:w-[42px] md:h-[42px] rounded-full flex items-center justify-center bg-[#f8fafc] shrink-0">
                                 <div className="flex items-center justify-center">
-                                    <AccessTime className="!text-[#64748b] !text-[19px]" />
+                                    <AccessTime className="!text-[#64748b] !text-[17px] md:!text-[19px]" />
                                 </div>
                             </div>
-                            <div className="px-3 py-[6px] rounded-full text-[9px] font-[800] tracking-[0.08em] uppercase bg-[#f8fafc] text-[#94a3b8]">
+                            <div className="px-2 md:px-2.5 py-[4px] md:py-[5px] rounded-full text-[7px] sm:text-[7.5px] md:text-[8px] font-[800] tracking-[0.03em] md:tracking-[0.05em] uppercase whitespace-nowrap shrink truncate max-w-[110px] sm:max-w-[130px] md:max-w-[150px] bg-[#f8fafc] text-[#94a3b8]">
                                 LAST INSPECTION
                             </div>
                         </div>
-                      <h3 className="text-[23px] leading-none font-[800] tracking-[-0.04em] text-[#0f172a]">
+                      <h3 className="text-[19px] sm:text-[21px] md:text-[23px] leading-none font-[800] tracking-[-0.04em] text-[#0f172a]">
     {daysSinceLastCheck}
 </h3>
-                        <p className="mt-3 text-[10px] font-[800] tracking-[0.08em] uppercase text-[#94a3b8]">
+                        <p className="mt-2.5 md:mt-3 text-[9px] md:text-[10px] font-[800] tracking-[0.08em] uppercase text-[#94a3b8]">
                             DAYS SINCE LAST CHECK
                         </p>
                     </div>
@@ -453,14 +453,14 @@ if (totalPages <= 5) {
                     </div>
                 </div> */}
 
-                <div className="bg-white border border-[#dbe3ef] rounded-[24px] p-4 mb-6 flex items-center justify-between shadow-sm">
+                <div className="bg-white border border-[#dbe3ef] rounded-[20px] md:rounded-[24px] p-3 sm:p-4 mb-5 md:mb-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-sm">
                     <div className="relative w-full">
-                        <Search className="absolute left-5 top-1/2 -translate-y-1/2 !text-[20px] text-[#94a3b8]" />
+                        <Search className="absolute left-4 sm:left-5 top-1/2 -translate-y-1/2 !text-[18px] sm:!text-[20px] text-[#94a3b8]" />
                         <input
                             value={this.state.search}
                             onChange={this.handleSearchChange}
                             placeholder="Filter by ID, State, or Driver"
-                            className="w-full h-[45px] bg-[#f8fafc] border border-[#eef2f7] rounded-[16px] pl-11 pr-7 text-[13px] text-[#0f172a] outline-none"
+                            className="w-full h-[42px] md:h-[45px] bg-[#f8fafc] border border-[#eef2f7] rounded-[14px] md:rounded-[16px] pl-10 sm:pl-11 pr-5 sm:pr-7 text-[13px] text-[#0f172a] outline-none"
                         />
                     </div>
 
@@ -508,13 +508,14 @@ if (totalPages <= 5) {
                     </div>
                 </div>
 
-                <div className="bg-white border border-[#dbe3ef] rounded-[24px] overflow-hidden shadow-sm">
-                    <table className="w-full">
+                <div className="bg-white border border-[#dbe3ef] rounded-[20px] md:rounded-[24px] overflow-hidden shadow-sm">
+                    <div className="overflow-x-auto">
+                    <table className="w-full min-w-[520px]">
                         <thead className="bg-[#f8fafc]/50">
                             <tr className="border-b border-[#f1f5f9]">
-                                <th className="px-8 py-5 text-left text-[11px] font-[700] uppercase tracking-wider text-[#64748b]">Date & Region</th>
-                                <th className="px-8 py-5 text-left text-[11px] font-[700] uppercase tracking-wider text-[#64748b]">Type</th>
-                                <th className="px-8 py-5 text-left text-[11px] font-[700] uppercase tracking-wider text-[#64748b]">VIN</th>
+                                <th className="px-4 sm:px-6 md:px-8 py-3.5 sm:py-4 md:py-5 text-left text-[10px] md:text-[11px] font-[700] uppercase tracking-wider text-[#64748b]">Date & Region</th>
+                                <th className="px-4 sm:px-6 md:px-8 py-3.5 sm:py-4 md:py-5 text-left text-[10px] md:text-[11px] font-[700] uppercase tracking-wider text-[#64748b]">Type</th>
+                                <th className="px-4 sm:px-6 md:px-8 py-3.5 sm:py-4 md:py-5 text-left text-[10px] md:text-[11px] font-[700] uppercase tracking-wider text-[#64748b]">VIN</th>
                                 {/* <th className="px-8 py-5 text-right text-[11px] font-[700] uppercase tracking-wider text-[#64748b]">Safety Status</th> */}
                             </tr>
                         </thead>
@@ -523,7 +524,7 @@ if (totalPages <= 5) {
                                 <tr>
                                     <td 
                                         colSpan={4} 
-                                        className="px-8 py-12 text-center text-[14px] font-[500] text-[#64748b] bg-white"
+                                        className="px-4 sm:px-6 md:px-8 py-10 md:py-12 text-center text-[13px] md:text-[14px] font-[500] text-[#64748b] bg-white"
                                     >
                                         No inspection records found.
                                     </td>
@@ -533,13 +534,13 @@ if (totalPages <= 5) {
                                     let statusConfig = this.getStatusConfig(item.status);
                                     return (
                                         <tr key={idx} className="hover:bg-[#f8fafc] transition-colors">
-                                            <td className="px-8 py-6">
-                                                <p className="text-[14px] font-[700] text-[#0f172a]">{item.date}</p>
-                                                <p className="text-[12px] text-[#94a3b8] font-[500] mt-0.5">{item.region}</p>
+                                            <td className="px-4 sm:px-6 md:px-8 py-4 sm:py-5 md:py-6">
+                                                <p className="text-[13px] md:text-[14px] font-[700] text-[#0f172a]">{item.date}</p>
+                                                <p className="text-[11px] md:text-[12px] text-[#94a3b8] font-[500] mt-0.5">{item.region}</p>
                                             </td>
-                                            <td className="px-8 py-6 text-[14px] font-[500] text-[#475569]">{item.type}</td>
-                                            <td className="px-8 py-6">
-                                                <span className="text-[14px] font-[700] text-[#2563eb] border-b border-transparent hover:border-[#2563eb] cursor-pointer">
+                                            <td className="px-4 sm:px-6 md:px-8 py-4 sm:py-5 md:py-6 text-[13px] md:text-[14px] font-[500] text-[#475569]">{item.type}</td>
+                                            <td className="px-4 sm:px-6 md:px-8 py-4 sm:py-5 md:py-6">
+                                                <span className="text-[13px] md:text-[14px] font-[700] text-[#2563eb] border-b border-transparent hover:border-[#2563eb] cursor-pointer">
                                                     {item.refId}
                                                 </span>
                                             </td>
@@ -555,9 +556,10 @@ if (totalPages <= 5) {
                             )}
                         </tbody>
                     </table>
+                    </div>
 
-                    <div className="px-8 py-5 border-t border-[#eef2f7] flex items-center justify-between">
-                        <p className="text-[12px] text-[#64748b]">
+                    <div className="px-4 sm:px-6 md:px-8 py-4 md:py-5 border-t border-[#eef2f7] flex flex-col sm:flex-row items-center justify-between gap-3">
+                        <p className="text-[11.5px] md:text-[12px] text-[#64748b] text-center sm:text-left">
                             Showing <span className="font-[600] text-[#1e293b]">{indexOfFirstItem + 1}</span> to{" "}
                             <span className="font-[600] text-[#1e293b]">{Math.min(indexOfLastItem, filteredTable.length)}</span> of{" "}
                             {filteredTable.length} results
