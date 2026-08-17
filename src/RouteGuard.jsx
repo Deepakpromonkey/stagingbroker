@@ -1,17 +1,46 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "./components/ui/Toaster";
+import { apiFetch } from "./lib/api";
 
 const LOGIN_PATH = "/";
 const PUBLIC_PATHS = [LOGIN_PATH, "/signup"];
 const AUTH_USER_KEY = "crm_user";
 
 // Where the user picks a subscription plan, and the localStorage key
-// Subscription.jsx sets once a plan has been chosen. Kept in sync with
+// Subscription.jsx writes once a plan has been chosen. Kept in sync with
 // the values used in Subscription.jsx (PLAN_STORAGE_KEY) and the route
 // registered in App.jsx (path="/subscribe").
 const SUBSCRIBE_PATH = "/subscribe";
 const PLAN_STORAGE_KEY = "crm_plan_selected";
+
+// Reachable without an active subscription, because they are how one is
+// obtained. /billing/success in particular is where Stripe returns the
+// customer, and at that moment the subscription is still 'incomplete' — the
+// page's whole job is to confirm it — so gating it on being subscribed would
+// bounce every paying customer back to the pricing table.
+const PAYWALL_EXEMPT_PATHS = [SUBSCRIBE_PATH, "/billing/success", "/billing/plans"];
+
+/*
+| Whether this account is allowed past the paywall.
+|
+| The answer belongs to the API, not the browser: localStorage is the user's
+| to edit, so gating on it alone sent a paying customer back to the pricing
+| page the moment they cleared site data or opened the app in another browser.
+| GET /subscription is asked instead, and `subscription.is_active` — the
+| server's own grantsAccess(), which covers trialing and past_due as well as
+| active — is what decides.
+|
+| Cached per page load so this costs one request rather than one per
+| navigation. 'unknown' means the answer has not arrived yet.
+*/
+let cachedPlanAccess = "unknown";
+
+// Call after anything that changes subscription state — finishing checkout,
+// syncing a Stripe session — so the next navigation re-asks the API.
+export function refreshPlanAccess() {
+  cachedPlanAccess = "unknown";
+}
 
 // Carrier onboarding is reached from an invitation email by someone who has no
 // account here at all, so it can't be gated on a session. These need prefix
@@ -80,11 +109,16 @@ const STEP_PREREQUISITES = [
     redirectTo: "/trackshipment/step1",
   },
   {
-    // No plan chosen yet blocks every protected route except the plan
-    // picker itself. Set by Subscription.jsx's handleSelectPlan right
-    // after the user picks a plan.
-    match: (pathname) => pathname !== SUBSCRIBE_PATH,
-    isSatisfied: () => !!localStorage.getItem(PLAN_STORAGE_KEY),
+    // No active subscription blocks every protected route except the plan
+    // picker itself. Answered by the API — see cachedPlanAccess above.
+    //
+    // Only a definite "no" redirects: while the answer is still in flight,
+    // or if the request failed, the user is let through rather than bounced
+    // to pricing on a slow connection. The API enforces the paywall on every
+    // request of its own accord, so this guard is for navigation, not
+    // security.
+    match: (pathname) => !PAYWALL_EXEMPT_PATHS.includes(pathname),
+    isSatisfied: (planAccess) => planAccess !== "none",
     redirectTo: SUBSCRIBE_PATH,
   },
 ];
@@ -118,6 +152,45 @@ export default function RouteGuard({ children }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const token = getToken();
+  const [planAccess, setPlanAccess] = useState(cachedPlanAccess);
+
+  // Ask the API once whether this account is subscribed, and keep the
+  // localStorage flag in step with the answer so the rest of the app (which
+  // still reads it for display) cannot drift from the server.
+  useEffect(() => {
+    if (!token || cachedPlanAccess !== "unknown") {
+      setPlanAccess(cachedPlanAccess);
+      return;
+    }
+
+    let cancelled = false;
+
+    apiFetch("/subscription")
+      .then((response) => {
+        if (cancelled) return;
+
+        const subscription = response?.data?.subscription;
+        const allowed = !!subscription?.is_active;
+
+        cachedPlanAccess = allowed ? "active" : "none";
+        setPlanAccess(cachedPlanAccess);
+
+        if (allowed) {
+          localStorage.setItem(PLAN_STORAGE_KEY, subscription.plan);
+        } else {
+          localStorage.removeItem(PLAN_STORAGE_KEY);
+        }
+      })
+      .catch(() => {
+        // A failed check must not lock anyone out — leave it unknown so the
+        // prerequisite below lets them through, and try again next mount.
+        if (!cancelled) setPlanAccess("unknown");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   useEffect(() => {
     const isPublic = isPublicPath(pathname);
@@ -151,7 +224,7 @@ export default function RouteGuard({ children }) {
     // step 1 yet in this session), or into any protected route before a
     // subscription plan has been chosen.
     const blockedStep = STEP_PREREQUISITES.find(
-      (step) => step.match(pathname) && !step.isSatisfied()
+      (step) => step.match(pathname) && !step.isSatisfied(planAccess)
     );
     if (blockedStep) {
       if (blockedStep.redirectTo === SUBSCRIBE_PATH) {
@@ -173,7 +246,7 @@ export default function RouteGuard({ children }) {
       toast.error("You don't have permission to access that page.");
       navigate("/dashboard?unauthorized=1", { replace: true });
     }
-  }, [pathname, token, navigate]);
+  }, [pathname, token, navigate, planAccess]);
 
   return children;
 }

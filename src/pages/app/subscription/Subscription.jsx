@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { apiFetch } from '../../../lib/api';
+import { toast } from '../../../components/ui/Toaster';
+
 import {
 	PersonOutlineOutlined,
 	GroupsOutlined,
@@ -16,14 +19,21 @@ import {
 } from '@mui/icons-material';
 
 // Marks that the user has picked a plan so route guards (e.g. the
-// dashboard route) can allow access. No pricing API yet, so this is
-// stored locally for now. Keep this key in sync with RouteGuard.js's
-// PLAN_STORAGE_KEY.
+// dashboard route) can allow access. Keep this key in sync with
+// RouteGuard.js's PLAN_STORAGE_KEY.
 const PLAN_STORAGE_KEY = 'crm_plan_selected';
 
+/*
+| `id` is this page's own identifier (selection state, localStorage).
+| `apiPlan` is what POST /subscription/checkout expects — it validates against
+| the keys of config('subscriptions.plans') on the API, which are named
+| standard / pro / enterprise. The two vocabularies differ, so keep the mapping
+| here rather than renaming the plans shown to the user.
+*/
 const PLANS = [
 	{
 		id: 'individual',
+		apiPlan: 'standard',
 		icon: PersonOutlineOutlined,
 		name: 'Individual',
 		price: '$249',
@@ -42,6 +52,7 @@ const PLANS = [
 	},
 	{
 		id: 'team',
+		apiPlan: 'pro',
 		icon: GroupsOutlined,
 		name: 'Team',
 		price: '$499',
@@ -60,6 +71,7 @@ const PLANS = [
 	},
 	{
 		id: 'enterprise',
+		apiPlan: 'enterprise',
 		icon: ApartmentOutlined,
 		name: 'Enterprise',
 		price: 'Contact for price',
@@ -86,23 +98,55 @@ function Subscription() {
 		() => localStorage.getItem(PLAN_STORAGE_KEY) || null
 	);
 
-	// Picking a plan always unlocks and continues to the dashboard, whether
-	// the user arrived here fresh from signup or was redirected here by
-	// RouteGuard for not having a plan selected yet (that redirect uses
-	// `replace` with no location state, so we can't rely on state to decide
-	// whether to continue on).
+	const [checkoutPlan, setCheckoutPlan] = useState(null);
+
+	/*
+	| Hands the user off to Stripe Checkout.
+	|
+	| The API creates the session and returns its URL; the redirect has to be a
+	| full page navigation rather than navigate(), because the destination is
+	| Stripe's domain and not a route in this app. Stripe sends the user back to
+	| success_path / cancel_path afterwards, which is where the subscription is
+	| confirmed — nothing here should mark the plan as paid.
+	*/
 	const handleSelectPlan = (plan) => {
+
+		if (checkoutPlan) return;
 
 		setSelectedPlan(plan.id);
 		localStorage.setItem(PLAN_STORAGE_KEY, plan.id);
 
 		if (plan.id === 'enterprise') {
-			// No self-serve checkout for Enterprise yet — send them to sales,
-			// but still unlock the dashboard since a plan has been chosen.
+			// Priced individually — there is no self-serve checkout for it, so
+			// this stays an enquiry and the dashboard opens as before.
 			window.location.href = 'mailto:sales@yourcompany.com?subject=Enterprise%20Plan%20Inquiry';
+			navigate('/dashboard');
+			return;
 		}
 
-		navigate('/dashboard');
+		setCheckoutPlan(plan.id);
+
+		apiFetch('/subscription/checkout', {
+			method: 'POST',
+			body: JSON.stringify({ plan: plan.apiPlan }),
+		})
+			.then((data) => {
+				const checkoutUrl = data?.data?.checkout_url;
+
+				if (!checkoutUrl) {
+					throw new Error('No checkout URL returned.');
+				}
+
+				window.location.href = checkoutUrl;
+			})
+			.catch((error) => {
+				setCheckoutPlan(null);
+
+				toast.error({
+					title: 'Could not start checkout',
+					message: error?.message || 'Something went wrong opening the payment page. Please try again.',
+				});
+			});
 	};
 
 	return (
@@ -201,13 +245,16 @@ function Subscription() {
 
 							<button
 								onClick={() => handleSelectPlan(plan)}
+								disabled={checkoutPlan !== null}
 								className={
 									isPopular
 										? `w-full h-[50px] rounded-full text-[13.5px] font-medium mt-[32px] shadow-lg transition-all duration-200 ${isSelected ? 'bg-white text-[#0052CC]' : 'bg-[#0052CC] text-white hover:bg-[#0066FF] hover:shadow-[0_4px_20px_rgba(0,82,204,0.4)]'}`
 										: `w-full h-[48px] rounded-full text-[13.5px] font-medium mt-[32px] transition-all duration-200 border ${isSelected ? 'bg-[#1E293B] text-white border-[#3B82F6]' : 'bg-[#111E38] text-[#94A3B8] border-transparent hover:bg-[#1C2C4E] hover:text-white'}`
 								}
 							>
-								{isSelected ? 'Selected' : plan.cta}
+								{checkoutPlan === plan.id
+									? 'Opening checkout…'
+									: isSelected ? 'Selected' : plan.cta}
 							</button>
 						</div>
 					);

@@ -18,6 +18,7 @@ import ControlTowerShipment from './pages/app/control_tower/ControlTowerShipment
 
 
 import Subscription from './pages/app/subscription/Subscription'
+import BillingSuccess from './pages/app/subscription/BillingSuccess'
 
 import AppHeader from './components/AppHeader';
 import RouteGuard from './RouteGuard'
@@ -78,6 +79,13 @@ function AppShell() {
           <Route path="/profile" element={<ProfileUpdate />} />
           <Route path="/settings/carrier" element={<CarrierSettings />} />
           <Route path="/subscribe" element={<Subscription />} />
+
+          {/* Where Stripe sends the customer back to. The paths are the API's
+              success_path / cancel_path (config/subscriptions.php), not ours —
+              cancelling just returns to the pricing table. */}
+          <Route path="/billing/success" element={<BillingSuccess />} />
+          <Route path="/billing/plans" element={<Navigate to="/subscribe" replace />} />
+
           <Route path="/carrier-questions" element={<CarrierQuestions />} />
 
           <Route path="/control-tower" element={<ControlTowerList />} />
