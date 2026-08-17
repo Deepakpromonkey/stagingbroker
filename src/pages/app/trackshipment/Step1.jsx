@@ -54,6 +54,28 @@ const INTERVALS = [
 ];
 
 const PHONE_PATTERN = /^[0-9()+\-\s]{7,}$/;
+/*
+| How often the driver app reports its position, in seconds.
+|
+| The API accepts 60–21600 (CreateShipmentRequest), and the driver app reads
+| the chosen value back off every sync response and restarts its tracker when
+| it changes. The ends of the range are bounded for a reason: under a minute
+| flattens a phone battery inside a shift without buying useful precision, and
+| past six hours it is not tracking any more.
+*/
+const TRACKING_INTERVALS = [
+  { value: 60, label: "Every 1 minute" },
+  { value: 120, label: "Every 2 minutes" },
+  { value: 300, label: "Every 5 minutes (default)" },
+  { value: 600, label: "Every 10 minutes" },
+  { value: 900, label: "Every 15 minutes" },
+  { value: 1800, label: "Every 30 minutes" },
+  { value: 3600, label: "Every 1 hour" },
+  { value: 7200, label: "Every 2 hours" },
+  { value: 14400, label: "Every 4 hours" },
+  { value: 21600, label: "Every 6 hours" },
+];
+
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMAIL_LIST_PATTERN = /^\s*[^\s@]+@[^\s@]+\.[^\s@]+\s*(,\s*[^\s@]+@[^\s@]+\.[^\s@]+\s*)*$/;
 
@@ -90,6 +112,10 @@ export const BLANK_STEP1_VALUES = {
 
   dispatcherName: "",
   dispatcherEmail: "",
+
+  // How often the driver's phone reports its position on this load. Five
+  // minutes is the backend's default, so the form opens on the same value.
+  trackingIntervalSeconds: 300,
 
   // Kept for backward compatibility with the payload shape / template
   // mapping even though the "Send Updates To" rows are hidden from the UI.
@@ -822,6 +848,8 @@ export default function TrackShipmentStep1() {
       dispatcherName: apiData.broker_dispatcher_name || "",
       dispatcherEmail: apiData.broker_dispatcher_email || "",
 
+      trackingIntervalSeconds: Number(apiData.tracking_interval_seconds) || 300,
+
       updates: updatesFromApi,
       // The API may return this as an array (["a@x.com", "b@x.com"]) or as
       // the older comma-string shape — normalise either into the
@@ -908,6 +936,9 @@ export default function TrackShipmentStep1() {
 
       broker_dispatcher_name: data.dispatcherName || "",
       broker_dispatcher_email: data.dispatcherEmail || "",
+
+      // How often the driver app reports its position on this load.
+      tracking_interval_seconds: Number(data.trackingIntervalSeconds) || 300,
 
   
       send_updates_to: data.updates.map((update) => ({
@@ -1305,6 +1336,33 @@ export default function TrackShipmentStep1() {
             </div>
 
             <SectionHeading>Schedule &amp; Updates</SectionHeading>
+
+            {/* The one control that decides how often the driver's phone
+                reports in. The driver app picks the new value up from its next
+                sync response, so changing it takes effect without the driver
+                doing anything. */}
+            <div className="mb-8">
+              <FieldLabel>Driver Location Updates</FieldLabel>
+              <div className="grid grid-cols-1 gap-2 sm:max-w-md">
+                <div className="relative">
+                  <select
+                    className={selectClass}
+                    {...register("trackingIntervalSeconds", { valueAsNumber: true })}
+                  >
+                    {TRACKING_INTERVALS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown />
+                </div>
+                <p className="text-xs text-slate-500 ">
+                  How often the driver&rsquo;s app sends its position while this load is running.
+                  Shorter intervals track more closely but use more of the driver&rsquo;s battery.
+                </p>
+              </div>
+            </div>
 
             {/* REMOVED: "Send Updates To" date/time/duration/interval rows.
                 Kept here (commented) in case this needs to come back later.

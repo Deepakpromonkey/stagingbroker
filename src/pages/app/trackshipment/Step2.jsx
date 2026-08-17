@@ -63,6 +63,11 @@ const blankStop = () => ({
   stopType: "pickup",
   stopTypeLabel: "Pickup",
   stopName: "",
+
+  // Who the driver's verification code is texted to at this stop.
+  contactName: "",
+  contactPhone: "",
+
   address: "",
   address2: "",
   city: "",
@@ -77,7 +82,13 @@ const blankStop = () => ({
   startTime: "",
   startTimezone: "",
 
- 
+
+  // Only used/shown for Intermediate and Delivery stops
+  endDate: "",
+  endTime: "",
+  endTimezone: "",
+
+
   // Only used/shown for the Pickup stop
   trackStartOffset: "",
 
@@ -396,39 +407,59 @@ function AddressAutocomplete({ index, value, onChange, setValue, error, hasError
 }
 
  
+// "(UTC-08:00) Pacific" -> "Pacific" (what the backend stores)
+const timezoneName = (tz) => (tz ? tz.split(") ")[1] || tz : "");
+
+
 // Builds the specific JSON structure your backend expects
 function buildTripSheetPayload(stops) {
-  return stops.map((stop) => ({
-    stop_type: stop.stopTypeLabel || stop.stopType,
-    stop_name: stop.stopName,
-    address: stop.address,
-    address_2: stop.address2 || "",
-    city: stop.city || "",
-    state: stop.state || "",
-    zipcode: stop.zipcode || "",
-    country: stop.country || "",
-    latitude: stop.latitude,
-    longitude: stop.longitude,
+  return stops.map((stop) => {
+    // Pickup has no arrival window — only Intermediate/Delivery stops carry End timing.
+    const hasEndWindow = stop.stopType !== "pickup";
 
- 
-    start_date: stop.startDate || "",
-    start_time: stop.startTime || "",
-    start_timezone: stop.startTimezone ? stop.startTimezone.split(') ')[1] : "", // Extracts 'Pacific' from '(UTC-08:00) Pacific'
+    return {
+      stop_type: stop.stopTypeLabel || stop.stopType,
+      stop_name: stop.stopName,
 
- 
-    // Only meaningful for the Pickup stop
-    track_start_offset: stop.stopType === "pickup" ? (stop.trackStartOffset || "") : "",
+      // The driver app texts this stop's verification code here.
+      contact_name: stop.contactName || "",
+      contact_phone: stop.contactPhone || "",
 
- 
-    comment_to_driver: stop.commentToDriver || "",
-    alert_emails: stop.alertEmails || "",
+      address: stop.address,
+      address_2: stop.address2 || "",
+      city: stop.city || "",
+      state: stop.state || "",
+      zipcode: stop.zipcode || "",
+      country: stop.country || "",
+      latitude: stop.latitude,
+      longitude: stop.longitude,
 
- 
-    custom_events: (stop.customEvents || []).map((ce) => ({
-      question: ce.question || "",
-      answer_type: ce.answerType || "",
-    })),
-  }));
+
+      start_date: stop.startDate || "",
+      start_time: stop.startTime || "",
+      start_timezone: timezoneName(stop.startTimezone),
+
+
+      // Only meaningful for Intermediate/Delivery stops
+      end_date: hasEndWindow ? stop.endDate || "" : "",
+      end_time: hasEndWindow ? stop.endTime || "" : "",
+      end_timezone: hasEndWindow ? timezoneName(stop.endTimezone) : "",
+
+
+      // Only meaningful for the Pickup stop
+      track_start_offset: stop.stopType === "pickup" ? (stop.trackStartOffset || "") : "",
+
+
+      comment_to_driver: stop.commentToDriver || "",
+      alert_emails: stop.alertEmails || "",
+
+
+      custom_events: (stop.customEvents || []).map((ce) => ({
+        question: ce.question || "",
+        answer_type: ce.answerType || "",
+      })),
+    };
+  });
 }
 
  
@@ -492,6 +523,11 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
 
  
   const { value: stopTypeValue, label: stopTypeLabel } = getStopTypeInfo(index, total);
+
+  // Who the on-site contact is depends on what happens at the stop: you load
+  // from a shipper and hand over to a receiver.
+  const contactLabel =
+    stopTypeValue === "pickup" ? "Shipper" : stopTypeValue === "delivery" ? "Receiver" : "Contact";
 
  
   const toggleCollapsed = () => setCollapsed((v) => !v);
@@ -576,6 +612,47 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
             <div className="mb-5">
               <FieldLabel>Stop Name</FieldLabel>
               <input className={inputClass} placeholder="Enter stop name" {...register(`stops.${index}.stopName`)} />
+            </div>
+
+
+            {/* The person on site who confirms the driver. The driver app texts
+                a 6-digit code to this number and cannot load or deliver until
+                it is read back — without it the stop is stuck. */}
+            <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <FieldLabel required>{contactLabel} Name</FieldLabel>
+                <input
+                  className={inputClass}
+                  placeholder={`Who the driver reports to at ${stopTypeLabel.toLowerCase()}`}
+                  {...register(`stops.${index}.contactName`, {
+                    required: `${contactLabel} name is required`,
+                  })}
+                />
+                <ErrorText>{errors?.stops?.[index]?.contactName?.message}</ErrorText>
+              </div>
+              <div>
+                <FieldLabel required>{contactLabel} Phone</FieldLabel>
+                <input
+                  className={
+                    inputClass +
+                    (errors?.stops?.[index]?.contactPhone ? " border-red-400 focus:border-red-400 focus:ring-red-100" : "")
+                  }
+                  placeholder="+1 555 000 1111"
+                  {...register(`stops.${index}.contactPhone`, {
+                    required: "Phone number is required — the OTP is sent here",
+                    validate: (v) =>
+                      // Matches the driver app: strip everything but digits and
+                      // require at least 10, since a 10-digit number is taken as
+                      // North American and anything longer carries its own code.
+                      String(v || "").replace(/\D/g, "").length >= 10 ||
+                      "Enter a full phone number with country code",
+                  })}
+                />
+                <ErrorText>{errors?.stops?.[index]?.contactPhone?.message}</ErrorText>
+                <p className="mt-1.5 text-xs text-slate-500 font-sans">
+                  The verification code for this stop is texted to this number.
+                </p>
+              </div>
             </div>
 
  
@@ -670,6 +747,63 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
             </div>
 
  
+            {/* End window — only Intermediate and Delivery stops have an arrival/departure end */}
+            {stopTypeValue !== "pickup" && (
+              <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div>
+                  <FieldLabel required>End — Date</FieldLabel>
+                  <input
+                    className={inputClass}
+                    type="date"
+                    {...register(`stops.${index}.endDate`, {
+                      required: "End date is required",
+                      validate: (value, formValues) => {
+                        const stop = formValues?.stops?.[index];
+                        if (!value || !stop?.startDate) return true;
+                        const start = `${stop.startDate}T${stop.startTime || "00:00"}`;
+                        const end = `${value}T${stop.endTime || "00:00"}`;
+                        return end >= start || "End must be after the start date/time";
+                      },
+                    })}
+                  />
+                  <ErrorText>{errors?.stops?.[index]?.endDate?.message}</ErrorText>
+                </div>
+                <div>
+                  <FieldLabel required>Time</FieldLabel>
+                  <Controller
+                    control={control}
+                    name={`stops.${index}.endTime`}
+                    rules={{ required: "End time is required" }}
+                    render={({ field: { value, onChange }, fieldState }) => (
+                      <>
+                        <CustomTimePicker value={value} onChange={onChange} hasError={!!fieldState.error} />
+                        <ErrorText>{fieldState.error?.message}</ErrorText>
+                      </>
+                    )}
+                  />
+                </div>
+                <div>
+                  <FieldLabel required>Timezone</FieldLabel>
+                  <div className="relative">
+                    <select
+                      className={
+                        selectClass +
+                        (errors?.stops?.[index]?.endTimezone ? " border-red-400 focus:border-red-400 focus:ring-red-100" : "")
+                      }
+                      {...register(`stops.${index}.endTimezone`, { required: "End timezone is required" })}
+                      defaultValue=""
+                    >
+                      <option value="" disabled>Select timezone</option>
+                      {TIMEZONES.map((tz) => <option key={tz} value={tz}>{tz}</option>)}
+                    </select>
+                    <ChevronDown />
+                  </div>
+                  <ErrorText>{errors?.stops?.[index]?.endTimezone?.message}</ErrorText>
+                </div>
+              </div>
+            )}
+
+
             {/* Start the Track — only shown for the Pickup stop */}
             {stopTypeValue === "pickup" && (
               <div className="mb-8">
