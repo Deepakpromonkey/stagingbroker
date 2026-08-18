@@ -4,7 +4,7 @@ import { toast } from "./components/ui/Toaster";
 import { apiFetch } from "./lib/api";
 
 const LOGIN_PATH = "/";
-const PUBLIC_PATHS = [LOGIN_PATH, "/signup"];
+const PUBLIC_PATHS = [LOGIN_PATH, "/signup", "/guest-pay"];
 const AUTH_USER_KEY = "crm_user";
 
 // Where the user picks a subscription plan, and the localStorage key
@@ -60,6 +60,7 @@ const PUBLIC_PATH_PREFIXES = [
   "/carrier/connect/",
   "/carrier/invalid-access",
   "/carrier/email-approval",
+  '/guest-pay'
 ];
 
 function isPublicPath(pathname) {
