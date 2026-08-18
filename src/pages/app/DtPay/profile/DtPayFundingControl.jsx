@@ -19,7 +19,7 @@ import NoData from "components/NoData";
 
 import Loader from "components/Loader";
 
-import { apiFetch } from 'lib/api';
+import { apiFetch, STRIPE_PUBLIC_KEY } from 'lib/api';
 
 import {loadStripe} from "@stripe/stripe-js";
 
@@ -34,7 +34,7 @@ import {
 
 import { ScrId, PH, Card } from '../components/ui';
 
-const stripePromise = loadStripe('pk_test_51TP2bME8lGA6s4DIvkKRuCU1crMqEo0NgiAfoWYTlyuLUNAlvIh6Zhqj8a3iRqLwWRlj0JO7Vfq8lXUzcEh021yQ00E3ArEngX');
+const stripePromise = loadStripe(STRIPE_PUBLIC_KEY);
 
 export default function DtPayFundingControl() {
 
@@ -49,6 +49,8 @@ export default function DtPayFundingControl() {
     const [no_methods, setNoMethods] = useState(false);
 
     const [success_message, setSuccessMessage] = useState("");
+    const [error_message, setErrorMessage] = useState("");
+
     const [count, setCount] = useState(0);
 
     const [user, setUser] = useState(null);
@@ -88,6 +90,9 @@ export default function DtPayFundingControl() {
 
                         setNoMethods(false)
                     }
+                }else{
+
+                    setErrorMessage(data?.message)
                 }
 
                 setIniting(false);
@@ -106,6 +111,9 @@ export default function DtPayFundingControl() {
 
                     setClientSecret(data.clientSecret);
                     setShowAddCard(true);
+                }else{
+
+                    setErrorMessage(data?.message)
                 }
 
                 setLoading(false)
@@ -124,20 +132,14 @@ export default function DtPayFundingControl() {
 
                     setLoading(false)
                     await connectBank(data.clientSecret);
+                }else{
+
+                    setErrorMessage(data?.message)
                 }
 
                 setLoading(false)
             })
             .catch((err) => console.error('Control tower init error:', err));
-
-        // Api.post('dt-pay/profile/methods/attach', {type: 'bank'}, async function (data) {
-
-        //     if(data.status){
-
-        //         setLoading(false)
-        //         await connectBank(data.clientSecret);
-        //     }
-        // });
     }
 
     async function connectBank(clientSecret){
@@ -169,12 +171,6 @@ export default function DtPayFundingControl() {
             return;
         }
 
-        // if(error){
-
-        //     alert(error.message);
-        //     return;
-        // }
-
         if(confirmedSetupIntent.status === "succeeded" || confirmedSetupIntent.status === 'processing'){
 
             setLoading(false)
@@ -194,6 +190,7 @@ export default function DtPayFundingControl() {
                     <PH
                         crumb={<><b>{user && (`${user.first_name} ${user.last_name}`)}</b> → Settings</>}
                         title="Funding & controls"
+                        back="/dt-pay"
                     />
                 </Grid>
 
@@ -256,11 +253,11 @@ export default function DtPayFundingControl() {
                         {!initing &&
                         
                             <div className="mt-5 pt-5 gap-5 flex items-end justify-end">
-                                <Button startIcon={<CreditCardOutlined />} size="small" variant="outlined" loading={loading} onClick={openAddCard}>
+                                <Button className="flex items-center justify-center gap-2 rounded-xl! border border-slate-200 bg-blue-500! cursor-pointer px-6! py-2! text-[13px]! capitalize! font-semibold text-white! shadow-sm! hover:bg-blue-700! transition disabled:bg-gray-300!" startIcon={<CreditCardOutlined />} size="small" variant="outlined" loading={loading} onClick={openAddCard}>
                                     Add Card
                                 </Button>
 
-                                <Button startIcon={<AccountBalanceOutlined />} size="small" variant="outlined" loading={loading} onClick={openAddBank}>
+                                <Button className="flex items-center justify-center gap-2 rounded-xl! border border-slate-200 bg-blue-500! cursor-pointer px-6! py-2! text-[13px]! capitalize! font-semibold text-white! shadow-sm! hover:bg-blue-700! transition disabled:bg-gray-300!" startIcon={<AccountBalanceOutlined />} size="small" variant="outlined" loading={loading} onClick={openAddBank}>
                                     Link Bank
                                 </Button>
                             </div>
@@ -326,6 +323,18 @@ export default function DtPayFundingControl() {
             >
                 <Alert severity="success" variant="filled">{success_message}</Alert>
             </Snackbar>
+
+            <Snackbar
+                open={error_message !== '' ? true : false}
+                autoHideDuration={6000}
+                onClose={() => {
+
+                    setErrorMessage('')
+                }}
+                anchorOrigin={{vertical: 'top', horizontal: 'center'}}
+            >
+                <Alert severity="error" variant="filled">{error_message}</Alert>
+            </Snackbar>
         </div>
     );
 }
@@ -379,7 +388,7 @@ function AddCardForm({clientSecret, close}){
 
             <div>
                 <label className="text-blue-800 font-semibold text-xs">Card Number</label>
-                <div className="border p-2 border-gray-300 rounded-lg">
+                <div className="border p-3 border-gray-300 rounded-lg">
                     <div className="stripe-input">
                         <CardNumberElement
                             options={{
@@ -395,7 +404,7 @@ function AddCardForm({clientSecret, close}){
                 <div className="col-span-1">
                     <label className="text-blue-800 font-semibold text-xs">Expiry</label>
 
-                    <div className="border p-2 border-gray-300 rounded-lg">
+                    <div className="border p-3 border-gray-300 rounded-lg">
                         <div className="stripe-input">
                             <CardExpiryElement />
                         </div>
@@ -406,8 +415,8 @@ function AddCardForm({clientSecret, close}){
 
                     <label className="text-blue-800 font-semibold text-xs">CVC</label>
 
-                    <div className="border p-2 border-gray-300 rounded-lg">
-                        <div className="stripe-input">
+                    <div className="border p-3 border-gray-300 rounded-lg">
+                        <div className="stripe-input placeholder-gray-100!">
                             <CardCvcElement />
                         </div>
                     </div>
@@ -415,11 +424,12 @@ function AddCardForm({clientSecret, close}){
             </div>
 
             <div className="flex items-end justify-end mt-9 gap-3">
-                <Button size="small" onClick={() => {
+                <Button className="flex items-center justify-center gap-2 rounded-xl! border border-slate-200 bg-white! cursor-pointer px-6! py-2! text-[13px]! capitalize! font-semibold text-blue-700! shadow-sm! hover:bg-white! hover:border-gray-600! transition disabled:bg-gray-300!" size="small" onClick={() => {
 
                     close();
                 }}>Cancel</Button>
                 <Button
+                    className="flex items-center justify-center gap-2 rounded-xl! border border-slate-200 bg-blue-500! cursor-pointer px-6! py-2! text-[13px]! capitalize! font-semibold text-white! shadow-sm! hover:bg-blue-700! transition disabled:bg-gray-300!"
                     type="submit"
                     disabled={saving}
                     loading={saving}

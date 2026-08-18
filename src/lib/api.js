@@ -1,5 +1,6 @@
 import { clearSessionStorage } from "../utils/Auth";
 
+export const STRIPE_PUBLIC_KEY = 'pk_live_51TP2bME8lGA6s4DI1Qrd3hBPKD6jZEZFP43NN0tJT0eV9aFU4V4kfaCybqtfmxWAntEnEkkMOU5N8TzLq6VBuvrS009KsgSeic';
 
 // export const API_BASE = "https://qs233r41-8000.inc1.devtunnels.ms/api/v1";
 export const API_BASE = "https://brokerapi.dollartraq.com/api/v1";
