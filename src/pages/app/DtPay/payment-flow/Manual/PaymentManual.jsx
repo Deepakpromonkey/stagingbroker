@@ -32,9 +32,9 @@ import { ScrId, PH, Steps, Card, Sum, SumRow, Callout, Tml, Te, Field, inputCls,
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
-import { apiFetch } from 'lib/api';
+import { apiFetch, STRIPE_PUBLIC_KEY } from 'lib/api';
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_KEY);
+const stripePromise = loadStripe(STRIPE_PUBLIC_KEY);
 
 const SEARCH_TYPES = ['mc', 'dot', 'company', 'phone', 'address', 'email', 'ein'];
 

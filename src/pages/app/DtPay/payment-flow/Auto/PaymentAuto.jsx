@@ -30,14 +30,14 @@ import Done from '@mui/icons-material/Done'
 
 import NoData from 'components/NoData';
 
-import { apiFetch } from 'lib/api';
+import { apiFetch, STRIPE_PUBLIC_KEY } from 'lib/api';
 
 import { ScrId, PH, Steps, Card, Sum, SumRow, Callout, Tml, Te } from '../../components/ui';
 
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_KEY);
+const stripePromise = loadStripe(loadStripe);
 
 function CheckoutForm() {
     const stripe = useStripe();
