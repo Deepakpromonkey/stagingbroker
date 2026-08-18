@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 
 import Search from '@mui/icons-material/Search'
 import LocalShippingOutlined from '@mui/icons-material/LocalShippingOutlined'
+import ArrowRightAlt from '@mui/icons-material/ArrowRightAlt'
 
 import Button from '@mui/material/Button';
 
@@ -112,7 +113,7 @@ export default function CarrierBlock() {
 
     }
 
-    function makePayment(){
+    function updateCarrier(){
 
         setInitingTransaction(true);
 
@@ -122,7 +123,7 @@ export default function CarrierBlock() {
                 'Content-Type': 'application/json',
                 Accept: 'application/json',
             },
-            body: JSON.stringify({ carrier_id: selectedCarrier.row_id }),
+            body: JSON.stringify({ carrier_id: selectedCarrier.dot_number }),
         })
             .then(function (response) {
 
@@ -263,7 +264,9 @@ export default function CarrierBlock() {
                 
                     {selectedCarrier &&
                 
-                        <Button variant="contained" className="w-full" loading={initingTransaction} onClick={() => makePayment()}>Continue</Button>
+                        <Button endIcon={<ArrowRightAlt />} className="flex items-center justify-center gap-2 rounded-xl! border border-slate-200 bg-blue-500! cursor-pointer px-6! py-2! text-[13px]! capitalize! font-semibold text-white! shadow-sm! hover:bg-blue-700! transition disabled:bg-gray-300! w-full" loading={initingTransaction} onClick={() => updateCarrier()}>
+                            Continue
+                        </Button>
                     }
                 </div>
             </Field>

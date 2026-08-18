@@ -10,6 +10,7 @@ import Snackbar from '@mui/material/Snackbar';
 import Alert from '@mui/material/Alert';
 
 import UploadFileOutlined from '@mui/icons-material/UploadFileOutlined'
+import ArrowRightAlt from '@mui/icons-material/ArrowRightAlt'
 
 import Button from '@mui/material/Button';
 
@@ -242,7 +243,7 @@ export default function LoadBlock({step, transaction_id, transaction}){
                 }
 
                 <div className="col-span-2 flex items-center justify-end mt-2">
-                    <Button variant="contained" size="small" loading={submittingLoad} onClick={() => {
+                    <Button endIcon={<ArrowRightAlt />} className="flex items-center justify-center gap-2 rounded-xl! border border-slate-200 bg-blue-500! cursor-pointer px-6! py-2! text-[13px]! capitalize! font-semibold text-white! shadow-sm! hover:bg-blue-700! transition disabled:bg-gray-300!" size="small" loading={submittingLoad} onClick={() => {
 
                         loadForm.handleSubmit()
                     }}>Continue</Button>

@@ -11,6 +11,8 @@ import Stack from '@mui/material/Stack';
 import CarrierBlock from './block/CarrierBlock';
 import LoadBlock from './block/LoadBlock';
 import YouBlock from './block/YouBlock';
+import MethodBlock from './block/MethodBlock';
+import TrackBlock from './block/TrackBlock';
 
 import { API_BASE } from 'lib/api';
 
@@ -34,8 +36,7 @@ export default function DtPayGuestPay() {
         'load': {label: 'Load', name: 'Guest — find carrier', num: 1},
         'you': {label: 'You', name: 'Guest — find carrier', num: 2},
         'method': {label: 'Method', name: 'Guest — find carrier', num: 3},
-        'pay': {label: 'Pay', name: 'Guest — find carrier', num: 4},
-        'track': {label: 'Track', name: 'Guest — find carrier', num: 5}
+        'track': {label: 'Track', name: 'Guest — find carrier', num: 4}
     }
 
     useEffect(() => {
@@ -161,8 +162,28 @@ export default function DtPayGuestPay() {
                                 }
 
                                 {currentStepNum === 2 &&
-                                
+
                                     <YouBlock
+                                        step={step}
+                                        transaction_id={transaction_id}
+
+                                        transaction={transaction}
+                                    />
+                                }
+
+                                {currentStepNum === 3 &&
+
+                                    <MethodBlock
+                                        step={step}
+                                        transaction_id={transaction_id}
+
+                                        transaction={transaction}
+                                    />
+                                }
+
+                                {currentStepNum === 4 &&
+
+                                    <TrackBlock
                                         step={step}
                                         transaction_id={transaction_id}
 
@@ -173,44 +194,6 @@ export default function DtPayGuestPay() {
                     }
                 </div>
             </div>
-
-            {/* <Snackbar
-                open={success_message}
-                autoHideDuration={6000}
-                onClose={() => {
-
-                    setSuccessMessage(null)
-                }}
-                anchorOrigin={{vertical: 'top', horizontal: 'center'}}
-            >
-                <Alert
-                    severity="success"
-                    variant="filled"
-                    sx={{ width: '100%' }}
-                >
-                    {success_message}
-                </Alert>
-            </Snackbar>
-
-            <Snackbar
-                open={error_message}
-                autoHideDuration={6000}
-                onClose={() => {
-
-                    setErrorMessage(null)
-                }}
-                anchorOrigin={{vertical: 'top', horizontal: 'center'}}
-            >
-                <Alert
-                    severity="error"
-                    variant="filled"
-                    sx={{ width: '100%' }}
-                >
-                    {error_message}
-                </Alert>
-            </Snackbar> */}
-
-            {/* <Loader loading={screen_loading} /> */}
         </div>
     );
 }
