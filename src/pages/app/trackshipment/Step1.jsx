@@ -90,7 +90,7 @@ const PHONE_PATTERN = /^[0-9()+\-\s]{7,}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMAIL_LIST_PATTERN = /^\s*[^\s@]+@[^\s@]+\.[^\s@]+\s*(,\s*[^\s@]+@[^\s@]+\.[^\s@]+\s*)*$/;
 
-const CARRIER_LIST_URL = "/getCarrier";
+const CARRIER_LIST_URL = "/carrier-connect";
 
 // NEW: template listing + per-template fetch endpoints
 const TEMPLATE_LIST_URL = "/shipment-templates";
