@@ -134,7 +134,7 @@ function Subscription() {
 				const checkoutUrl = data?.data?.checkout_url;
 
 				if (!checkoutUrl) {
-					throw new Error('No checkout URL returned.');
+					throw new Error(`We couldn't generate a payment link for the ${plan.name} plan. Please try again in a moment.`);
 				}
 
 				window.location.href = checkoutUrl;
@@ -142,9 +142,13 @@ function Subscription() {
 			.catch((error) => {
 				setCheckoutPlan(null);
 
+				const fallbackMessage = `We couldn't start checkout for the ${plan.name} plan. Please try again, or contact support if this keeps happening.`;
+
 				toast.error({
 					title: 'Could not start checkout',
-					message: error?.message || 'Something went wrong opening the payment page. Please try again.',
+					message: (error && typeof error.message === 'string' && error.message.trim() !== '')
+						? error.message
+						: fallbackMessage,
 				});
 			});
 	};

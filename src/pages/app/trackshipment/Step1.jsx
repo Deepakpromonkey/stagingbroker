@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { create } from "zustand";
 
 import { apiFetch } from "../../../lib/api";
@@ -73,9 +75,59 @@ const TRACKING_INTERVALS = [
   { value: 21600, label: "Every 6 hours" },
 ];
 
-const PHONE_PATTERN = /^[0-9()+\-\s]{7,}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMAIL_LIST_PATTERN = /^\s*[^\s@]+@[^\s@]+\.[^\s@]+\s*(,\s*[^\s@]+@[^\s@]+\.[^\s@]+\s*)*$/;
+
+// Only letters and spaces (used for dispatcher name)
+const ALPHA_PATTERN = /^[A-Za-z\s]*$/;
+
+const PHONE_VALIDATION = {
+  US: {
+    length: 10,
+    pattern: /^[2-9]\d{9}$/,
+    message: "Enter a valid 10-digit US phone number",
+  },
+  CA: {
+    length: 10,
+    pattern: /^[2-9]\d{9}$/,
+    message: "Enter a valid 10-digit Canadian phone number",
+  },
+  MX: {
+    length: 10,
+    pattern: /^\d{10}$/,
+    message: "Enter a valid 10-digit Mexican phone number",
+  },
+  IN: {
+    length: 10,
+    pattern: /^[6-9]\d{9}$/,
+    message: "Enter a valid 10-digit Indian mobile number",
+  },
+};
+
+function validatePhoneForCountry(rawPhone, countryCode) {
+  const digits = (rawPhone || "").replace(/\D/g, "");
+  const rule = PHONE_VALIDATION[countryCode] || PHONE_VALIDATION.US;
+
+  if (digits.length !== rule.length) {
+    return rule.message;
+  }
+
+  if (rule.pattern && !rule.pattern.test(digits)) {
+    return rule.message;
+  }
+
+  return true;
+}
+
+function sanitizePhoneDigits(rawValue, countryCode) {
+  const maxLength = (PHONE_VALIDATION[countryCode] || PHONE_VALIDATION.US).length;
+  return (rawValue || "").replace(/\D/g, "").slice(0, maxLength);
+}
+
+// Strips digits/symbols from name-type fields — letters and spaces only.
+function sanitizeName(rawValue) {
+  return (rawValue || "").replace(/[^A-Za-z\s]/g, "");
+}
 
 const CARRIER_LIST_URL = "/carrier-connect";
 
@@ -120,6 +172,87 @@ export const BLANK_STEP1_VALUES = {
   notes: "",
   saveAsTemplate: false,
 };
+
+// Zod schema — single source of truth for validation. Every field's
+// pass/fail logic lives here; the onChange sanitizers on the inputs are
+// UX guardrails only (they stop invalid keystrokes) and never decide
+// correctness on their own.
+const step1Schema = z
+  .object({
+    reuseTemplate: z.string(),
+
+    proNumber: z.string().trim().min(1, "Load ID is required"),
+    trackingNumber: z.string().trim().min(1, "Dollar Traq No. is required"),
+
+    carrierName: z.string().min(1, "Carrier name is required"),
+    carrierMc: z.string().trim().min(1, "Carrier MC # is required"),
+    carrierDot: z.string().trim().min(1, "Carrier DOT # is required"),
+    carrierPhone: z
+      .string()
+      .trim()
+      .min(1, "Carrier phone is required")
+      .transform((v) => v.replace(/\D/g, ""))
+      .refine((v) => v.length === 10, "Enter a valid 10-digit phone number"),
+
+    trackingMethod: z.string(),
+
+    countryCode1: z.string(),
+    driverPhone1: z.string().trim().min(1, "Driver phone is required"),
+    countryCode2: z.string(),
+    driverPhone2: z.string().trim().optional().or(z.literal("")),
+    driverType: z.string(),
+
+    truckNumber: z.string().trim().min(1, "Truck number is required"),
+    trailerNumber: z.string().trim().min(1, "Trailer number is required"),
+
+    teamLoad: z.boolean(),
+
+    dispatcherName: z
+      .string()
+      .regex(ALPHA_PATTERN, "Only letters and spaces are allowed")
+      .optional()
+      .or(z.literal("")),
+    dispatcherEmail: z
+      .string()
+      .optional()
+      .refine((v) => !v || EMAIL_PATTERN.test(v), {
+        message: "Enter a valid email address",
+      }),
+
+    trackingIntervalSeconds: z.number(),
+
+    updates: z.array(z.any()),
+    emailUpdatesTo: z
+      .string()
+      .optional()
+      .refine((v) => !v || EMAIL_LIST_PATTERN.test(v), {
+        message: "Enter one or more valid emails, separated by commas",
+      }),
+
+    notes: z.string().optional(),
+    saveAsTemplate: z.boolean(),
+  })
+  .superRefine((data, ctx) => {
+    const phone1Check = validatePhoneForCountry(data.driverPhone1, data.countryCode1);
+    if (phone1Check !== true) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["driverPhone1"],
+        message: phone1Check,
+      });
+    }
+
+    if (data.driverPhone2) {
+      const phone2Check = validatePhoneForCountry(data.driverPhone2, data.countryCode2);
+      if (phone2Check !== true) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["driverPhone2"],
+          message: phone2Check,
+        });
+      }
+    }
+  });
 
 export const useShipmentDraftStore = create((set) => ({
   step1: BLANK_STEP1_VALUES,
@@ -788,20 +921,12 @@ export default function TrackShipmentStep1() {
   const setStep1Draft = useShipmentDraftStore((s) => s.setStep1);
   const resetStep1Draft = useShipmentDraftStore((s) => s.resetStep1);
   const setLastCreatedShipment = useShipmentDraftStore((s) => s.setLastCreatedShipment);
-  const cameFromStep2Back = useShipmentDraftStore((s) => s.cameFromStep2Back);
   const clearComingFromStep2Back = useShipmentDraftStore((s) => s.clearComingFromStep2Back);
 
-  const didInitRef = useRef(false);
-  if (!didInitRef.current) {
-    didInitRef.current = true;
-    if (cameFromStep2Back) {
-      clearComingFromStep2Back();
-    } else {
-      resetStep1Draft();
-    }
-  }
-
-  const step1Draft = useShipmentDraftStore((s) => s.step1);
+  // Snapshot the store synchronously, once, so we don't depend on render/subscription
+  // timing to know whether we're arriving from Step 2 ("Back") or starting fresh.
+  const initialStoreStateRef = useRef(useShipmentDraftStore.getState());
+  const initialStoreState = initialStoreStateRef.current;
 
   const generateTrackingNumber = () => {
     const randomNum = Math.floor(10000000 + Math.random() * 90000000);
@@ -817,11 +942,19 @@ export default function TrackShipmentStep1() {
     setValue,
     formState: { isSubmitting, errors },
   } = useForm({
+    resolver: zodResolver(step1Schema),
     mode: "onBlur",
-    defaultValues: step1Draft,
+    defaultValues: initialStoreState.cameFromStep2Back
+      ? initialStoreState.step1
+      : BLANK_STEP1_VALUES,
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: "updates" });
+
+  // Tracked so the phone inputs below know how many digits the currently
+  // selected country allows.
+  const countryCode1 = watch("countryCode1");
+  const countryCode2 = watch("countryCode2");
 
   useEffect(() => {
     const subscription = watch((values) => {
@@ -831,20 +964,29 @@ export default function TrackShipmentStep1() {
   }, [watch, setStep1Draft]);
 
   useEffect(() => {
-   if (searchParams.get("incomplete") === "1") {
-    toast.error({
-      title: "Finish step 1 first",
-       message: "Please complete and save the shipment summary before continuing.",
-       duration: 5000,
-     });
-     searchParams.delete("incomplete");
-     setSearchParams(searchParams, { replace: true });
-   }
+    if (initialStoreState.cameFromStep2Back) {
+      // Force the form to reflect the saved draft. defaultValues only applies on the
+      // very first render, so if the store hadn't fully settled by then, reset()
+      // here guarantees the fields actually get populated.
+      reset(initialStoreState.step1);
+      clearComingFromStep2Back();
+    } else {
+      resetStep1Draft();
+      if (!initialStoreState.step1?.trackingNumber) {
+        setValue("trackingNumber", generateTrackingNumber());
+      }
+    }
 
-   if (!step1Draft?.trackingNumber) {
-     setValue("trackingNumber", generateTrackingNumber());
-   }
-   // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (searchParams.get("incomplete") === "1") {
+      toast.error({
+        title: "Finish step 1 first",
+        message: "Please complete and save the shipment summary before continuing.",
+        duration: 5000,
+      });
+      searchParams.delete("incomplete");
+      setSearchParams(searchParams, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const mapApiTemplateToFormValues = (apiData) => {
@@ -1128,7 +1270,7 @@ export default function TrackShipmentStep1() {
                 <input
                   className={inputClass}
                   placeholder="e.g. PRO123456"
-                  {...register("proNumber", { required: "Load ID is required" })}
+                  {...register("proNumber")}
                 />
                 <ErrorText>{errors.proNumber?.message}</ErrorText>
               </div>
@@ -1138,7 +1280,7 @@ export default function TrackShipmentStep1() {
                   className={`${inputClass} cursor-not-allowed bg-slate-100 text-slate-500`}
                   placeholder="TRK12345678"
                   readOnly
-                  {...register("trackingNumber", { required: "Dollar Traq No. is required" })}
+                  {...register("trackingNumber")}
                 />
                 <ErrorText>{errors.trackingNumber?.message}</ErrorText>
               </div>
@@ -1162,7 +1304,6 @@ export default function TrackShipmentStep1() {
               <Controller
                 control={control}
                 name="carrierName"
-                rules={{ required: "Carrier name is required" }}
                 render={({ field: { value, onChange }, fieldState }) => (
                   <>
                     <CustomDropdown
@@ -1200,7 +1341,7 @@ export default function TrackShipmentStep1() {
                 <input
                   className={inputClass}
                   placeholder="MC123456"
-                  {...register("carrierMc", { required: "Carrier MC # is required" })}
+                  {...register("carrierMc")}
                 />
                 <ErrorText>{errors.carrierMc?.message}</ErrorText>
               </div>
@@ -1209,7 +1350,7 @@ export default function TrackShipmentStep1() {
                 <input
                   className={inputClass}
                   placeholder="DOT987654"
-                  {...register("carrierDot", { required: "Carrier DOT # is required" })}
+                  {...register("carrierDot")}
                 />
                 <ErrorText>{errors.carrierDot?.message}</ErrorText>
               </div>
@@ -1218,9 +1359,12 @@ export default function TrackShipmentStep1() {
                 <input
                   className={inputClass}
                   placeholder="9876543210"
+                  inputMode="numeric"
+                  maxLength={10}
                   {...register("carrierPhone", {
-                    required: "Carrier phone is required",
-                    pattern: { value: PHONE_PATTERN, message: "Enter a valid phone number" },
+                    onChange: (e) => {
+                      e.target.value = e.target.value.replace(/\D/g, "").slice(0, 10);
+                    },
                   })}
                 />
                 <ErrorText>{errors.carrierPhone?.message}</ErrorText>
@@ -1259,15 +1403,26 @@ export default function TrackShipmentStep1() {
               </div>
               <div>
                 <FieldLabel required>Driver Phone 1</FieldLabel>
-                <input
-                  className={inputClass}
-                  placeholder="Primary"
-                  {...register("driverPhone1", {
-                    required: "Driver phone is required",
-                    pattern: { value: PHONE_PATTERN, message: "Enter a valid phone number" },
-                  })}
+                <Controller
+                  control={control}
+                  name="driverPhone1"
+                  render={({ field: { value, onChange }, fieldState }) => (
+                    <>
+                      <input
+                        className={
+                          inputClass +
+                          (fieldState.error ? " border-red-400 focus:border-red-400 focus:ring-red-100" : "")
+                        }
+                        placeholder="Primary"
+                        inputMode="numeric"
+                        maxLength={(PHONE_VALIDATION[countryCode1] || PHONE_VALIDATION.US).length}
+                        value={value}
+                        onChange={(e) => onChange(sanitizePhoneDigits(e.target.value, countryCode1))}
+                      />
+                      <ErrorText>{fieldState.error?.message}</ErrorText>
+                    </>
+                  )}
                 />
-                <ErrorText>{errors.driverPhone1?.message}</ErrorText>
               </div>
             </div>
             </div>
@@ -1280,7 +1435,7 @@ export default function TrackShipmentStep1() {
                 <input
                   className={inputClass}
                   placeholder="e.g. 4471"
-                  {...register("truckNumber", { required: "Truck number is required" })}
+                  {...register("truckNumber")}
                 />
                 <ErrorText>{errors.truckNumber?.message}</ErrorText>
               </div>
@@ -1289,7 +1444,7 @@ export default function TrackShipmentStep1() {
                 <input
                   className={inputClass}
                   placeholder="e.g. TR-208"
-                  {...register("trailerNumber", { required: "Trailer number is required" })}
+                  {...register("trailerNumber")}
                 />
                 <ErrorText>{errors.trailerNumber?.message}</ErrorText>
               </div>
@@ -1313,14 +1468,26 @@ export default function TrackShipmentStep1() {
               </div>
               <div>
                 <FieldLabel>Driver Phone 2</FieldLabel>
-                <input
-                  className={inputClass}
-                  placeholder="Optional"
-                  {...register("driverPhone2", {
-                    validate: (v) => v === "" || PHONE_PATTERN.test(v) || "Enter a valid phone number",
-                  })}
+                <Controller
+                  control={control}
+                  name="driverPhone2"
+                  render={({ field: { value, onChange }, fieldState }) => (
+                    <>
+                      <input
+                        className={
+                          inputClass +
+                          (fieldState.error ? " border-red-400 focus:border-red-400 focus:ring-red-100" : "")
+                        }
+                        placeholder="Optional"
+                        inputMode="numeric"
+                        maxLength={(PHONE_VALIDATION[countryCode2] || PHONE_VALIDATION.US).length}
+                        value={value}
+                        onChange={(e) => onChange(sanitizePhoneDigits(e.target.value, countryCode2))}
+                      />
+                      <ErrorText>{fieldState.error?.message}</ErrorText>
+                    </>
+                  )}
                 />
-                <ErrorText>{errors.driverPhone2?.message}</ErrorText>
               </div>
             </div>
 
@@ -1386,7 +1553,24 @@ export default function TrackShipmentStep1() {
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
               <div>
                 <FieldLabel>Dispatcher Name</FieldLabel>
-                <input className={inputClass} placeholder="Enter dispatcher name" {...register("dispatcherName")} />
+                <Controller
+                  control={control}
+                  name="dispatcherName"
+                  render={({ field: { value, onChange }, fieldState }) => (
+                    <>
+                      <input
+                        className={
+                          inputClass +
+                          (fieldState.error ? " border-red-400 focus:border-red-400 focus:ring-red-100" : "")
+                        }
+                        placeholder="Enter dispatcher name"
+                        value={value}
+                        onChange={(e) => onChange(sanitizeName(e.target.value))}
+                      />
+                      <ErrorText>{fieldState.error?.message}</ErrorText>
+                    </>
+                  )}
+                />
               </div>
               <div>
                 <FieldLabel>Email</FieldLabel>
@@ -1400,7 +1584,6 @@ export default function TrackShipmentStep1() {
                   readOnly={dispatcherEmailLocked}
                   onFocus={() => setDispatcherEmailLocked(false)}
                   {...register("dispatcherEmail", {
-                    validate: (v) => v === "" || EMAIL_PATTERN.test(v) || "Enter a valid email address",
                     onBlur: () => setDispatcherEmailLocked(true),
                   })}
                 />
@@ -1440,9 +1623,6 @@ export default function TrackShipmentStep1() {
               <Controller
                 control={control}
                 name="emailUpdatesTo"
-                rules={{
-                  validate: (v) => v === "" || EMAIL_LIST_PATTERN.test(v) || "Enter one or more valid emails, separated by commas",
-                }}
                 render={({ field: { value, onChange, onBlur }, fieldState }) => (
                   <>
                     <EmailChipsInput

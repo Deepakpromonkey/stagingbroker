@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     Visibility as VisibilityIcon,
     VisibilityOff as VisibilityOffIcon,
@@ -14,13 +14,13 @@ import {
     CheckCircle as CheckCircleIconMui,
     Shield as ShieldIconMui,
     ArrowForward as ArrowRightIconMui,
+    Public as PublicIconMui,
+    Search as SearchIconMui,
+    KeyboardArrowDown as KeyboardArrowDownIconMui,
 } from '@mui/icons-material';
 import { apiFetch, getToken } from '../../../lib/api';
 import { toast, ToastContainer } from '../../../components/ui/Toaster'
 
-// ---------------------------------------------------------------------
-// Design tokens — back to your original navy / indigo / blue palette.
-// ---------------------------------------------------------------------
 const NAVY = '#0F1B33';
 const NAVY_LIGHT = '#1B2C52';
 const INDIGO = '#4F46E5';
@@ -32,6 +32,79 @@ const PAGE_BG = '#F4F5F1';
 
 const TOKEN_KEY = 'crm_auth_token';
 const USER_KEY = 'crm_user';
+
+// ---------------------------------------------------------------------
+// Country codes / phone validation — same source list & rules as
+// Step 1 of Track Shipment, so the two forms stay consistent.
+// ---------------------------------------------------------------------
+const COUNTRY_CODES = [
+    { code: "IN", dial: "+91", label: "India" },
+    { code: "US", dial: "+1", label: "United States" },
+    { code: "CA", dial: "+1", label: "Canada" },
+    { code: "MX", dial: "+52", label: "Mexico" },
+];
+
+const PHONE_VALIDATION = {
+    US: {
+        length: 10,
+        pattern: /^[2-9]\d{9}$/,
+        message: "Enter a valid 10-digit US phone number",
+    },
+    CA: {
+        length: 10,
+        pattern: /^[2-9]\d{9}$/,
+        message: "Enter a valid 10-digit Canadian phone number",
+    },
+    MX: {
+        length: 10,
+        pattern: /^\d{10}$/,
+        message: "Enter a valid 10-digit Mexican phone number",
+    },
+    IN: {
+        length: 10,
+        pattern: /^[6-9]\d{9}$/,
+        message: "Enter a valid 10-digit Indian mobile number",
+    },
+};
+
+function validatePhoneForCountry(rawPhone, countryCode) {
+    const digits = (rawPhone || "").replace(/\D/g, "");
+    const rule = PHONE_VALIDATION[countryCode] || PHONE_VALIDATION.US;
+
+    if (digits.length !== rule.length) {
+        return rule.message;
+    }
+
+    if (rule.pattern && !rule.pattern.test(digits)) {
+        return rule.message;
+    }
+
+    return true;
+}
+
+function sanitizePhoneDigits(rawValue, countryCode) {
+    const maxLength = (PHONE_VALIDATION[countryCode] || PHONE_VALIDATION.US).length;
+    return (rawValue || "").replace(/\D/g, "").slice(0, maxLength);
+}
+
+const MAX_NAME_LENGTH = 50;
+
+// Strips digits/symbols from name fields — letters and spaces only,
+// capped at MAX_NAME_LENGTH.
+function sanitizeName(rawValue) {
+    return (rawValue || "").replace(/[^A-Za-z\s]/g, "").slice(0, MAX_NAME_LENGTH);
+}
+
+const CountryFlag = ({ code, className = "" }) => (
+    <img
+        src={`https://flagcdn.com/24x18/${code.toLowerCase()}.png`}
+        srcSet={`https://flagcdn.com/48x36/${code.toLowerCase()}.png 2x`}
+        width={20}
+        height={15}
+        alt=""
+        className={`inline-block flex-shrink-0 rounded-[2px] object-cover ${className}`}
+    />
+);
 
 const EyeIcon = ({ show }) =>
     show ? <VisibilityIcon sx={{ fontSize: 15 }} /> : <VisibilityOffIcon sx={{ fontSize: 15 }} />;
@@ -48,6 +121,9 @@ const CloseIcon = () => <CloseIconMui sx={{ fontSize: 16 }} />;
 const CheckCircleIcon = () => <CheckCircleIconMui sx={{ fontSize: 9, color: '#fff' }} />;
 const ShieldIcon = ({ color = '#fff', size = 18 }) => <ShieldIconMui sx={{ fontSize: size, color }} />;
 const ArrowRightIcon = () => <ArrowRightIconMui sx={{ fontSize: 12 }} />;
+const GlobeIcon = () => <PublicIconMui sx={{ fontSize: 14 }} />;
+const SearchIcon = () => <SearchIconMui sx={{ fontSize: 16 }} />;
+const ChevronDownIcon = () => <KeyboardArrowDownIconMui sx={{ fontSize: 18 }} />;
 
 // ---------------------------------------------------------------------
 // A single ledger row — label left, value right, hairline divider.
@@ -66,35 +142,141 @@ function DetailRow({ label, value, icon }) {
     );
 }
 
-function TextInput({ label, icon, ...inputProps }) {
+function TextInput({ label, icon, error, ...inputProps }) {
     const [focused, setFocused] = useState(false);
     const hasValue = Boolean(inputProps.value);
+    const borderColor = error ? '#D92D20' : focused ? INDIGO : hasValue ? '#D7DCE3' : '#E3E7EC';
 
     return (
-        <div className="flex items-center gap-3">
+        <div>
+            <div className="flex items-center gap-3">
+                <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors"
+                    style={{
+                        background: focused ? INDIGO : error ? '#FEF3F2' : '#EEF2FF',
+                        color: focused ? '#fff' : error ? '#D92D20' : INDIGO,
+                    }}
+                >
+                    {icon}
+                </div>
+                <div className="flex-1 min-w-0 relative">
+                    <label
+                        className="block text-[10px] font-semibold uppercase tracking-wide mb-1 transition-colors"
+                        style={{ color: focused ? INDIGO : '#9CA3AF' }}
+                    >
+                        {label}
+                    </label>
+                    <input
+                        {...inputProps}
+                        onFocus={(e) => { setFocused(true); inputProps.onFocus?.(e); }}
+                        onBlur={(e) => { setFocused(false); inputProps.onBlur?.(e); }}
+                        className="w-full border-0 border-b-2 outline-none bg-transparent text-[15px] font-semibold text-gray-900 placeholder:text-gray-300 placeholder:font-medium pb-1.5 transition-colors"
+                        style={{ borderColor }}
+                    />
+                </div>
+            </div>
+            {error && (
+                <p className="text-[11.5px] font-medium text-red-600 mt-1.5 mb-0 ml-[52px]">{error}</p>
+            )}
+        </div>
+    );
+}
+
+// ---------------------------------------------------------------------
+// Editable, searchable country-code select with flag images. Options
+// come from the same COUNTRY_CODES list used in Step 1.
+// ---------------------------------------------------------------------
+function CountryCodeSelect({ value, onChange, options }) {
+    const [open, setOpen] = useState(false);
+    const [query, setQuery] = useState("");
+    const rootRef = useRef(null);
+
+    useEffect(() => {
+        function handler(e) {
+            if (rootRef.current && !rootRef.current.contains(e.target)) {
+                setOpen(false);
+                setQuery("");
+            }
+        }
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+    }, []);
+
+    const selected = options.find((o) => o.code === value) || options[0];
+    const filtered = query
+        ? options.filter((o) =>
+            `${o.code} ${o.dial} ${o.label}`.toLowerCase().includes(query.toLowerCase())
+        )
+        : options;
+
+    return (
+        <div className="flex items-center gap-3" ref={rootRef}>
             <div
                 className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors"
-                style={{
-                    background: focused ? INDIGO : '#EEF2FF',
-                    color: focused ? '#fff' : INDIGO,
-                }}
+                style={{ background: open ? INDIGO : '#EEF2FF', color: open ? '#fff' : INDIGO }}
             >
-                {icon}
+                <GlobeIcon />
             </div>
             <div className="flex-1 min-w-0 relative">
                 <label
                     className="block text-[10px] font-semibold uppercase tracking-wide mb-1 transition-colors"
-                    style={{ color: focused ? INDIGO : '#9CA3AF' }}
+                    style={{ color: open ? INDIGO : '#9CA3AF' }}
                 >
-                    {label}
+                    Country Code
                 </label>
-                <input
-                    {...inputProps}
-                    onFocus={(e) => { setFocused(true); inputProps.onFocus?.(e); }}
-                    onBlur={(e) => { setFocused(false); inputProps.onBlur?.(e); }}
-                    className="w-full border-0 border-b-2 outline-none bg-transparent text-[15px] font-semibold text-gray-900 placeholder:text-gray-300 placeholder:font-medium pb-1.5 transition-colors"
-                    style={{ borderColor: focused ? INDIGO : hasValue ? '#D7DCE3' : '#E3E7EC' }}
-                />
+                <button
+                    type="button"
+                    onClick={() => setOpen((v) => !v)}
+                    className="w-full flex items-center justify-between border-0 border-b-2 outline-none bg-transparent text-[15px] font-semibold text-gray-900 pb-1.5 transition-colors"
+                    style={{ borderColor: open ? INDIGO : '#E3E7EC' }}
+                >
+                    <span className="flex items-center gap-2">
+                        <CountryFlag code={selected.code} />
+                        {selected.code} {selected.dial}
+                    </span>
+                    <ChevronDownIcon />
+                </button>
+
+                {open && (
+                    <div className="absolute z-20 mt-1 w-full min-w-[240px] overflow-hidden rounded-xl border border-[#E3E7EC] bg-white shadow-lg">
+                        <div className="flex items-center gap-2 border-b border-gray-100 px-3 py-2">
+                            <SearchIcon />
+                            <input
+                                autoFocus
+                                value={query}
+                                onChange={(e) => setQuery(e.target.value)}
+                                placeholder="Search country or code…"
+                                className="w-full text-sm text-gray-700 outline-none placeholder:text-gray-300"
+                            />
+                        </div>
+                        <div className="max-h-48 overflow-y-auto py-1">
+                            {filtered.length === 0 && (
+                                <p className="px-4 py-2.5 text-sm text-gray-400">No matches</p>
+                            )}
+                            {filtered.map((opt) => {
+                                const isSelected = opt.code === value;
+                                return (
+                                    <button
+                                        type="button"
+                                        key={opt.code}
+                                        onClick={() => {
+                                            onChange(opt.code);
+                                            setOpen(false);
+                                            setQuery("");
+                                        }}
+                                        className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium transition ${isSelected ? "bg-[#EEF2FF] text-[#4F46E5]" : "text-gray-700 hover:bg-gray-50"
+                                            }`}
+                                    >
+                                        <CountryFlag code={opt.code} />
+                                        <span className="font-semibold">{opt.code}</span>
+                                        <span className="text-gray-400">{opt.dial}</span>
+                                        <span className="truncate">{opt.label}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -220,10 +402,15 @@ const ProfileUpdate = () => {
         first_name: '',
         last_name: '',
         contact: '',
+        country_code: 'US',
         profile_pic_url: ''
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [avatarError, setAvatarError] = useState(false);
+
+    const [firstNameError, setFirstNameError] = useState('');
+    const [lastNameError, setLastNameError] = useState('');
+    const [contactError, setContactError] = useState('');
 
     const [oldPassword, setOldPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
@@ -262,6 +449,10 @@ const ProfileUpdate = () => {
                         first_name: parsedUser.first_name || '',
                         last_name: parsedUser.last_name || '',
                         contact: parsedUser.phone ?? parsedUser.contact ?? '',
+                        country_code:
+                            COUNTRY_CODES.find(
+                                (c) => c.code === parsedUser.country_code || c.dial === parsedUser.country_code
+                            )?.code || 'US',
                         profile_pic_url: parsedUser.profile_pic_url || ''
                     });
                 } catch (err) {
@@ -295,8 +486,15 @@ const ProfileUpdate = () => {
                 first_name: user.first_name || '',
                 last_name: user.last_name || '',
                 contact: user.phone ?? user.contact ?? '',
+                country_code:
+                    COUNTRY_CODES.find(
+                        (c) => c.code === user.country_code || c.dial === user.country_code
+                    )?.code || 'US',
                 profile_pic_url: user.profile_pic_url || ''
             });
+            setFirstNameError('');
+            setLastNameError('');
+            setContactError('');
         }
     }, [editOpen, user]);
 
@@ -326,6 +524,32 @@ const ProfileUpdate = () => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
+    // First / last name: letters + spaces only, capped at 50 chars.
+    const handleNameInputChange = (field) => (e) => {
+        const sanitized = sanitizeName(e.target.value);
+        setFormData(prev => ({ ...prev, [field]: sanitized }));
+        if (field === 'first_name' && firstNameError) setFirstNameError('');
+        if (field === 'last_name' && lastNameError) setLastNameError('');
+    };
+
+    // Mobile: digits only, capped to the selected country's max length —
+    // same sanitizer used in Step 1.
+    const handleContactChange = (e) => {
+        const sanitized = sanitizePhoneDigits(e.target.value, formData.country_code);
+        setFormData(prev => ({ ...prev, contact: sanitized }));
+        if (contactError) setContactError('');
+    };
+
+    const handleCountryCodeChange = (code) => {
+        setFormData(prev => ({
+            ...prev,
+            country_code: code,
+            // re-trim the existing number to the newly selected country's length
+            contact: sanitizePhoneDigits(prev.contact, code),
+        }));
+        if (contactError) setContactError('');
+    };
+
     const handleFileChange = (e) => {
         const file = e.target.files[0];
         if (file) {
@@ -344,7 +568,7 @@ const ProfileUpdate = () => {
     // Update profile — POST {{base_url}}/update-profile
     //
     // Sent as multipart/form-data:
-    //   first_name, last_name, phone, profile_image (file, optional)
+    //   first_name, last_name, phone, country_code, profile_image (file, optional)
     //
     // NOTE: apiFetch must NOT force a "Content-Type: application/json"
     // header when the body is a FormData instance — the browser needs to
@@ -355,13 +579,58 @@ const ProfileUpdate = () => {
     // ---------------------------------------------------------------------
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        const trimmedFirst = formData.first_name.trim();
+        const trimmedLast = formData.last_name.trim();
+
+        let hasError = false;
+
+        if (!trimmedFirst) {
+            setFirstNameError('First name is required.');
+            hasError = true;
+        } else if (!/^[A-Za-z\s]+$/.test(trimmedFirst)) {
+            setFirstNameError('First name can only contain letters.');
+            hasError = true;
+        } else if (trimmedFirst.length > MAX_NAME_LENGTH) {
+            setFirstNameError(`First name must be ${MAX_NAME_LENGTH} characters or fewer.`);
+            hasError = true;
+        } else {
+            setFirstNameError('');
+        }
+
+        if (!trimmedLast) {
+            setLastNameError('Last name is required.');
+            hasError = true;
+        } else if (!/^[A-Za-z\s]+$/.test(trimmedLast)) {
+            setLastNameError('Last name can only contain letters.');
+            hasError = true;
+        } else if (trimmedLast.length > MAX_NAME_LENGTH) {
+            setLastNameError(`Last name must be ${MAX_NAME_LENGTH} characters or fewer.`);
+            hasError = true;
+        } else {
+            setLastNameError('');
+        }
+
+        const phoneCheck = validatePhoneForCountry(formData.contact, formData.country_code);
+        if (phoneCheck !== true) {
+            setContactError(phoneCheck);
+            hasError = true;
+        } else {
+            setContactError('');
+        }
+
+        if (hasError) return;
+
         setIsSubmitting(true);
 
         try {
+            const dialCode = COUNTRY_CODES.find((c) => c.code === formData.country_code)?.dial || '+1';
+
             const payload = new FormData();
-            payload.append('first_name', formData.first_name);
-            payload.append('last_name', formData.last_name);
+            payload.append('first_name', trimmedFirst);
+            payload.append('last_name', trimmedLast);
             payload.append('phone', formData.contact);
+            payload.append('country_code', dialCode);
 
             if (formData.profile_pic_file) {
                 payload.append('profile_image', formData.profile_pic_file);
@@ -393,6 +662,7 @@ const ProfileUpdate = () => {
                     const mergedUser = {
                         ...user,
                         ...updatedUser,
+                        country_code: formData.country_code,
                         profile_pic_url: serverPicUrl || user.profile_pic_url
                     };
                     localStorage.setItem(USER_KEY, JSON.stringify(mergedUser));
@@ -406,9 +676,10 @@ const ProfileUpdate = () => {
                 } else {
                     const syncedUser = {
                         ...user,
-                        first_name: formData.first_name,
-                        last_name: formData.last_name,
+                        first_name: trimmedFirst,
+                        last_name: trimmedLast,
                         contact: formData.contact,
+                        country_code: formData.country_code,
                         profile_pic_url: serverPicUrl || user.profile_pic_url
                     };
                     localStorage.setItem(USER_KEY, JSON.stringify(syncedUser));
@@ -597,7 +868,15 @@ const ProfileUpdate = () => {
                             <DetailRow label="Display Name" value={`${user.first_name || ''} ${user.last_name || ''}`.trim()} icon={<UserIcon />} />
                             <DetailRow label="Corporate Email" value={user.email} icon={<MailIcon />} />
                             <DetailRow label="Access Level" value={getRoleLabel() || '—'} icon={<BadgeIcon />} />
-                            <DetailRow label="Mobile Contact" value={user.phone ?? user.contact} icon={<PhoneIcon />} />
+                            <DetailRow
+                                label="Mobile Contact"
+                                value={
+                                    user.phone ?? user.contact
+                                        ? `${COUNTRY_CODES.find((c) => c.code === user.country_code)?.dial || ''} ${user.phone ?? user.contact}`.trim()
+                                        : ''
+                                }
+                                icon={<PhoneIcon />}
+                            />
                             <DetailRow label="Onboarding Date" value={user.added_on_formatted} icon={<CalendarIcon />} />
                             <DetailRow label="Last Updated" value={user.updated_on_formatted || user.added_on_formatted} icon={<ClockIcon />} />
                         </div>
@@ -719,7 +998,9 @@ const ProfileUpdate = () => {
                                                 type="text"
                                                 name="first_name"
                                                 value={formData.first_name}
-                                                onChange={handleInputChange}
+                                                onChange={handleNameInputChange('first_name')}
+                                                error={firstNameError}
+                                                maxLength={MAX_NAME_LENGTH}
                                                 required
                                             />
                                             <TextInput
@@ -728,20 +1009,40 @@ const ProfileUpdate = () => {
                                                 type="text"
                                                 name="last_name"
                                                 value={formData.last_name}
-                                                onChange={handleInputChange}
+                                                onChange={handleNameInputChange('last_name')}
+                                                error={lastNameError}
+                                                maxLength={MAX_NAME_LENGTH}
                                                 required
                                             />
                                         </div>
+                                        <div className="flex items-start gap-4 mb-5">
+                                            {/* Country Code - smaller width */}
+                                            <div className="w-[200px] flex-shrink-0">
+                                                <CountryCodeSelect
+                                                    value={formData.country_code}
+                                                    onChange={handleCountryCodeChange}
+                                                    options={COUNTRY_CODES}
+                                                />
+                                            </div>
 
-                                        <TextInput
-                                            label="Mobile"
-                                            icon={<PhoneIcon />}
-                                            type="text"
-                                            name="contact"
-                                            value={formData.contact}
-                                            onChange={handleInputChange}
-                                            required
-                                        />
+                                            {/* Mobile - takes remaining width */}
+                                            <div className="flex-1 min-w-0">
+                                                <TextInput
+                                                    label="Mobile"
+                                                    icon={<PhoneIcon />}
+                                                    type="text"
+                                                    name="contact"
+                                                    inputMode="numeric"
+                                                    value={formData.contact}
+                                                    onChange={handleContactChange}
+                                                    error={contactError}
+                                                    maxLength={
+                                                        (PHONE_VALIDATION[formData.country_code] || PHONE_VALIDATION.US).length
+                                                    }
+                                                    required
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 

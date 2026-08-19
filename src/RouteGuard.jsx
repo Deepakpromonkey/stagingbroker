@@ -250,9 +250,15 @@ export default function RouteGuard({ children }) {
     );
     if (blockedStep) {
       if (blockedStep.redirectTo === SUBSCRIBE_PATH) {
-        toast.error("Please choose a plan to continue.");
+        toast.error({
+          title: "Choose a plan",
+          message: "Please choose a plan to continue.",
+        });
       } else {
-        toast.error("Please complete the previous step first.");
+        toast.error({
+          title: "Previous step required",
+          message: "Please complete the previous step first.",
+        });
       }
       navigate(`${blockedStep.redirectTo}?incomplete=1`, { replace: true });
       return;
@@ -265,7 +271,10 @@ export default function RouteGuard({ children }) {
       (route) => route.match(pathname) && !hasPermission(route.permission, getUser())
     );
     if (blockedRoute) {
-      toast.error("You don't have permission to access that page.");
+      toast.error({
+        title: "Access restricted",
+        message: "You don't have permission to access that page.",
+      });
       navigate("/dashboard?unauthorized=1", { replace: true });
     }
   }, [pathname, token, navigate, planAccess]);

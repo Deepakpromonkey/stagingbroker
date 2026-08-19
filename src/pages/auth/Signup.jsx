@@ -27,6 +27,12 @@ const COLOR_MAIN = '#178A54';
 const COLOR_MAIN_DARK = '#136E43';
 const COLOR_BORDER = '#E4E7EC';
 
+// ---- Field length / validation limits ----
+const NAME_MAX_LENGTH = 50;
+const PASSWORD_MIN_LENGTH = 8;
+const PASSWORD_MAX_LENGTH = 16;
+const DOT_NUMBER_MAX_LENGTH = 10;
+const COMPANY_NAME_MAX_LENGTH = 100;
 
 const COUNTRY_CODES = [
     { code: 'IN', dial: '+91', label: 'India', digits: 10 },
@@ -254,6 +260,9 @@ const IconField = ({ icon, trailing, ...textFieldProps }) => (
 
 const validEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
+// Letters only (plus hyphen/apostrophe for names like O'Brien or Anne-Marie) — no spaces or digits
+const sanitizeName = (value) => (value || '').replace(/[^A-Za-z'-]/g, '');
+
 const Signup = () => {
 
     const navigate = useNavigate();
@@ -277,6 +286,7 @@ const Signup = () => {
     const [firstNameError, setFirstNameError] = useState(false);
     const [lastNameError, setLastNameError] = useState(false);
     const [emailError, setEmailError] = useState(false);
+    const [emailErrorMessage, setEmailErrorMessage] = useState('Please enter valid email address');
     const [passwordError, setPasswordError] = useState(false);
     const [passwordConfirmationError, setPasswordConfirmationError] = useState(false);
     const [phoneError, setPhoneError] = useState(false);
@@ -290,14 +300,14 @@ const Signup = () => {
 
         var _has_error = false;
 
-        if(firstName.trim() === ''){
+        if(firstName.trim() === '' || firstName.trim().length > NAME_MAX_LENGTH){
             setFirstNameError(true);
             _has_error = true;
         }else{
             setFirstNameError(false);
         }
 
-        if(lastName.trim() === ''){
+        if(lastName.trim() === '' || lastName.trim().length > NAME_MAX_LENGTH){
             setLastNameError(true);
             _has_error = true;
         }else{
@@ -306,12 +316,13 @@ const Signup = () => {
 
         if(!validEmail(email)){
             setEmailError(true);
+            setEmailErrorMessage('Please enter valid email address');
             _has_error = true;
         }else{
             setEmailError(false);
         }
 
-        if(password === '' || password.length < 6){
+        if(password === '' || password.length < PASSWORD_MIN_LENGTH || password.length > PASSWORD_MAX_LENGTH){
             setPasswordError(true);
             _has_error = true;
         }else{
@@ -342,9 +353,10 @@ if(phone.trim() === '' || phoneDigitCount !== selectedCountry.digits){
             setBusinessTypeError(false);
         }
 
-        // DOT# is mandatory only for 3PL / Freight Broker
+        // DOT# is mandatory only for 3PL / Freight Broker, digits only, max 10
         if(businessType === '3pl_freight_broker'){
-            if(dotNumber.trim() === ''){
+            const dotDigits = dotNumber.trim();
+            if(dotDigits === '' || !/^\d{1,10}$/.test(dotDigits)){
                 setDotNumberError(true);
                 _has_error = true;
             }else{
@@ -354,7 +366,7 @@ if(phone.trim() === '' || phoneDigitCount !== selectedCountry.digits){
             setDotNumberError(false);
         }
 
-        if(company.trim() === ''){
+        if(company.trim() === '' || company.trim().length > COMPANY_NAME_MAX_LENGTH){
             setCompanyError(true);
             _has_error = true;
         }else{
@@ -455,7 +467,9 @@ if (userData) {
                     : 'Registration failed. Please try again.';
         
             if (err?.errors?.email) {
+                const emailErr = Array.isArray(err.errors.email) ? err.errors.email[0] : err.errors.email;
                 setEmailError(true);
+                setEmailErrorMessage(emailErr || 'This email address is already in use');
             }
         
             setTimeout(() => {
@@ -530,24 +544,26 @@ if (userData) {
                                     icon={<PersonOutlineIcon sx={{ fontSize: 19 }} />}
                                     placeholder="First Name"
                                     value={firstName}
+                                    inputProps={{ maxLength: NAME_MAX_LENGTH }}
                                     onChange={(e) => {
-                                        setFirstName(e.target.value);
+                                        setFirstName(sanitizeName(e.target.value).slice(0, NAME_MAX_LENGTH));
                                         if (firstNameError) setFirstNameError(false);
                                     }}
                                     error={firstNameError}
-                                    helperText={firstNameError ? 'Please enter your first name' : ''}
+                                    helperText={firstNameError ? `Please enter your first name (max ${NAME_MAX_LENGTH} characters)` : ''}
                                 />
 
                                 <IconField
                                     icon={<PersonOutlineIcon sx={{ fontSize: 19 }} />}
                                     placeholder="Last Name"
                                     value={lastName}
+                                    inputProps={{ maxLength: NAME_MAX_LENGTH }}
                                     onChange={(e) => {
-                                        setLastName(e.target.value);
+                                        setLastName(sanitizeName(e.target.value).slice(0, NAME_MAX_LENGTH));
                                         if (lastNameError) setLastNameError(false);
                                     }}
                                     error={lastNameError}
-                                    helperText={lastNameError ? 'Please enter your last name' : ''}
+                                    helperText={lastNameError ? `Please enter your last name (max ${NAME_MAX_LENGTH} characters)` : ''}
                                 />
 
                                 <IconField
@@ -556,21 +572,40 @@ if (userData) {
                                     value={email}
                                     onChange={(e) => {
                                         setEmail(e.target.value);
-                                        if (emailError) setEmailError(false);
+                                        if (emailError) {
+                                            setEmailError(false);
+                                            setEmailErrorMessage('Please enter valid email address');
+                                        }
                                     }}
                                     error={emailError}
-                                    helperText={emailError ? 'Please enter valid email address' : ''}
+                                    helperText={emailError ? emailErrorMessage : ''}
                                 />
 
 <div className="flex gap-2 items-start">
-    <CountryCodeDropdown value={countryCode} onChange={setCountryCode} />
+    <CountryCodeDropdown
+        value={countryCode}
+        onChange={(code) => {
+            setCountryCode(code);
+            const maxDigits = COUNTRY_CODES.find((c) => c.code === code)?.digits ?? 10;
+            setPhone((prev) => phoneDigits(prev).slice(0, maxDigits));
+            if (phoneError) setPhoneError(false);
+        }}
+    />
     <div className="flex-1 min-w-0">
         <IconField
             icon={<LocalPhoneOutlinedIcon sx={{ fontSize: 19 }} />}
             placeholder="Phone"
             value={phone}
+            inputMode="numeric"
+            inputProps={{
+                maxLength: COUNTRY_CODES.find((c) => c.code === countryCode)?.digits ?? 10,
+                inputMode: 'numeric',
+                pattern: '[0-9]*',
+            }}
             onChange={(e) => {
-                setPhone(e.target.value);
+                const maxDigits = COUNTRY_CODES.find((c) => c.code === countryCode)?.digits ?? 10;
+                const digitsOnly = phoneDigits(e.target.value).slice(0, maxDigits);
+                setPhone(digitsOnly);
                 if (phoneError) setPhoneError(false);
             }}
             error={phoneError}
@@ -588,6 +623,7 @@ if (userData) {
                                     placeholder="Password"
                                     type={showPassword ? 'text' : 'password'}
                                     value={password}
+                                    inputProps={{ maxLength: PASSWORD_MAX_LENGTH }}
                                     onChange={(e) => {
                                         const value = e.target.value;
                                         setPassword(value);
@@ -597,7 +633,7 @@ if (userData) {
                                         }
                                     }}
                                     error={passwordError}
-                                    helperText={passwordError ? 'Please enter a password (min 8 characters)' : ''}
+                                    helperText={passwordError ? `Password must be ${PASSWORD_MIN_LENGTH}-${PASSWORD_MAX_LENGTH} characters` : ''}
                                     trailing={
                                         <button
                                             type="button"
@@ -616,6 +652,7 @@ if (userData) {
                                     placeholder="Confirm Password"
                                     type={showConfirmPassword ? 'text' : 'password'}
                                     value={passwordConfirmation}
+                                    inputProps={{ maxLength: PASSWORD_MAX_LENGTH }}
                                     onChange={(e) => {
                                         const value = e.target.value;
                                         setPasswordConfirmation(value);
@@ -659,12 +696,19 @@ if (userData) {
                                             icon={<BadgeOutlinedIcon sx={{ fontSize: 19 }} />}
                                             placeholder="DOT Number"
                                             value={dotNumber}
+                                            inputMode="numeric"
+                                            inputProps={{
+                                                maxLength: DOT_NUMBER_MAX_LENGTH,
+                                                inputMode: 'numeric',
+                                                pattern: '[0-9]*',
+                                            }}
                                             onChange={(e) => {
-                                                setDotNumber(e.target.value);
+                                                const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, DOT_NUMBER_MAX_LENGTH);
+                                                setDotNumber(digitsOnly);
                                                 if (dotNumberError) setDotNumberError(false);
                                             }}
                                             error={dotNumberError}
-                                            helperText={dotNumberError ? 'DOT number is required for 3PL / Freight Broker' : ''}
+                                            helperText={dotNumberError ? `DOT number is required (numbers only, max ${DOT_NUMBER_MAX_LENGTH} digits)` : ''}
                                         />
                                     </div>
                                 )}
@@ -674,12 +718,13 @@ if (userData) {
                                 icon={<BusinessOutlinedIcon sx={{ fontSize: 19 }} />}
                                 placeholder="Company Name"
                                 value={company}
+                                inputProps={{ maxLength: COMPANY_NAME_MAX_LENGTH }}
                                 onChange={(e) => {
                                     setCompany(e.target.value);
                                     if (companyError) setCompanyError(false);
                                 }}
                                 error={companyError}
-                                helperText={companyError ? 'Please enter your company name' : ''}
+                                helperText={companyError ? `Please enter your company name (max ${COMPANY_NAME_MAX_LENGTH} characters)` : ''}
                             />
 
                             <Button

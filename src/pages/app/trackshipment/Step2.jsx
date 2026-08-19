@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { create } from "zustand";
 
 import { apiFetch } from "../../../lib/api";
@@ -42,6 +44,19 @@ const TIMEZONES = [
 ];
 
 const EMAIL_LIST_PATTERN = /^\s*[^\s@]+@[^\s@]+\.[^\s@]+\s*(,\s*[^\s@]+@[^\s@]+\.[^\s@]+\s*)*$/;
+
+// Only letters and spaces (used for the shipper / receiver contact name)
+const ALPHA_PATTERN = /^[A-Za-z\s]*$/;
+
+// Strips digits/symbols from name-type fields — letters and spaces only.
+function sanitizeName(rawValue) {
+  return (rawValue || "").replace(/[^A-Za-z\s]/g, "");
+}
+
+// Strips non-digits and caps the shipper/receiver contact phone at 10 digits.
+function sanitizePhoneDigits(rawValue) {
+  return (rawValue || "").replace(/\D/g, "").slice(0, 10);
+}
 
 const getStopTypeInfo = (index, total) => {
   if (index === 0) return { value: "pickup", label: "Pickup" };
@@ -89,7 +104,93 @@ export const BLANK_STEP2_VALUES = {
   stops: [blankStop(), blankStop()],
 };
 
+// Zod schema — single source of truth for validation, mirroring Step1's
+// pattern. The onChange sanitizers on the inputs are UX guardrails only
+// (they stop invalid keystrokes) and never decide correctness on their own.
+const stopSchema = z.object({
+  stopType: z.string(),
+  stopTypeLabel: z.string(),
+  stopName: z.string().optional().or(z.literal("")),
 
+  contactName: z
+    .string()
+    .trim()
+    .min(1, "Name is required")
+    .regex(ALPHA_PATTERN, "Only letters and spaces are allowed"),
+  contactPhone: z
+    .string()
+    .trim()
+    .min(1, "Phone number is required — the OTP is sent here")
+    .transform((v) => v.replace(/\D/g, ""))
+    .refine((v) => v.length === 10, "Enter a valid 10-digit phone number"),
+
+  address: z.string().trim().min(1, "Address is required"),
+  address2: z.string().optional().or(z.literal("")),
+  city: z.string().optional().or(z.literal("")),
+  state: z.string().optional().or(z.literal("")),
+  zipcode: z.string().optional().or(z.literal("")),
+  country: z.string().optional().or(z.literal("")),
+  latitude: z.number().nullable().optional(),
+  longitude: z.number().nullable().optional(),
+
+  startDate: z.string().optional().or(z.literal("")),
+  startTime: z.string().optional().or(z.literal("")),
+  startTimezone: z.string().optional().or(z.literal("")),
+
+  endDate: z.string().optional().or(z.literal("")),
+  endTime: z.string().optional().or(z.literal("")),
+  endTimezone: z.string().optional().or(z.literal("")),
+
+  trackStartOffset: z.string().optional().or(z.literal("")),
+
+  commentToDriver: z.string().optional().or(z.literal("")),
+  alertEmails: z
+    .string()
+    .optional()
+    .refine((v) => !v || EMAIL_LIST_PATTERN.test(v), {
+      message: "Enter one or more valid emails",
+    }),
+
+  customEvents: z.array(z.any()).optional(),
+});
+
+const step2Schema = z.object({ stops: z.array(stopSchema) }).superRefine((data, ctx) => {
+  data.stops.forEach((stop, idx) => {
+    const isPickup = stop.stopType === "pickup";
+
+    if (isPickup) {
+      if (!stop.startDate) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["stops", idx, "startDate"],
+          message: "Start date is required",
+        });
+      }
+    } else {
+      if (!stop.endDate) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["stops", idx, "endDate"],
+          message: "End date is required",
+        });
+      }
+      if (!stop.endTime) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["stops", idx, "endTime"],
+          message: "End time is required",
+        });
+      }
+      if (!stop.endTimezone) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["stops", idx, "endTimezone"],
+          message: "End timezone is required",
+        });
+      }
+    }
+  });
+});
 
 const useTripSheetDraftStore = create((set) => ({
   step2: BLANK_STEP2_VALUES,
@@ -540,31 +641,47 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
             <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 rounded-xl border border-slate-100 bg-slate-50/50 p-4">
               <div>
                 <FieldLabel required>{contactLabel} Name</FieldLabel>
-                <input
-                  className={inputClass}
-                  placeholder={`Who the driver reports to at ${stopTypeLabel.toLowerCase()}`}
-                  {...register(`stops.${index}.contactName`, {
-                    required: `${contactLabel} name is required`,
-                  })}
+                <Controller
+                  control={control}
+                  name={`stops.${index}.contactName`}
+                  render={({ field: { value, onChange }, fieldState }) => (
+                    <>
+                      <input
+                        className={
+                          inputClass +
+                          (fieldState.error ? " border-red-400 focus:border-red-400 focus:ring-red-100" : "")
+                        }
+                        placeholder={`Who the driver reports to at ${stopTypeLabel.toLowerCase()}`}
+                        value={value}
+                        onChange={(e) => onChange(sanitizeName(e.target.value))}
+                      />
+                      <ErrorText>{fieldState.error?.message}</ErrorText>
+                    </>
+                  )}
                 />
-                <ErrorText>{errors?.stops?.[index]?.contactName?.message}</ErrorText>
               </div>
               <div>
                 <FieldLabel required>{contactLabel} Phone</FieldLabel>
-                <input
-                  className={
-                    inputClass +
-                    (errors?.stops?.[index]?.contactPhone ? " border-red-400 focus:border-red-400 focus:ring-red-100" : "")
-                  }
-                  placeholder="+1 555 000 1111"
-                  {...register(`stops.${index}.contactPhone`, {
-                    required: "Phone number is required — the OTP is sent here",
-                    validate: (v) =>
-                      String(v || "").replace(/\D/g, "").length >= 10 ||
-                      "Enter a full phone number with country code",
-                  })}
+                <Controller
+                  control={control}
+                  name={`stops.${index}.contactPhone`}
+                  render={({ field: { value, onChange }, fieldState }) => (
+                    <>
+                      <input
+                        className={
+                          inputClass +
+                          (fieldState.error ? " border-red-400 focus:border-red-400 focus:ring-red-100" : "")
+                        }
+                        placeholder="5550001111"
+                        inputMode="numeric"
+                        maxLength={10}
+                        value={value}
+                        onChange={(e) => onChange(sanitizePhoneDigits(e.target.value))}
+                      />
+                      <ErrorText>{fieldState.error?.message}</ErrorText>
+                    </>
+                  )}
                 />
-                <ErrorText>{errors?.stops?.[index]?.contactPhone?.message}</ErrorText>
                 <p className="mt-1.5 text-xs text-slate-500 font-sans">
                   The verification code for this stop is texted to this number.
                 </p>
@@ -576,7 +693,6 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
               <Controller
                 control={control}
                 name={`stops.${index}.address`}
-                rules={{ required: "Address is required" }}
                 render={({ field: { value, onChange }, fieldState }) => (
                   <AddressAutocomplete
                     index={index}
@@ -637,7 +753,7 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
                   <input
                     className={inputClass}
                     type="date"
-                    {...register(`stops.${index}.startDate`, { required: "Start date is required" })}
+                    {...register(`stops.${index}.startDate`)}
                   />
                   <ErrorText>{errors?.stops?.[index]?.startDate?.message}</ErrorText>
                 </div>
@@ -674,16 +790,7 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
                   <input
                     className={inputClass}
                     type="date"
-                    {...register(`stops.${index}.endDate`, {
-                      required: "End date is required",
-                      validate: (value, formValues) => {
-                        const stop = formValues?.stops?.[index];
-                        if (!value || !stop?.startDate) return true;
-                        const start = `${stop.startDate}T${stop.startTime || "00:00"}`;
-                        const end = `${value}T${stop.endTime || "00:00"}`;
-                        return end >= start || "End must be after the start date/time";
-                      },
-                    })}
+                    {...register(`stops.${index}.endDate`)}
                   />
                   <ErrorText>{errors?.stops?.[index]?.endDate?.message}</ErrorText>
                 </div>
@@ -692,7 +799,6 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
                   <Controller
                     control={control}
                     name={`stops.${index}.endTime`}
-                    rules={{ required: "End time is required" }}
                     render={({ field: { value, onChange }, fieldState }) => (
                       <>
                         <CustomTimePicker value={value} onChange={onChange} hasError={!!fieldState.error} />
@@ -709,7 +815,7 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
                         selectClass +
                         (errors?.stops?.[index]?.endTimezone ? " border-red-400 focus:border-red-400 focus:ring-red-100" : "")
                       }
-                      {...register(`stops.${index}.endTimezone`, { required: "End timezone is required" })}
+                      {...register(`stops.${index}.endTimezone`)}
                       defaultValue=""
                     >
                       <option value="" disabled>Select timezone</option>
@@ -755,9 +861,7 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
               <input
                 className={inputClass}
                 placeholder="Enter email(s)"
-                {...register(`stops.${index}.alertEmails`, {
-                  validate: (v) => v === "" || EMAIL_LIST_PATTERN.test(v) || "Enter one or more valid emails",
-                })}
+                {...register(`stops.${index}.alertEmails`)}
               />
               <ErrorText>{errors?.stops?.[index]?.alertEmails?.message}</ErrorText>
             </div>
@@ -821,6 +925,7 @@ export default function TrackShipmentStep2() {
     setValue,
     formState: { isSubmitting, errors },
   } = useForm({
+    resolver: zodResolver(step2Schema),
     mode: "onBlur",
     defaultValues: step2Draft,
   });

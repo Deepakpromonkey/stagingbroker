@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
+import AttachFile from "@mui/icons-material/AttachFile";
 import Close from "@mui/icons-material/Close";
+import InsertDriveFileOutlined from "@mui/icons-material/InsertDriveFileOutlined";
 import WarningAmber from "@mui/icons-material/WarningAmber";
 import CircularProgress from "@mui/material/CircularProgress";
 
@@ -25,6 +27,10 @@ const EMPTY_FORM = {
   carrier_email: "",
 };
 
+const MAX_ATTACHMENT_SIZE_MB = 10;
+const ACCEPTED_ATTACHMENT_TYPES =
+  ".pdf,.doc,.docx,.png,.jpg,.jpeg,.heic";
+
 const inputClasses =
   "w-full rounded-lg border border-[#E5E7EB] px-3 py-2.5 text-sm text-[#1F2937] transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none disabled:bg-gray-50";
 
@@ -44,6 +50,12 @@ function Field({ label, required, error, children }) {
       {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
     </div>
   );
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 /**
@@ -66,6 +78,11 @@ export default function ReportCarrierModal({
   const [form, setForm] = useState(EMPTY_FORM);
   const [selectedIncidents, setSelectedIncidents] = useState([]);
 
+  const [attachment, setAttachment] = useState(null);
+  const [attachmentError, setAttachmentError] = useState("");
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const fileInputRef = useRef(null);
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
@@ -86,6 +103,8 @@ export default function ReportCarrierModal({
 
     setForm({ ...EMPTY_FORM, carrier_email: carrierEmail });
     setSelectedIncidents([]);
+    setAttachment(null);
+    setAttachmentError("");
     setError("");
     setFieldErrors({});
   }, [isOpen, carrierEmail]);
@@ -136,6 +155,39 @@ export default function ReportCarrierModal({
     });
   };
 
+  const setAttachmentFile = (fileList) => {
+    const file = fileList?.[0];
+    if (!file) return;
+
+    if (file.size > MAX_ATTACHMENT_SIZE_MB * 1024 * 1024) {
+      setAttachmentError(
+        `"${file.name}" is larger than ${MAX_ATTACHMENT_SIZE_MB}MB.`,
+      );
+      return;
+    }
+
+    setAttachmentError("");
+    setAttachment(file);
+  };
+
+  const removeAttachment = () => {
+    setAttachment(null);
+    setAttachmentError("");
+  };
+
+  const handleFileInputChange = (event) => {
+    setAttachmentFile(event.target.files);
+    // Allow re-selecting the same file after it's been removed.
+    event.target.value = "";
+  };
+
+  const handleDrop = (event) => {
+    event.preventDefault();
+    setIsDraggingFile(false);
+    if (submitting) return;
+    setAttachmentFile(event.dataTransfer.files);
+  };
+
   const validate = () => {
     const errors = {};
 
@@ -174,23 +226,51 @@ export default function ReportCarrierModal({
     setError("");
 
     try {
-      const res = await apiFetch("/carrier-reports", {
-        method: "POST",
-        body: JSON.stringify({
-          row_id: carrier.row_id,
-          incident_date: form.incident_date,
-          origin_city: form.origin_city.trim(),
-          origin_state: form.origin_state.trim(),
-          origin_country: form.origin_country,
-          destination_city: form.destination_city.trim(),
-          destination_state: form.destination_state.trim(),
-          destination_country: form.destination_country,
-          incidents: selectedIncidents,
-          comments: form.comments.trim() || null,
-          is_private: form.is_private,
-          carrier_email: form.carrier_email.trim() || null,
-        }),
-      });
+      const payload = {
+        row_id: carrier.row_id,
+        incident_date: form.incident_date,
+        origin_city: form.origin_city.trim(),
+        origin_state: form.origin_state.trim(),
+        origin_country: form.origin_country,
+        destination_city: form.destination_city.trim(),
+        destination_state: form.destination_state.trim(),
+        destination_country: form.destination_country,
+        incidents: selectedIncidents,
+        comments: form.comments.trim() || null,
+        is_private: form.is_private,
+        carrier_email: form.carrier_email.trim() || null,
+      };
+
+      let res;
+
+      if (attachment) {
+        // Files can't travel as JSON, so switch to multipart when there is
+        // one. apiFetch must not force a Content-Type: application/json
+        // header here — with a FormData body, the browser needs to set its
+        // own multipart boundary.
+        const formData = new FormData();
+
+        Object.entries(payload).forEach(([key, value]) => {
+          if (value === null || value === undefined) return;
+
+          formData.append(
+            key,
+            typeof value === "object" ? JSON.stringify(value) : value,
+          );
+        });
+
+        formData.append("attachment", attachment);
+
+        res = await apiFetch("/carrier-reports", {
+          method: "POST",
+          body: formData,
+        });
+      } else {
+        res = await apiFetch("/carrier-reports", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+      }
 
       onSubmitted?.(res);
       onClose?.();
@@ -433,6 +513,98 @@ export default function ReportCarrierModal({
                 className={`${inputClasses} resize-y`}
               />
             </Field>
+          </div>
+
+          <div className="mt-7">
+            <span className={labelClasses}>
+              Attachment
+              <span className="ml-1 normal-case text-[#9CA3AF]">
+                (optional)
+              </span>
+            </span>
+
+            <p className="mb-3 text-xs text-[#6B7280]">
+              A rate confirmation, BOL, or photo that backs up the report. Up
+              to {MAX_ATTACHMENT_SIZE_MB}MB.
+            </p>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ACCEPTED_ATTACHMENT_TYPES}
+              disabled={submitting}
+              onChange={handleFileInputChange}
+              className="hidden"
+            />
+
+            {!attachment && (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  if (!submitting) setIsDraggingFile(true);
+                }}
+                onDragLeave={() => setIsDraggingFile(false)}
+                onDrop={handleDrop}
+                disabled={submitting}
+                className={`flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-6 text-center transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                  isDraggingFile
+                    ? "border-[#1D4ED8] bg-[#EFF6FF]"
+                    : "border-[#E5E7EB] bg-[#FAFBFC] hover:border-[#93C5FD] hover:bg-[#EFF6FF]"
+                }`}
+              >
+                <AttachFile
+                  style={{ fontSize: 20 }}
+                  className="text-[#6B7280]"
+                />
+
+                <span className="text-sm font-semibold text-[#374151]">
+                  Click to upload
+                  <span className="font-normal text-[#6B7280]">
+                    {" "}
+                    or drag and drop
+                  </span>
+                </span>
+
+                <span className="text-xs text-[#9CA3AF]">
+                  PDF, Word, or image
+                </span>
+              </button>
+            )}
+
+            {attachmentError && (
+              <p className="mt-1.5 text-xs text-red-500">{attachmentError}</p>
+            )}
+
+            {attachment && (
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-[#E5E7EB] bg-white px-3 py-2">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <InsertDriveFileOutlined
+                    style={{ fontSize: 18 }}
+                    className="shrink-0 text-[#6B7280]"
+                  />
+
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-medium text-[#111827]">
+                      {attachment.name}
+                    </p>
+                    <p className="text-xs text-[#9CA3AF]">
+                      {formatFileSize(attachment.size)}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={removeAttachment}
+                  disabled={submitting}
+                  className="shrink-0 rounded-full p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:opacity-40"
+                >
+                  <Close style={{ fontSize: 16 }} />
+                </button>
+              </div>
+            )}
           </div>
 
           <label className="mt-5 flex cursor-pointer items-start gap-2.5 rounded-xl border border-[#E5E7EB] bg-[#FAFBFC] px-4 py-3">
