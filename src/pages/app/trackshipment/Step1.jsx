@@ -30,7 +30,6 @@ import BookmarkAddedOutlinedIcon from "@mui/icons-material/BookmarkAddedOutlined
 const TRACKING_METHODS = [
   { value: "driver_phone", label: "Driver's Cell Phone" },
   { value: "eld", label: "ELD / Telematics" },
-  // { value: "gps", label: "Trailer GPS" },
 ];
 
 const DRIVER_TYPES = [
@@ -47,9 +46,6 @@ const COUNTRY_CODES = [
   { code: "MX", dial: "+52", label: "Mexico" },
 ];
 
-// NOTE: TRACK_DURATIONS and INTERVALS were only used by the "Send Updates To"
-// rows, which have been removed from the UI below (see commented section).
-// Keeping the constants here (unused) in case that section is restored later.
 const TRACK_DURATIONS = [
   { value: "track for 1 day", label: "Track for 1 day" },
   { value: "track for 2 days", label: "Track for 2 days" },
@@ -64,15 +60,6 @@ const INTERVALS = [
   { value: "every 2 hour", label: "Every 2 hours" },
 ];
 
-/*
-| How often the driver app reports its position, in seconds.
-|
-| The API accepts 60–21600 (CreateShipmentRequest), and the driver app reads
-| the chosen value back off every sync response and restarts its tracker when
-| it changes. The ends of the range are bounded for a reason: under a minute
-| flattens a phone battery inside a shift without buying useful precision, and
-| past six hours it is not tracking any more.
-*/
 const TRACKING_INTERVALS = [
   { value: 60, label: "Every 1 minute" },
   { value: 120, label: "Every 2 minutes" },
@@ -92,7 +79,6 @@ const EMAIL_LIST_PATTERN = /^\s*[^\s@]+@[^\s@]+\.[^\s@]+\s*(,\s*[^\s@]+@[^\s@]+\
 
 const CARRIER_LIST_URL = "/carrier-connect";
 
-// NEW: template listing + per-template fetch endpoints
 const TEMPLATE_LIST_URL = "/shipment-templates";
 const templateDetailUrl = (trackingNumber) =>
   `/shipment-templates/${encodeURIComponent(trackingNumber)}`;
@@ -124,12 +110,8 @@ export const BLANK_STEP1_VALUES = {
   dispatcherName: "",
   dispatcherEmail: "",
 
-  // How often the driver's phone reports its position on this load. Five
-  // minutes is the backend's default, so the form opens on the same value.
   trackingIntervalSeconds: 300,
 
-  // Kept for backward compatibility with the payload shape / template
-  // mapping even though the "Send Updates To" rows are hidden from the UI.
   updates: [
     { date: "", time: "", duration: "", interval: "" },
   ],
@@ -143,6 +125,10 @@ export const useShipmentDraftStore = create((set) => ({
   step1: BLANK_STEP1_VALUES,
   setStep1: (values) => set({ step1: values }),
   resetStep1: () => set({ step1: BLANK_STEP1_VALUES }),
+
+  cameFromStep2Back: false,
+  markComingFromStep2Back: () => set({ cameFromStep2Back: true }),
+  clearComingFromStep2Back: () => set({ cameFromStep2Back: false }),
 
   lastCreatedShipment: null,
   setLastCreatedShipment: (shipment) => set({ lastCreatedShipment: shipment }),
@@ -163,17 +149,20 @@ function useCarrierOptions() {
     let cancelled = false;
 
     apiFetch(CARRIER_LIST_URL, { method: "GET" })
-      .then((data) => {
+      .then((res) => {
         if (cancelled) return;
-        // Be defensive about the response shape: plain array, or wrapped in
-        // { data: [...] } / { records: [...] }
-        const list = Array.isArray(data)
-          ? data
-          : Array.isArray(data?.data)
-            ? data.data
-            : Array.isArray(data?.records)
-              ? data.records
-              : [];
+
+        const requests = Array.isArray(res?.data?.requests) ? res.data.requests : [];
+
+        const list = requests
+          .filter((r) => r && r.carrier)
+          .map((r) => ({
+            ...r.carrier,
+            stripe_verified_at: r.completed ? true : null,
+            connect_status: r.status,
+            connect_stage: r.stage_label,
+          }));
+
         setCarriers(list);
       })
       .catch(() => { })
@@ -310,11 +299,6 @@ const ChevronDown = () => (
   />
 );
 
-// NEW: a more visible pill-style toggle used for "Save as template".
-// Same on/off boolean contract as MUI's Switch (checked / onChange(bool)),
-// just styled so the on/off state is obvious at a glance: filled blue pill
-// background, a sliding white knob, and a highlighted border + label color
-// when active.
 const CustomToggle = ({ checked, onChange, label, icon: Icon }) => (
   <button
     type="button"
@@ -547,13 +531,13 @@ function to12Hour(value24) {
   const hour = h % 12 === 0 ? 12 : h % 12;
   return { hour, minute: m, period };
 }
- 
+
 function to24HourString(hour, minute, period) {
   let h = hour % 12;
   if (period === "PM") h += 12;
   return `${pad(h)}:${pad(minute)}`;
 }
- 
+
 function CustomTimePicker({ value, onChange, hasError = false }) {
   const { hour, minute, period } = to12Hour(value);
 
@@ -657,13 +641,11 @@ function splitDateTime(dateTime) {
   return { date: date || "", time: time ? time.slice(0, 5) : "" };
 }
 
-
 function emailStringToList(rawValue) {
- 
   const items = Array.isArray(rawValue)
     ? rawValue
     : (rawValue || "").split(",");
- 
+
   return items
     .map((e) => (e || "").trim())
     .filter(Boolean);
@@ -694,45 +676,29 @@ function chipColorForEmail(email) {
 
 function EmailChipsInput({ value, onChange, onBlur, hasError }) {
   const [draft, setDraft] = useState("");
-  // Local validation message for whatever is currently sitting in the draft
-  // box (e.g. "abc" with no @, or a duplicate). This is what was missing
-  // before: an invalid entry used to be silently wiped (setDraft("")) even
-  // though it was never turned into a chip, which then made the *next*
-  // Backspace remove the last real chip instead of just clearing the typo.
   const [draftError, setDraftError] = useState("");
-  // Chrome's saved-address autofill ignores autocomplete="off" on fields it
-  // recognizes as "email"-like, and fills every such field in the form
-  // (this is what was pulling the same address into Dispatcher Email).
-  // Keeping the field read-only until the user actually focuses it stops
-  // Chrome from offering/applying that autofill at all.
   const [locked, setLocked] = useState(true);
   const emails = emailStringToList(value);
 
   const commitDraft = () => {
     const candidate = draft.trim().replace(/,+$/, "");
 
- 
     if (!candidate) {
       setDraft("");
       setDraftError("");
       return;
     }
 
- 
     if (!EMAIL_PATTERN.test(candidate)) {
-      // Keep the text in the box (don't clear it) so the user can see and
-      // fix what they typed instead of it silently vanishing.
       setDraftError("Enter a valid email address");
       return;
     }
 
- 
     if (emails.includes(candidate)) {
       setDraftError("That email is already added");
       return;
     }
 
- 
     onChange(emailListToString([...emails, candidate]));
     setDraft("");
     setDraftError("");
@@ -783,7 +749,6 @@ function EmailChipsInput({ value, onChange, onBlur, hasError }) {
           value={draft}
           onChange={(e) => {
             setDraft(e.target.value);
-            // Clear the stale error the moment the user starts editing again.
             if (draftError) setDraftError("");
           }}
           onKeyDown={handleKeyDown}
@@ -795,8 +760,6 @@ function EmailChipsInput({ value, onChange, onBlur, hasError }) {
           }}
           readOnly={locked}
           placeholder={emails.length === 0 ? "name@company.com, name2@company.com" : ""}
-          // Prevent the browser's saved-address autofill (which was cross-filling
-          // the Broker Dispatcher "Email" field) from attaching to this input.
           name="email_updates_draft_no_autofill"
           autoComplete="off"
           autoCorrect="off"
@@ -818,21 +781,27 @@ export default function TrackShipmentStep1() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [carriers, carriersLoading] = useCarrierOptions();
-  // NEW: template list now comes from /shipment-templates
   const [templates, , templatesLoading] = useApiOptions(TEMPLATE_LIST_URL);
-  // NEW: track the in-flight "load template details" request separately
-  // from the plain templates-list loading state above.
   const [templateApplying, setTemplateApplying] = useState(false);
-  // Chrome ties Dispatcher Email + Email Updates To together for its saved-
-  // address autofill; locking this field until it's actually focused stops
-  // that autofill from firing here too (see EmailChipsInput for the same
-  // pattern).
   const [dispatcherEmailLocked, setDispatcherEmailLocked] = useState(true);
 
-  const step1Draft = useShipmentDraftStore((s) => s.step1);
   const setStep1Draft = useShipmentDraftStore((s) => s.setStep1);
   const resetStep1Draft = useShipmentDraftStore((s) => s.resetStep1);
   const setLastCreatedShipment = useShipmentDraftStore((s) => s.setLastCreatedShipment);
+  const cameFromStep2Back = useShipmentDraftStore((s) => s.cameFromStep2Back);
+  const clearComingFromStep2Back = useShipmentDraftStore((s) => s.clearComingFromStep2Back);
+
+  const didInitRef = useRef(false);
+  if (!didInitRef.current) {
+    didInitRef.current = true;
+    if (cameFromStep2Back) {
+      clearComingFromStep2Back();
+    } else {
+      resetStep1Draft();
+    }
+  }
+
+  const step1Draft = useShipmentDraftStore((s) => s.step1);
 
   const generateTrackingNumber = () => {
     const randomNum = Math.floor(10000000 + Math.random() * 90000000);
@@ -852,9 +821,6 @@ export default function TrackShipmentStep1() {
     defaultValues: step1Draft,
   });
 
-  // Kept in place (even though the "Send Updates To" rows are hidden from
-  // the UI below) so BLANK_STEP1_VALUES.updates / buildPayload keep working
-  // without further changes.
   const { fields, append, remove } = useFieldArray({ control, name: "updates" });
 
   useEffect(() => {
@@ -910,7 +876,7 @@ export default function TrackShipmentStep1() {
       carrierPhone: apiData.carrier_phone || "",
 
       trackingMethod: apiData.tracking_method || "driver_phone",
-      
+
       truckNumber: apiData.truck_number || "",
       trailerNumber: apiData.trailer_number || "",
 
@@ -925,13 +891,9 @@ export default function TrackShipmentStep1() {
       dispatcherName: apiData.broker_dispatcher_name || "",
       dispatcherEmail: apiData.broker_dispatcher_email || "",
 
-      // How often the driver's phone reports its position on this load.
       trackingIntervalSeconds: Number(apiData.tracking_interval_seconds) || 300,
 
       updates: updatesFromApi,
-      // The API may return this as an array (["a@x.com", "b@x.com"]) or as
-      // the older comma-string shape — normalise either into the
-      // comma-string the chip input works with.
       emailUpdatesTo: Array.isArray(apiData.email_updates_to)
         ? emailListToString(apiData.email_updates_to)
         : (apiData.email_updates_to || ""),
@@ -939,7 +901,6 @@ export default function TrackShipmentStep1() {
       notes: apiData.notes || "",
     };
   };
-
 
   const onApplyTemplate = (trackingNumber) => {
     if (trackingNumber === "scratch") {
@@ -952,7 +913,6 @@ export default function TrackShipmentStep1() {
 
     apiFetch(templateDetailUrl(trackingNumber), { method: "GET" })
       .then((res) => {
-        // Response shape: { status: true, message: "...", data: {...} }
         if (res && res.status === false) {
           toast.error({
             title: "Could not load template",
@@ -985,7 +945,6 @@ export default function TrackShipmentStep1() {
       .finally(() => setTemplateApplying(false));
   };
 
-
   const buildPayload = (data) => {
     const selectedCarrier = carriers.find((c) => c.row_id === data.carrierName);
 
@@ -1015,20 +974,17 @@ export default function TrackShipmentStep1() {
       broker_dispatcher_name: data.dispatcherName || "",
       broker_dispatcher_email: data.dispatcherEmail || "",
 
-      // How often the driver app reports its position on this load.
       tracking_interval_seconds: Number(data.trackingIntervalSeconds) || 300,
 
-  
       send_updates_to: data.updates.map((update) => ({
         date_time: buildDateTime(update.date, update.time),
         tracking_days: update.duration || "",
         interval: update.interval || "",
       })),
-     
+
       email_updates_to: emailStringToList(data.emailUpdatesTo),
 
       notes: data.notes || "",
-
 
       save_as_template: !!data.saveAsTemplate,
       template_name: data.trackingNumber,
@@ -1066,7 +1022,6 @@ export default function TrackShipmentStep1() {
       });
     }
   };
-
 
   const carrierOptions = carriers.map((c) => {
     const verified = !!c.stripe_verified_at;
@@ -1147,6 +1102,9 @@ export default function TrackShipmentStep1() {
                     >
                       <option value="scratch">Start from scratch</option>
                       {templatesLoading && <option disabled>Loading…</option>}
+                      {!templatesLoading && templates.length === 0 && (
+                        <option disabled>No saved templates available</option>
+                      )}
                       {templates.map((t) => (
                         <option key={t.tracking_number} value={t.tracking_number}>
                           {t.template_name || t.tracking_number}
@@ -1164,7 +1122,6 @@ export default function TrackShipmentStep1() {
 
             <div className={cardClass}>
             <SectionHeading icon={Inventory2OutlinedIcon}>Load</SectionHeading>
-            {/* CHANGED: "Dollar Traq No." (tracking number) now sits right after Pro # / Load ID */}
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
               <div>
                 <FieldLabel required>Pro # / Load ID</FieldLabel>
@@ -1225,11 +1182,18 @@ export default function TrackShipmentStep1() {
                       hasError={!!fieldState.error}
                     />
                     <ErrorText>{fieldState.error?.message}</ErrorText>
+                    {!carriersLoading && carriers.length === 0 && (
+                      <p className="mt-1.5 text-xs font-medium text-amber-600">
+                        No carriers found. Please complete the Carrier Connect
+                        invitation (W-9, Certificate of Insurance, bank &amp;
+                        identity verification) for at least one carrier before
+                        you can select one here.
+                      </p>
+                    )}
                   </>
                 )}
               />
             </div>
-            {/* CHANGED: "Ext" removed; Carrier Phone now sits in that spot */}
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3">
               <div>
                 <FieldLabel required>Carrier MC #</FieldLabel>
@@ -1266,9 +1230,6 @@ export default function TrackShipmentStep1() {
 
             <div className={cardClass}>
             <SectionHeading icon={MyLocationOutlinedIcon}>Tracking</SectionHeading>
-            {/* CHANGED: Tracking Full Number moved up to the Load section (as "Dollar Traq No.");
-                Driver Phone 1 now takes its place here, with its own Country Code
-                (default US) right before it. */}
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3">
               <div>
                 <FieldLabel>Tracking Method</FieldLabel>
@@ -1334,7 +1295,6 @@ export default function TrackShipmentStep1() {
               </div>
             </div>
 
-            {/* CHANGED: Country Code (default US) now appears right before Driver Phone 2 */}
             <div className="mb-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
               <div>
                 <FieldLabel>Country Code</FieldLabel>
@@ -1452,10 +1412,6 @@ export default function TrackShipmentStep1() {
             <div className={cardClass}>
             <SectionHeading icon={NotificationsActiveOutlinedIcon}>Schedule &amp; Updates</SectionHeading>
 
-            {/* The one control that decides how often the driver's phone
-                reports in. The driver app picks the new value up from its
-                next sync response, so changing it takes effect without the
-                driver doing anything. */}
             <div className="mb-6">
               <FieldLabel>Driver Location Updates</FieldLabel>
               <div className="grid grid-cols-1 gap-2 sm:max-w-md">
@@ -1479,128 +1435,8 @@ export default function TrackShipmentStep1() {
               </div>
             </div>
 
-            {/* REMOVED: "Send Updates To" date/time/duration/interval rows.
-                Kept here (commented) in case this needs to come back later.
-
-            <div className="mb-2">
-              <FieldLabel>Send Updates To</FieldLabel>
-            </div>
-              <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-[1.1fr_0.9fr_1.2fr_1.2fr_auto]">
-              <span className="text-xs font-semibold ">Date</span>
-              <span className="text-xs font-semibold  ">Time</span>
-              <span className="text-xs font-semibold ">Duration</span>
-              <span className="text-xs font-semibold ">Interval</span>
-              <span />
-            </div>
-            <div className="space-y-3">
-              {fields.map((row, index) => (
-                <div
-                  key={row.id}
-                  className="grid grid-cols-1 items-start gap-3 sm:grid-cols-[1.1fr_0.9fr_1.2fr_1.2fr_auto]"
-                >
-                  <div>
-                    <span className="mb-1 block text-xs font-semibold text-slate-500  sm:hidden">Date</span>
-                    <Controller
-                      control={control}
-                      name={`updates.${index}.date`}
-                      rules={index === 0 ? { required: "Date is required" } : undefined}
-                      render={({ field: { value, onChange }, fieldState }) => (
-                        <>
-                          <CustomDatePicker value={value} onChange={onChange} hasError={!!fieldState.error} />
-                          <ErrorText>{fieldState.error?.message}</ErrorText>
-                        </>
-                      )}
-                    />
-                  </div>
-                  <div>
-                    <span className="mb-1 block text-xs font-semibold text-slate-500  sm:hidden">Time</span>
-                    <Controller
-                      control={control}
-                      name={`updates.${index}.time`}
-                      rules={index === 0 ? { required: "Time is required" } : undefined}
-                      render={({ field: { value, onChange }, fieldState }) => (
-                        <>
-                          <CustomTimePicker value={value} onChange={onChange} hasError={!!fieldState.error} />
-                          <ErrorText>{fieldState.error?.message}</ErrorText>
-                        </>
-                      )}
-                    />
-                  </div>
-                  <div>
-                    <span className="mb-1 block text-xs font-semibold text-slate-500  sm:hidden">Duration</span>
-                    <div className="relative">
-                      <Controller
-                        control={control}
-                        name={`updates.${index}.duration`}
-                        render={({ field: { value, onChange } }) => (
-                          <select
-                            className={selectClass}
-                            value={value || ""}
-                            onChange={(e) => onChange(e.target.value)}
-                          >
-                            <option value="" disabled>Select duration…</option>
-                            {TRACK_DURATIONS.map((d) => (
-                              <option key={d.value} value={d.value}>{d.label}</option>
-                            ))}
-                          </select>
-                        )}
-                      />
-                      <ChevronDown />
-                    </div>
-                  </div>
-                  <div>
-                    <span className="mb-1 block text-xs font-semibold text-slate-500  sm:hidden">Interval</span>
-                    <div className="relative">
-                      <Controller
-                        control={control}
-                        name={`updates.${index}.interval`}
-                        render={({ field: { value, onChange } }) => (
-                          <select
-                            className={selectClass}
-                            value={value || ""}
-                            onChange={(e) => onChange(e.target.value)}
-                          >
-                            <option value="" disabled>Select interval…</option>
-                            {INTERVALS.map((i) => (
-                              <option key={i.value} value={i.value}>{i.label}</option>
-                            ))}
-                          </select>
-                        )}
-                      />
-                      <ChevronDown />
-                    </div>
-                  </div>
-                  <div className="flex h-[46px] items-center justify-self-start sm:justify-self-center">
-                    {index > 0 ? (
-                      <IconButton size="small" onClick={() => remove(index)} aria-label="Remove update row" sx={{ color: "#ef4444" }}>
-                        <CloseIcon fontSize="small" />
-                      </IconButton>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-3 flex justify-end">
-              <button
-                type="button"
-                onClick={() => append({ date: "", time: "", duration: "", interval: "" })}
-                className="flex items-center gap-1.5 text-sm font-bold text-blue-600 hover:text-blue-700 "
-              >
-                <span className="text-lg leading-none">+</span> Add update
-              </button>
-            </div>
-
-            */}
-
             <div className="mb-6">
               <FieldLabel>Email Updates To</FieldLabel>
-              {/* CHANGED: Gmail-style chip UI — each valid email becomes a pill with a
-                  colored initial avatar and an ✕ to remove it (matches the reference
-                  screenshot). Press space, comma, or enter to turn what you typed
-                  into a chip; backspace on an empty input removes the last chip.
-                  Internally this still edits a comma string; buildPayload() is what
-                  turns it into the ["a@x.com", "b@x.com"] array shape sent to the API. */}
               <Controller
                 control={control}
                 name="emailUpdatesTo"
@@ -1640,10 +1476,6 @@ export default function TrackShipmentStep1() {
               <span className="text-xs text-slate-400">
                 <span className="text-red-500">*</span> Required fields
               </span>
-              {/* CHANGED: swapped the barely-visible MUI Switch for a more
-                  visible pill-style CustomToggle. Same value/onChange
-                  contract via Controller, nothing else about this field
-                  changed. */}
               <Controller
                 control={control}
                 name="saveAsTemplate"
