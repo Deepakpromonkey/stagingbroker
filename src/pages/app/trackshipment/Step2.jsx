@@ -23,13 +23,8 @@ import FlagCircleOutlinedIcon from "@mui/icons-material/FlagCircleOutlined";
 import TripOriginOutlinedIcon from "@mui/icons-material/TripOriginOutlined";
 import PlaceOutlinedIcon from "@mui/icons-material/PlaceOutlined";
 
- 
 const COUNTRIES = ["United States", "Canada", "Mexico", "India"];
 
- 
-// Answer type options for a custom event — matches the "Answer Type"
-// dropdown you shared. `value` is what gets sent to the backend, `label`
-// is what's shown in the UI.
 const ANSWER_TYPES = [
   { value: "yes_no", label: "Yes / No" },
   { value: "text", label: "Text" },
@@ -38,7 +33,6 @@ const ANSWER_TYPES = [
   { value: "image_upload", label: "Image Upload" },
 ];
 
- 
 const TIMEZONES = [
   "(UTC-07:00) Arizona",
   "(UTC-05:00) Eastern",
@@ -47,7 +41,6 @@ const TIMEZONES = [
   "(UTC+05:30) India",
 ];
 
- 
 const EMAIL_LIST_PATTERN = /^\s*[^\s@]+@[^\s@]+\.[^\s@]+\s*(,\s*[^\s@]+@[^\s@]+\.[^\s@]+\s*)*$/;
 
 const getStopTypeInfo = (index, total) => {
@@ -59,13 +52,11 @@ const getStopTypeInfo = (index, total) => {
   };
 };
 
- 
 const blankStop = () => ({
   stopType: "pickup",
   stopTypeLabel: "Pickup",
   stopName: "",
 
-  // Who the driver's verification code is texted to at this stop.
   contactName: "",
   contactPhone: "",
 
@@ -78,50 +69,39 @@ const blankStop = () => ({
   latitude: null,
   longitude: null,
 
- 
-  // Only used/shown for the Pickup stop
   startDate: "",
   startTime: "",
   startTimezone: "",
 
-
-  // Only used/shown for Intermediate and Delivery stops
   endDate: "",
   endTime: "",
   endTimezone: "",
 
-
-  // Only used/shown for the Pickup stop
   trackStartOffset: "",
 
- 
   commentToDriver: "",
   alertEmails: "",
 
- 
   customEvents: [],
 });
 
- 
 export const BLANK_STEP2_VALUES = {
   stops: [blankStop(), blankStop()],
 };
 
- 
+
+
 const useTripSheetDraftStore = create((set) => ({
   step2: BLANK_STEP2_VALUES,
   setStep2: (values) => set({ step2: values }),
   resetStep2: () => set({ step2: BLANK_STEP2_VALUES }),
 }));
 
- 
 const inputClass =
   "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 font-sans";
 
- 
 const selectClass = inputClass + " appearance-none pr-9";
 
- 
 const FieldLabel = ({ children, required }) => (
   <label className="mb-2 block text-sm font-semibold text-slate-800 font-sans">
     {children}
@@ -129,7 +109,6 @@ const FieldLabel = ({ children, required }) => (
   </label>
 );
 
- 
 const SectionEyebrow = ({ icon: Icon, children }) => (
   <div className="mb-5 flex items-center gap-3 border-b border-slate-100 pb-3.5">
     {Icon ? (
@@ -145,11 +124,9 @@ const SectionEyebrow = ({ icon: Icon, children }) => (
 
 const subPanelClass = "rounded-2xl border border-slate-100 bg-slate-50/50 p-4";
 
- 
 const ErrorText = ({ children }) =>
   children ? <p className="mt-1.5 text-xs text-red-500 font-sans">{children}</p> : null;
 
- 
 const ChevronDown = () => (
   <KeyboardArrowDownIcon
     className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400"
@@ -157,7 +134,6 @@ const ChevronDown = () => (
   />
 );
 
- 
 const pad = (n) => String(n).padStart(2, "0");
 
 function to12Hour(value24) {
@@ -170,7 +146,6 @@ function to12Hour(value24) {
   return { hour, minute: m, period };
 }
 
- 
 function to24HourString(hour, minute, period) {
   let h = hour % 12;
   if (period === "PM") h += 12;
@@ -180,12 +155,10 @@ function to24HourString(hour, minute, period) {
 function CustomTimePicker({ value, onChange, hasError = false }) {
   const { hour, minute, period } = to12Hour(value);
 
- 
   const commit = (nextHour, nextMinute, nextPeriod) => {
     onChange(to24HourString(nextHour, nextMinute, nextPeriod));
   };
 
- 
   const bumpHour = (dir) => {
     const next = ((hour - 1 + dir + 12) % 12) + 1;
     commit(next, minute, period);
@@ -196,7 +169,6 @@ function CustomTimePicker({ value, onChange, hasError = false }) {
   };
   const togglePeriod = () => commit(hour, minute, period === "AM" ? "PM" : "AM");
 
- 
   const handleHourInput = (e) => {
     const raw = e.target.value.replace(/\D/g, "").slice(-2);
     if (raw === "") return;
@@ -206,7 +178,6 @@ function CustomTimePicker({ value, onChange, hasError = false }) {
     commit(n, minute, period);
   };
 
- 
   const handleMinuteInput = (e) => {
     const raw = e.target.value.replace(/\D/g, "").slice(-2);
     if (raw === "") return;
@@ -215,12 +186,14 @@ function CustomTimePicker({ value, onChange, hasError = false }) {
     commit(hour, n, period);
   };
 
- 
+  useEffect(() => {
+  window.scrollTo(0, 0);
+}, []);
+
   const spinnerBtnClass = "flex justify-center text-slate-400 hover:text-blue-600 transition leading-none";
   const segmentClass =
     "w-6 border-none bg-transparent text-center text-sm font-semibold text-slate-800 outline-none font-sans";
 
- 
   return (
     <div
       className={`flex h-[46px] w-full items-center gap-2 rounded-xl border bg-white px-3 shadow-sm transition ${
@@ -239,10 +212,8 @@ function CustomTimePicker({ value, onChange, hasError = false }) {
         </button>
       </div>
 
- 
       <span className="text-slate-400">:</span>
 
- 
       <div className="flex flex-col items-center leading-none">
         <button type="button" className={spinnerBtnClass} onClick={() => bumpMinute(1)} tabIndex={-1}>
           <KeyboardArrowUpIcon sx={{ fontSize: 14 }} />
@@ -253,7 +224,6 @@ function CustomTimePicker({ value, onChange, hasError = false }) {
         </button>
       </div>
 
- 
       <button
         type="button"
         onClick={togglePeriod}
@@ -271,26 +241,21 @@ function DurationInput({ value, onChange, hasError = false }) {
     let hourDigits = digits.slice(0, 2);
     let minuteDigits = digits.slice(2, 4);
 
- 
     if (hourDigits.length === 1 && parseInt(hourDigits, 10) > 2) {
-
       hourDigits = pad(parseInt(hourDigits, 10));
     } else if (hourDigits.length === 2) {
       const hVal = Math.min(parseInt(hourDigits, 10) || 0, 24);
       hourDigits = pad(hVal);
     }
 
- 
     if (minuteDigits.length === 2) {
       const mVal = Math.min(parseInt(minuteDigits, 10) || 0, 59);
       minuteDigits = pad(mVal);
     }
 
- 
     onChange(hourDigits.length === 2 ? `${hourDigits}:${minuteDigits}` : hourDigits);
   };
 
- 
   const handleBlur = () => {
     if (!value) return;
     const [rawHour = "", rawMinute = ""] = value.split(":");
@@ -299,7 +264,6 @@ function DurationInput({ value, onChange, hasError = false }) {
     onChange(`${pad(hour)}:${pad(minute)}`);
   };
 
- 
   return (
     <input
       type="text"
@@ -319,49 +283,33 @@ function DurationInput({ value, onChange, hasError = false }) {
   );
 }
 
- 
 const StopTypeBadge = ({ label }) => (
   <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-blue-600 font-sans">
     {label}
   </span>
 );
 
- 
-// --- GOOGLE MAPS AUTOCOMPLETE COMPONENT ---
-// Controlled via Controller (value/onChange) so the "required" rule on
-// stops.{index}.address actually registers with react-hook-form and shows
-// up in `errors`. setValue is still used for the side-channel fields
-// (lat/lng/city/state/zip/country) that Google's Autocomplete fills in.
 function AddressAutocomplete({ index, value, onChange, setValue, error, hasError }) {
   const inputRef = useRef(null);
 
- 
   useEffect(() => {
-    // Ensure Google maps script is loaded in your index.html
     if (!window.google) {
       console.warn("Google Maps JavaScript API is not loaded.");
       return;
     }
 
- 
     const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, {
       fields: ["address_components", "geometry", "formatted_address"],
     });
 
- 
     const listener = autocomplete.addListener("place_changed", () => {
       const place = autocomplete.getPlace();
 
- 
       if (!place.geometry) return;
 
- 
-      // Extract Coordinates
       const lat = place.geometry.location.lat();
       const lng = place.geometry.location.lng();
 
- 
-      // Extract Address Components
       let city = "", state = "", zip = "", country = "";
       place.address_components.forEach((component) => {
         const types = component.types;
@@ -371,10 +319,6 @@ function AddressAutocomplete({ index, value, onChange, setValue, error, hasError
         if (types.includes("country")) country = component.long_name;
       });
 
- 
-      // Push the selected address through Controller's onChange (this is
-      // what makes the "required" validation aware of a real value), and
-      // populate the remaining fields via setValue as before.
       onChange(place.formatted_address);
       setValue(`stops.${index}.latitude`, lat);
       setValue(`stops.${index}.longitude`, lng);
@@ -384,13 +328,11 @@ function AddressAutocomplete({ index, value, onChange, setValue, error, hasError
       if (country) setValue(`stops.${index}.country`, country);
     });
 
- 
     return () => {
       if (window.google) window.google.maps.event.removeListener(listener);
     };
   }, [index, setValue, onChange]);
 
- 
   return (
     <div>
       <input
@@ -405,25 +347,17 @@ function AddressAutocomplete({ index, value, onChange, setValue, error, hasError
   );
 }
 
- 
-// "(UTC-08:00) Pacific" -> "Pacific" (what the backend stores)
 const timezoneName = (tz) => (tz ? tz.split(") ")[1] || tz : "");
 
-
-// Builds the specific JSON structure your backend expects
 function buildTripSheetPayload(stops) {
   return stops.map((stop) => {
-    // Pickup has no arrival window — only Intermediate/Delivery stops carry End timing.
     const hasEndWindow = stop.stopType !== "pickup";
-    // CHANGED: Start window (date/time/timezone) is now only collected for
-    // the Pickup stop — Intermediate/Delivery stops no longer show or send it.
     const hasStartWindow = stop.stopType === "pickup";
 
     return {
       stop_type: stop.stopTypeLabel || stop.stopType,
       stop_name: stop.stopName,
 
-      // The driver app texts this stop's verification code here.
       contact_name: stop.contactName || "",
       contact_phone: stop.contactPhone || "",
 
@@ -436,26 +370,18 @@ function buildTripSheetPayload(stops) {
       latitude: stop.latitude,
       longitude: stop.longitude,
 
-
-      // Only meaningful for the Pickup stop
       start_date: hasStartWindow ? stop.startDate || "" : "",
       start_time: hasStartWindow ? stop.startTime || "" : "",
       start_timezone: hasStartWindow ? timezoneName(stop.startTimezone) : "",
 
-
-      // Only meaningful for Intermediate/Delivery stops
       end_date: hasEndWindow ? stop.endDate || "" : "",
       end_time: hasEndWindow ? stop.endTime || "" : "",
       end_timezone: hasEndWindow ? timezoneName(stop.endTimezone) : "",
 
-
-      // Only meaningful for the Pickup stop
       track_start_offset: stop.stopType === "pickup" ? (stop.trackStartOffset || "") : "",
-
 
       comment_to_driver: stop.commentToDriver || "",
       alert_emails: stop.alertEmails || "",
-
 
       custom_events: (stop.customEvents || []).map((ce) => ({
         question: ce.question || "",
@@ -465,7 +391,6 @@ function buildTripSheetPayload(stops) {
   });
 }
 
- 
 function CustomEventRow({ stopIndex, ceIndex, control, register, remove }) {
   return (
     <div className="border-t border-slate-100 px-4 py-4">
@@ -478,7 +403,6 @@ function CustomEventRow({ stopIndex, ceIndex, control, register, remove }) {
         </IconButton>
       </div>
 
- 
       <div className="mb-3">
         <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-slate-400 font-sans">
           Answer Type
@@ -498,7 +422,6 @@ function CustomEventRow({ stopIndex, ceIndex, control, register, remove }) {
         </div>
       </div>
 
- 
       <div>
         <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-slate-400 font-sans">
           Question
@@ -513,29 +436,22 @@ function CustomEventRow({ stopIndex, ceIndex, control, register, remove }) {
   );
 }
 
- 
 function StopCard({ index, total, control, register, errors, setValue, remove, canRemove }) {
   const [collapsed, setCollapsed] = useState(false);
 
- 
   const {
     fields: customEventFields,
     append: appendCustomEvent,
     remove: removeCustomEvent,
   } = useFieldArray({ control, name: `stops.${index}.customEvents` });
 
- 
   const { value: stopTypeValue, label: stopTypeLabel } = getStopTypeInfo(index, total);
 
-  // Who the on-site contact is depends on what happens at the stop: you load
-  // from a shipper and hand over to a receiver.
   const contactLabel =
     stopTypeValue === "pickup" ? "Shipper" : stopTypeValue === "delivery" ? "Receiver" : "Contact";
 
- 
   const toggleCollapsed = () => setCollapsed((v) => !v);
 
- 
   const stopAccent =
     stopTypeValue === "pickup" ? "#1D4ED8" : stopTypeValue === "delivery" ? "#12B76A" : "#7C6EF2";
   const StopIcon =
@@ -569,7 +485,6 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
           <StopTypeBadge label={stopTypeLabel} />
         </div>
 
- 
         <div className="flex items-center gap-2">
           {canRemove ? (
             <IconButton
@@ -605,32 +520,23 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
         </div>
       </div>
 
- 
       {!collapsed && (
         <div className="grid grid-cols-1 gap-8 px-4 sm:px-6 py-6 lg:grid-cols-2">
           <div>
             <SectionEyebrow icon={LocationOnOutlinedIcon}>Location</SectionEyebrow>
 
- 
             <div className="mb-5">
               <FieldLabel>Stop Type</FieldLabel>
-              {/* Stop type is derived automatically from the stop's position in the
-                  route (Pickup -> Intermediate(s) -> Delivery) and is not user editable. */}
               <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-500 font-sans">
                 {stopTypeLabel}
               </div>
             </div>
 
- 
             <div className="mb-5">
               <FieldLabel>Stop Name</FieldLabel>
               <input className={inputClass} placeholder="Enter stop name" {...register(`stops.${index}.stopName`)} />
             </div>
 
-
-            {/* The person on site who confirms the driver. The driver app texts
-                a 6-digit code to this number and cannot load or deliver until
-                it is read back — without it the stop is stuck. */}
             <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 rounded-xl border border-slate-100 bg-slate-50/50 p-4">
               <div>
                 <FieldLabel required>{contactLabel} Name</FieldLabel>
@@ -654,9 +560,6 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
                   {...register(`stops.${index}.contactPhone`, {
                     required: "Phone number is required — the OTP is sent here",
                     validate: (v) =>
-                      // Matches the driver app: strip everything but digits and
-                      // require at least 10, since a 10-digit number is taken as
-                      // North American and anything longer carries its own code.
                       String(v || "").replace(/\D/g, "").length >= 10 ||
                       "Enter a full phone number with country code",
                   })}
@@ -668,10 +571,8 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
               </div>
             </div>
 
- 
             <div className="mb-5">
               <FieldLabel required>Address</FieldLabel>
-              {/* Custom Google Places Component injected here */}
               <Controller
                 control={control}
                 name={`stops.${index}.address`}
@@ -689,7 +590,6 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
               />
             </div>
 
- 
             <div className="mb-5">
               <label className="mb-2 block text-sm font-semibold text-slate-800 font-sans">
                 Address 2 <span className="font-normal text-slate-400">optional</span>
@@ -697,7 +597,6 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
               <input className={inputClass} placeholder="Enter address 2" {...register(`stops.${index}.address2`)} />
             </div>
 
- 
             <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
               <div>
                 <FieldLabel>City</FieldLabel>
@@ -713,7 +612,6 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
               </div>
             </div>
 
- 
             <div className="mb-2">
               <FieldLabel>Country</FieldLabel>
               <div className="relative">
@@ -729,9 +627,6 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
           <div>
             <SectionEyebrow icon={AccessTimeOutlinedIcon}>Timing</SectionEyebrow>
 
-            {/* CHANGED: Start window (Date / Time / Timezone) is now only
-                collected for the Pickup stop. Intermediate and Delivery
-                stops only ask for the End window below. */}
             {stopTypeValue === "pickup" && (
               <div className={`mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 ${subPanelClass}`}>
                 <p className="col-span-full -mt-0.5 mb-0.5 text-[11px] font-bold uppercase tracking-wide text-[#1D4ED8]">
@@ -769,8 +664,6 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
               </div>
             )}
 
- 
-            {/* End window — only Intermediate and Delivery stops have an arrival/departure end */}
             {stopTypeValue !== "pickup" && (
               <div className={`mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 ${subPanelClass}`}>
                 <p className="col-span-full -mt-0.5 mb-0.5 text-[11px] font-bold uppercase tracking-wide text-[#12B76A]">
@@ -829,8 +722,6 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
               </div>
             )}
 
-
-            {/* Start the Track — only shown for the Pickup stop */}
             {stopTypeValue === "pickup" && (
               <div className={`mb-6 ${subPanelClass}`}>
                 <FieldLabel>Start the Track</FieldLabel>
@@ -849,7 +740,6 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
               </div>
             )}
 
- 
             <SectionEyebrow icon={ChatBubbleOutlineIcon}>Driver Comms</SectionEyebrow>
             <div className="mb-5">
               <FieldLabel>Comment to Driver</FieldLabel>
@@ -892,7 +782,6 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
                   ))
                 )}
 
- 
                 <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-3">
                   <button
                     type="button"
@@ -914,7 +803,6 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
   );
 }
 
- 
 export default function TrackShipmentStep2() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -923,6 +811,7 @@ export default function TrackShipmentStep2() {
   const resetStep2Draft = useTripSheetDraftStore((s) => s.resetStep2);
 
   const resetStep1Draft = useShipmentDraftStore((s) => s.resetStep1);
+  const markComingFromStep2Back = useShipmentDraftStore((s) => s.markComingFromStep2Back);
 
   const {
     control,
@@ -938,8 +827,6 @@ export default function TrackShipmentStep2() {
 
   const { fields, append, insert, remove } = useFieldArray({ control, name: "stops" });
 
-  // Keep stopType/stopTypeLabel in sync with each stop's position whenever
-  // stops are added or removed (Pickup -> Intermediate(s) -> Delivery).
   useEffect(() => {
     fields.forEach((_, idx) => {
       const info = getStopTypeInfo(idx, fields.length);
@@ -1031,7 +918,7 @@ export default function TrackShipmentStep2() {
                 control={control}
                 register={register}
                 errors={errors}
-                setValue={setValue} // Passing setValue down so Autocomplete can update forms
+                setValue={setValue}
                 remove={remove}
                 canRemove={index !== 0 && index !== fields.length - 1}
               />
@@ -1062,7 +949,10 @@ export default function TrackShipmentStep2() {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => navigate("/trackshipment/step1")}
+              onClick={() => {
+                markComingFromStep2Back();
+                navigate("/trackshipment/step1");
+              }}
               className="rounded-2xl border border-slate-200 bg-white px-5 sm:px-6 py-3 sm:py-4 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 whitespace-nowrap"
             >
               ← Back
