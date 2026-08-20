@@ -400,9 +400,7 @@ class Dashboard extends Component {
                         <div className="border-l border-[#e5e5e5] h-12 mx-0.5" />
                         <div>
                             <div className="text-xs font-bold text-[#333]">{monthYear}</div>
-                            <div className="flex items-center gap-1.5 mt-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e] inline-block" />
-                            </div>
+                         
                         </div>
                     </div>
                 </div>
@@ -579,108 +577,202 @@ class Dashboard extends Component {
                     </a>
                 </div>
 
-                {/* ── Custom Table ── */}
-                <div style={s.tblWrap} className="overflow-x-auto">
-                    <table style={s.table}>
-                        <thead>
-                            <tr>
-                                {columns.map((col) => (
-                                    <th key={col.label} style={s.th}>{col.label}</th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {shipments_loading && (
+                {/* ── Custom Table (desktop / tablet-landscape only — unchanged) ──
+                     NOTE: s.tblWrap sets `overflow: 'hidden'` as an inline
+                     style, which — being inline — always overrides the
+                     Tailwind `overflow-x-auto` class if both land on the
+                     same element. That silently killed horizontal
+                     scrolling. Fixed by splitting into an outer div (keeps
+                     the rounded/clipped look from s.tblWrap) and an inner
+                     div that actually scrolls. Look is unchanged. */}
+                <div className="hidden md:block">
+                    <div style={s.tblWrap}>
+                    <div className="overflow-x-auto">
+                        <table style={s.table}>
+                            <thead>
                                 <tr>
-                                    <td colSpan={columns.length} style={s.emptyRow}>
-                                        Loading…
-                                    </td>
+                                    {columns.map((col) => (
+                                        <th key={col.label} style={s.th}>{col.label}</th>
+                                    ))}
                                 </tr>
-                            )}
-
-                            {!shipments_loading && shipments.length === 0 && (
-                                <tr>
-                                    <td colSpan={columns.length} style={s.emptyRow}>
-                                        No shipments found.
-                                    </td>
-                                </tr>
-                            )}
-
-                            {!shipments_loading && shipments.map((row, i) => {
-                                const isLast = i === shipments.length - 1;
-                                const td = isLast ? s.tdLast : s.td;
-
-                                const carrierDisplay = row.carrier_name || row.carrier_mc || row.carrier_dot || '—';
-                                const trackingMethodDisplay = TRACKING_METHOD_LABELS[row.tracking_method] || row.tracking_method || '—';
-                                const driverTypeDisplay = DRIVER_TYPE_LABELS[row.driver_type] || row.driver_type || '—';
-
-                                return (
-                                    <tr
-                                        key={row.uuid || i}
-                                        className="dashboard-shipment-row"
-                                        style={{
-                                            background: '#fff',
-                                            transition: 'background 0.15s, box-shadow 0.15s',
-                                            cursor: 'pointer',
-                                            borderLeft: '3px solid transparent'
-                                        }}
-                                        onMouseEnter={e => {
-                                            e.currentTarget.style.background = '#f8fafc';
-                                            e.currentTarget.style.borderLeft = '3px solid #185FA5';
-                                        }}
-                                        onMouseLeave={e => {
-                                            e.currentTarget.style.background = '#fff';
-                                            e.currentTarget.style.borderLeft = '3px solid transparent';
-                                        }}
-                                        onClick={() => this.setState({ redirect: `/shipment/${row.uuid}` })}
-                                    >
-                                        {/* Shipment Number */}
-                                        <td style={{ ...td, color: '#003178', fontWeight: 700 }}>
-                                            <span className="dashboard-shipment-number">
-                                                {row.shipment_no}
-                                            </span>
+                            </thead>
+                            <tbody>
+                                {shipments_loading && (
+                                    <tr>
+                                        <td colSpan={columns.length} style={s.emptyRow}>
+                                            Loading…
                                         </td>
-
-                                        {/* Carrier */}
-                                        <td style={{ ...td, fontWeight: 600 }}>
-                                            {carrierDisplay}
-                                        </td>
-
-                                        {/* Pro # / Load ID */}
-                                        <td style={td}>
-                                            {row.pro_number || '—'}
-                                        </td>
-
-                                        {/* Tracking Method */}
-                                        <td style={td}>
-                                            {trackingMethodDisplay}
-                                        </td>
-
-                                        {/* Tracking # */}
-                                        <td style={{ ...td, fontWeight: 600 }}>
-                                            {row.tracking_number || '—'}
-                                        </td>
-
-                                        {/* Driver Type */}
-                                        <td style={td}>
-                                            {driverTypeDisplay}
-                                        </td>
-
-                                        {/* Status */}
-                                        <td style={td}>
-                                            <Chip
-                                                label={statusLabel(row.status)}
-                                                variant="outlined"
-                                                size="small"
-                                                color={statusChipColor(row.status)}
-                                            />
-                                        </td>
-
                                     </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+                                )}
+
+                                {!shipments_loading && shipments.length === 0 && (
+                                    <tr>
+                                        <td colSpan={columns.length} style={s.emptyRow}>
+                                            No shipments found.
+                                        </td>
+                                    </tr>
+                                )}
+
+                                {!shipments_loading && shipments.map((row, i) => {
+                                    const isLast = i === shipments.length - 1;
+                                    const td = isLast ? s.tdLast : s.td;
+
+                                    const carrierDisplay = row.carrier_name || row.carrier_mc || row.carrier_dot || '—';
+                                    const trackingMethodDisplay = TRACKING_METHOD_LABELS[row.tracking_method] || row.tracking_method || '—';
+                                    const driverTypeDisplay = DRIVER_TYPE_LABELS[row.driver_type] || row.driver_type || '—';
+
+                                    return (
+                                        <tr
+                                            key={row.uuid || i}
+                                            className="dashboard-shipment-row"
+                                            style={{
+                                                background: '#fff',
+                                                transition: 'background 0.15s, box-shadow 0.15s',
+                                                cursor: 'pointer',
+                                                borderLeft: '3px solid transparent'
+                                            }}
+                                            onMouseEnter={e => {
+                                                e.currentTarget.style.background = '#f8fafc';
+                                                e.currentTarget.style.borderLeft = '3px solid #185FA5';
+                                            }}
+                                            onMouseLeave={e => {
+                                                e.currentTarget.style.background = '#fff';
+                                                e.currentTarget.style.borderLeft = '3px solid transparent';
+                                            }}
+                                            onClick={() => this.setState({ redirect: `/shipment/${row.uuid}` })}
+                                        >
+                                            {/* Shipment Number */}
+                                            <td style={{ ...td, color: '#003178', fontWeight: 700 }}>
+                                                <span className="dashboard-shipment-number">
+                                                    {row.shipment_no}
+                                                </span>
+                                            </td>
+
+                                            {/* Carrier */}
+                                            <td style={{ ...td, fontWeight: 600 }}>
+                                                {carrierDisplay}
+                                            </td>
+
+                                            {/* Pro # / Load ID */}
+                                            <td style={td}>
+                                                {row.pro_number || '—'}
+                                            </td>
+
+                                            {/* Tracking Method */}
+                                            <td style={td}>
+                                                {trackingMethodDisplay}
+                                            </td>
+
+                                            {/* Tracking # */}
+                                            <td style={{ ...td, fontWeight: 600 }}>
+                                                {row.tracking_number || '—'}
+                                            </td>
+
+                                            {/* Driver Type */}
+                                            <td style={td}>
+                                                {driverTypeDisplay}
+                                            </td>
+
+                                            {/* Status */}
+                                            <td style={td}>
+                                                <Chip
+                                                    label={statusLabel(row.status)}
+                                                    variant="outlined"
+                                                    size="small"
+                                                    color={statusChipColor(row.status)}
+                                                />
+                                            </td>
+
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                    </div>
+                </div>
+
+                {/* ── Recent Activity — mobile / small-tablet card view ──
+                     Shown only below the md breakpoint. Same data, same
+                     row click-through, laid out as stacked cards instead
+                     of a wide table so nothing overflows/gets clipped on
+                     narrow screens. Desktop table above is untouched. */}
+                <div className="md:hidden flex flex-col gap-3">
+                    {shipments_loading && (
+                        <div className="bg-white border border-[#e5e7eb] rounded-2xl py-10 text-center text-sm text-[#9ca3af]">
+                            Loading…
+                        </div>
+                    )}
+
+                    {!shipments_loading && shipments.length === 0 && (
+                        <div className="bg-white border border-[#e5e7eb] rounded-2xl py-10 text-center text-sm text-[#9ca3af]">
+                            No shipments found.
+                        </div>
+                    )}
+
+                    {!shipments_loading && shipments.map((row, i) => {
+                        const carrierDisplay = row.carrier_name || row.carrier_mc || row.carrier_dot || '—';
+                        const trackingMethodDisplay = TRACKING_METHOD_LABELS[row.tracking_method] || row.tracking_method || '—';
+                        const driverTypeDisplay = DRIVER_TYPE_LABELS[row.driver_type] || row.driver_type || '—';
+
+                        return (
+                            <div
+                                key={row.uuid || i}
+                                onClick={() => this.setState({ redirect: `/shipment/${row.uuid}` })}
+                                className="bg-white border border-[#e5e7eb] rounded-2xl p-4 cursor-pointer active:bg-[#f8fafc]"
+                                style={{ borderLeft: '3px solid #185FA5' }}
+                            >
+                                <div className="flex items-start justify-between gap-3 mb-3">
+                                    <span className="text-[15px] font-bold text-[#003178]">
+                                        {row.shipment_no}
+                                    </span>
+                                    <Chip
+                                        label={statusLabel(row.status)}
+                                        variant="outlined"
+                                        size="small"
+                                        color={statusChipColor(row.status)}
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 text-[13px]">
+                                    <div>
+                                        <div className="text-[10px] font-bold tracking-[0.5px] text-[#9ca3af] uppercase mb-0.5">
+                                            Carrier
+                                        </div>
+                                        <div className="font-semibold text-[#1a1a1a]">{carrierDisplay}</div>
+                                    </div>
+
+                                    <div>
+                                        <div className="text-[10px] font-bold tracking-[0.5px] text-[#9ca3af] uppercase mb-0.5">
+                                            Pro # / Load ID
+                                        </div>
+                                        <div className="text-[#1a1a1a]">{row.pro_number || '—'}</div>
+                                    </div>
+
+                                    <div>
+                                        <div className="text-[10px] font-bold tracking-[0.5px] text-[#9ca3af] uppercase mb-0.5">
+                                            Tracking Method
+                                        </div>
+                                        <div className="text-[#1a1a1a]">{trackingMethodDisplay}</div>
+                                    </div>
+
+                                    <div>
+                                        <div className="text-[10px] font-bold tracking-[0.5px] text-[#9ca3af] uppercase mb-0.5">
+                                            Tracking #
+                                        </div>
+                                        <div className="font-semibold text-[#1a1a1a]">{row.tracking_number || '—'}</div>
+                                    </div>
+
+                                    <div className="col-span-2">
+                                        <div className="text-[10px] font-bold tracking-[0.5px] text-[#9ca3af] uppercase mb-0.5">
+                                            Driver Type
+                                        </div>
+                                        <div className="text-[#1a1a1a]">{driverTypeDisplay}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
 
                 {/* ── Concierge: not built yet ── */}
