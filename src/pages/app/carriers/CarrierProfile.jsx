@@ -13,6 +13,7 @@ import OperationalObservations from "../../../profileComponents/OperationalObser
 import SafetyIntelligenceConsole from "../../../profileComponents/safetyIntelligence/SafetyIntelligenceConsole";
 import FleetDetails from "../../../profileComponents/FleetDetails";
 import LoadHistory from "../../../profileComponents/LoadHistory";
+import IncidentReports from "../../../profileComponents/IncidentReports";
 import CompanySnapshot from "../../../profileComponents/CompanySnapShot";
 
 import CompanyAssociationsView from "../../../profileComponents/CompanyAssociationsView";
@@ -74,6 +75,10 @@ function CarrierProfile() {
   const [removingShortlist, setRemovingShortlist] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
 
+  // Bumped after a filing so the panel re-fetches: the broker who just wrote a
+  // report expects to see it, and a stale list reads as the save having failed.
+  const [reportsReloadKey, setReportsReloadKey] = useState(0);
+
   const accountToken = localStorage.getItem(import.meta.env.VITE_ACCOUNT_TOKEN);
 
   const AUTH_USER_KEY = "crm_user";
@@ -122,6 +127,7 @@ function CarrierProfile() {
     "SAFETY INTELLIGENCE CONSOLE": useRef(null),
     "FLEET DETAILS": useRef(null),
     "LOAD HISTORY": useRef(null),
+    "INCIDENT REPORTS": useRef(null),
     "COMPANY SNAPSHOT": useRef(null),
   };
 
@@ -408,6 +414,8 @@ function CarrierProfile() {
       res?.message || "The incident report has been recorded.",
       emailFailed ? 8000 : 4000,
     );
+
+    setReportsReloadKey((key) => key + 1);
   }
 
   /*
@@ -777,6 +785,11 @@ function CarrierProfile() {
       id: "load",
       label: "LOAD HISTORY",
       icon: <History />,
+    },
+    {
+      id: "reports",
+      label: "INCIDENT REPORTS",
+      icon: <ReportProblemOutlined />,
     },
     {
       id: "company",
@@ -1159,6 +1172,13 @@ function CarrierProfile() {
                 data-section="LOAD HISTORY"
               >
                 <LoadHistory data={carrier?.loadHistory || []} />
+              </section>
+
+              <section
+                ref={sectionRefs["INCIDENT REPORTS"]}
+                data-section="INCIDENT REPORTS"
+              >
+                <IncidentReports rowId={row_id} reloadKey={reportsReloadKey} />
               </section>
 
               <section
