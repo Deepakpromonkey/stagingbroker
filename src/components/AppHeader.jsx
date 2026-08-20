@@ -23,6 +23,7 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import AssignmentIndOutlinedIcon from '@mui/icons-material/AssignmentIndOutlined';
 import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
 import Checklist from '@mui/icons-material/Checklist';
+import BlockOutlined from '@mui/icons-material/BlockOutlined';
 import SettingsOutlined from '@mui/icons-material/SettingsOutlined';
 import DescriptionOutlined from '@mui/icons-material/DescriptionOutlined';
 import Group from '@mui/icons-material/Group';
@@ -58,6 +59,7 @@ const NAV_LINKS = [
 const PROFILE_LINKS = [
     { key: 'profile_page', label: 'Profile', icon: <AssignmentIndOutlinedIcon sx={{ fontSize: 18 }} />, to: '/profile' },
     { key: 'profile_shortlisting', label: 'Carriers Shortlisted', icon: <Checklist sx={{ fontSize: 18 }} />, to: '/profile/carriers/shortlisted' },
+    { key: 'profile_blocked', label: 'Carriers Blocked', icon: <BlockOutlined sx={{ fontSize: 18 }} />, to: '/profile/carriers/blocked' },
     { key: 'scoring_weights', label: 'Scoring Weights', icon: <SettingsOutlined sx={{ fontSize: 18 }} />, to: '/profile/scoring-weights', permission: 'edit-scoring-config' },
     {
         key: 'carrier_settings',

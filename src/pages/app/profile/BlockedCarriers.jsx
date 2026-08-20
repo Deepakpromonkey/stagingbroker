@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import Skeleton from '@mui/material/Skeleton';
 import { useNavigate } from 'react-router-dom';
 import CarrierCard from '../../../components/CarrierCards';
@@ -28,7 +28,7 @@ function CarrierCardSkeleton() {
     );
 }
 
-function ShortlistedCarriers() {
+function BlockedCarriers() {
     const navigate = useNavigate();
     const [successMessage, setSuccessMessage] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
@@ -37,7 +37,7 @@ function ShortlistedCarriers() {
     const [total, setTotal] = useState(0);
 
     useEffect(() => {
-        loadShortlistedCarriers();
+        loadBlockedCarriers();
     }, []);
 
     function flashSuccess(message) {
@@ -56,10 +56,10 @@ function ShortlistedCarriers() {
         navigate('/carriers/' + carrier.carrier_id);
     }
 
-    function loadShortlistedCarriers() {
+    function loadBlockedCarriers() {
         setLoading(true);
 
-        apiFetch('/shortlist', {
+        apiFetch('/blocked', {
             method: 'GET'
         })
             .then(response => {
@@ -81,126 +81,135 @@ function ShortlistedCarriers() {
                     active_authority: "A",
                     authority_verified: true,
                     insurance_current: true,
-                    risk_level: "low"
+                    risk_level: "low",
+                    // Supplied by the blocked endpoint on top of the carrier
+                    // record itself — who blocked them, and when.
+                    blocked_by: item.blocked_by || null,
+                    blocked_at: item.blocked_at || null
                 }));
 
                 setCarriers(mappedCarriers);
                 setTotal(mappedCarriers.length);
             })
             .catch(err => {
-                setErrorMessage(err.message || 'Failed to load shortlisted carriers.');
-                setTimeout(() => setErrorMessage(''), 4000);
+                flashError(err.message || 'Failed to load blocked carriers.');
             })
             .finally(() => setLoading(false));
     }
 
-    function removeFromShortlist(carrier_id) {
+    function unblockCarrier(carrier_id) {
         setSuccessMessage('');
         setErrorMessage('');
 
-        apiFetch('/shortlist', {
+        apiFetch('/blocked', {
             method: 'DELETE',
             body: JSON.stringify({ row_id: carrier_id })
         })
             .then(data => {
                 setCarriers(prev => prev.filter(c => c.carrier_id !== carrier_id));
                 setTotal(prev => Math.max(prev - 1, 0));
-                setSuccessMessage(data?.message || 'Carrier removed successfully');
-                setTimeout(() => setSuccessMessage(''), 4000);
+                flashSuccess(data?.message || 'Carrier removed from blocklist');
             })
             .catch(err => {
-                setErrorMessage(err.message || 'Something went wrong');
-                setTimeout(() => setErrorMessage(''), 4000);
+                flashError(err.message || 'Something went wrong');
             });
     }
 
-    const shortlistedHeader = (
+    const blockedToolbar = (
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-5 w-full">
             <CarrierListActions
-                type="monitored"
+                type="blocked"
                 onSuccess={flashSuccess}
                 onError={flashError}
                 onImported={(result) => {
                     flashSuccess(result.message);
-                    // The import writes straight to the shortlist, so the page
+                    // The import writes straight to the blocklist, so the page
                     // is stale the moment it succeeds.
-                    loadShortlistedCarriers();
+                    loadBlockedCarriers();
                 }}
             />
 
             <div className="flex items-center gap-3 sm:gap-3.5 rounded-xl border border-gray-200 bg-white px-4 py-3 sm:px-5 sm:py-3.5 w-full sm:w-auto">
-                <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-[10px] bg-blue-50 shrink-0">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600">
-                        <path d="M3 7h11v8H3z" />
-                        <path d="M14 10h4l3 3v2h-7z" />
-                        <circle cx="6" cy="19" r="1.5" />
-                        <circle cx="17" cy="19" r="1.5" />
+                <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-[10px] bg-red-50 shrink-0">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-600">
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="M5.6 5.6l12.8 12.8" />
                     </svg>
                 </div>
                 <div>
                     <div className="text-lg sm:text-xl font-semibold text-gray-900 leading-tight tabular-nums">
                         {loading ? '–' : total}
                     </div>
-                    <div className="text-xs text-gray-500 leading-tight mt-0.5">Total shortlisted</div>
+                    <div className="text-xs text-gray-500 leading-tight mt-0.5">Total blocked</div>
                 </div>
             </div>
         </div>
     );
 
-return (
-    <div className="min-h-screen bg-[#F4F5F1] px-4 py-5 sm:px-6 md:px-8 lg:px-14">
+    return (
+        <div className="min-h-screen bg-[#F4F5F1] px-4 py-5 sm:px-6 md:px-8 lg:px-14">
 
-        <div className="mb-6 sm:mb-8">
-            <h1 className="text-[26px] sm:text-[32px] md:text-[40px] font-semibold tracking-tight text-slate-900">
-                Shortlisted carriers
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm sm:text-[15px] leading-relaxed text-slate-500">
-                Carriers you've saved for quick access and comparison.
-            </p>
-        </div>
+            <div className="mb-6 sm:mb-8">
+                <h1 className="text-[26px] sm:text-[32px] md:text-[40px] font-semibold tracking-tight text-slate-900">
+                    Blocked carriers
+                </h1>
+                <p className="mt-2 max-w-2xl text-sm sm:text-[15px] leading-relaxed text-slate-500">
+                    Carriers your company has blocked from being booked or contacted.
+                </p>
+            </div>
 
-        <div className="max-w-5xl mx-auto flex flex-col gap-5 sm:gap-6">
+            <div className="max-w-5xl mx-auto flex flex-col gap-5 sm:gap-6">
 
-            {successMessage && (
-                <div className="w-full p-3 bg-green-50 text-green-700 border border-green-200 rounded-lg text-sm font-medium">
-                    ✓ {successMessage}
-                </div>
-            )}
-
-            {errorMessage && (
-                <div className="w-full p-3 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm font-medium">
-                    ✕ {errorMessage}
-                </div>
-            )}
-
-            {shortlistedHeader}
-
-            <div className="flex flex-col gap-3 w-full">
-                {loading &&
-                    [...Array(3)].map((_, i) => (
-                        <CarrierCardSkeleton key={i} />
-                    ))
-                }
-
-                {!loading && carriers.length === 0 && (
-                    <div className="text-center py-12 sm:py-16 px-4 sm:px-6 border border-dashed border-gray-200 rounded-xl text-sm text-gray-500 bg-white">
-                        No shortlisted carriers found — carriers you save will show up here.
+                {successMessage && (
+                    <div className="w-full p-3 bg-green-50 text-green-700 border border-green-200 rounded-lg text-sm font-medium">
+                        ✓ {successMessage}
                     </div>
                 )}
 
-                {carriers.map(carrier => (
-                    <CarrierCard
-                        key={carrier.carrier_id}
-                        carrier={carrier}
-                        showRemove
-                        onRemove={removeFromShortlist}
-                        onClick={handleCarrierClick}
-                    />
-                ))}
+                {errorMessage && (
+                    <div className="w-full p-3 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm font-medium">
+                        ✕ {errorMessage}
+                    </div>
+                )}
+
+                {blockedToolbar}
+
+                <div className="flex flex-col gap-3 w-full">
+                    {loading &&
+                        [...Array(3)].map((_, i) => (
+                            <CarrierCardSkeleton key={i} />
+                        ))
+                    }
+
+                    {!loading && carriers.length === 0 && (
+                        <div className="text-center py-12 sm:py-16 px-4 sm:px-6 border border-dashed border-gray-200 rounded-xl text-sm text-gray-500 bg-white">
+                            No blocked carriers — carriers you block will show up here.
+                        </div>
+                    )}
+
+                    {carriers.map(carrier => (
+                        <div key={carrier.carrier_id} className="flex flex-col gap-1">
+                            <CarrierCard
+                                carrier={carrier}
+                                showRemove
+                                removeLabel="Remove from blocklist"
+                                onRemove={unblockCarrier}
+                                onClick={handleCarrierClick}
+                            />
+
+                            {(carrier.blocked_by || carrier.blocked_at) && (
+                                <div className="px-1 text-xs text-gray-500">
+                                    Blocked
+                                    {carrier.blocked_by ? ` by ${carrier.blocked_by}` : ''}
+                                    {carrier.blocked_at ? ` on ${carrier.blocked_at}` : ''}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
             </div>
         </div>
-    </div>
-);
+    );
 }
 
-export default ShortlistedCarriers;
+export default BlockedCarriers;

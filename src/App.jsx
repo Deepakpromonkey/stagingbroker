@@ -23,6 +23,7 @@ import BillingSuccess from './pages/app/subscription/BillingSuccess'
 import AppHeader from './components/AppHeader';
 import RouteGuard from './RouteGuard'
 import ShortlistedCarriers from './pages/app/profile/ShortlistedCarriers'
+import BlockedCarriers from './pages/app/profile/BlockedCarriers'
 
 import { ToastContainer } from './components/ui/Toaster'
 import './App.css'
@@ -113,6 +114,7 @@ function AppShell() {
           <Route path="/control-tower" element={<ControlTowerList />} />
           <Route path="/shipment/:row_id" element={<ControlTowerShipment />} />
           <Route path="/profile/carriers/shortlisted" element={<ShortlistedCarriers />} />
+          <Route path="/profile/carriers/blocked" element={<BlockedCarriers />} />
 
           {/* The header's Carriers link points here; before this it fell
               through to the catch-all and bounced back to login. */}

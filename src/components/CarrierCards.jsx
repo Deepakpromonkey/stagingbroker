@@ -354,8 +354,8 @@ function RemoveButton(props) {
                 e.stopPropagation();
                 props.onRemove?.(props.carrierId);
             }}
-            title='Remove from shortlist'
-            aria-label='Remove from shortlist'
+            title={props.label || 'Remove from shortlist'}
+            aria-label={props.label || 'Remove from shortlist'}
             className='
                 absolute -top-[10px] -right-[10px] sm:-top-[11px] sm:-right-[11px]
                 flex items-center justify-center
@@ -503,7 +503,7 @@ function CarrierCard(props) {
             </div>
 
             {showRemove && (
-                <RemoveButton carrierId={carrier.carrier_id} onRemove={onRemove} />
+                <RemoveButton carrierId={carrier.carrier_id} onRemove={onRemove} label={props.removeLabel} />
             )}
 
         </div>

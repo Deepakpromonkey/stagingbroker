@@ -28,6 +28,8 @@ import AlternateEmail from "@mui/icons-material/AlternateEmail";
 import Language from "@mui/icons-material/Language";
 import DeleteOutline from "@mui/icons-material/DeleteOutlined";
 import ReportProblemOutlined from "@mui/icons-material/ReportProblemOutlined";
+import BlockOutlined from "@mui/icons-material/BlockOutlined";
+import CheckCircleOutlined from "@mui/icons-material/CheckCircleOutlined";
 
 import Skeleton from "@mui/material/Skeleton";
 
@@ -73,6 +75,9 @@ function CarrierProfile() {
   const [shortlisting, setShortlisting] = useState(false);
   const [shortlistRowId, setShortlistRowId] = useState(null);
   const [removingShortlist, setRemovingShortlist] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [blocking, setBlocking] = useState(false);
+  const [unblocking, setUnblocking] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
 
   // Bumped after a filing so the panel re-fetches: the broker who just wrote a
@@ -211,6 +216,22 @@ function CarrierProfile() {
             .catch(function (err) {
               console.error("Connection status check failed", err);
             });
+
+          // Unlike `shortlisted`, the detail endpoint carries no blocked flag,
+          // so the company's blocklist has to be read and matched on row_id.
+          apiFetch("/blocked", { method: "GET" })
+            .then(function (res) {
+              const records = res?.data || [];
+
+              const match = records.find(function (item) {
+                return item?.row_id === carrierData.row_id;
+              });
+
+              setIsBlocked(!!match);
+            })
+            .catch(function (err) {
+              console.error("Blocked status check failed", err);
+            });
         })
 
         .catch(function (err) {
@@ -225,6 +246,46 @@ function CarrierProfile() {
     },
     [row_id],
   );
+
+  function blockCarrier() {
+    if (!carrier?.row_id) return;
+    setBlocking(true);
+
+    apiFetch("/blocked", {
+      method: "POST",
+      body: JSON.stringify({ row_id: carrier.row_id })
+    })
+      .then(function (data) {
+        setIsBlocked(true);
+        showToast("success", "Blocked", data?.message || "Carrier blocked successfully.");
+      })
+      .catch(function (err) {
+        showToast("error", "Error", err?.message || "Failed to block carrier.");
+      })
+      .finally(function () {
+        setBlocking(false);
+      });
+  }
+
+  function unblockCarrier() {
+    if (!carrier?.row_id) return;
+    setUnblocking(true);
+
+    apiFetch("/blocked", {
+      method: "DELETE",
+      body: JSON.stringify({ row_id: carrier.row_id })
+    })
+      .then(function (data) {
+        setIsBlocked(false);
+        showToast("success", "Unblocked", data?.message || "Carrier removed from blocklist.");
+      })
+      .catch(function (err) {
+        showToast("error", "Error", err?.message || "Failed to unblock carrier.");
+      })
+      .finally(function () {
+        setUnblocking(false);
+      });
+  }
 
   function addToPreferred() {
     if (!carrier?.row_id) return;
@@ -895,6 +956,23 @@ function CarrierProfile() {
                     onClick: removeFromShortlist,
                     disabled: removingShortlist,
                     loading: removingShortlist,
+                  },
+              !isBlocked
+                ? {
+                    label: "Block Carrier",
+                    icon: <BlockOutlined className="!text-[18px]" />,
+                    variant: "danger",
+                    onClick: blockCarrier,
+                    disabled: blocking,
+                    loading: blocking,
+                  }
+                : {
+                    label: "Unblock Carrier",
+                    icon: <CheckCircleOutlined className="!text-[18px]" />,
+                    variant: "secondary",
+                    onClick: unblockCarrier,
+                    disabled: unblocking,
+                    loading: unblocking,
                   },
               {
                 label: "Report Carrier",
