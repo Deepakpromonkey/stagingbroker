@@ -402,7 +402,6 @@ class Dashboard extends Component {
                             <div className="text-xs font-bold text-[#333]">{monthYear}</div>
                             <div className="flex items-center gap-1.5 mt-1">
                                 <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e] inline-block" />
-                                <span className="text-[11px] text-[#565E74] font-medium">Service Operational</span>
                             </div>
                         </div>
                     </div>
