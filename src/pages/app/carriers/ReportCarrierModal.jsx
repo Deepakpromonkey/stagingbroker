@@ -278,7 +278,14 @@ export default function ReportCarrierModal({
           formData.append(key, value);
         });
 
-        formData.append("attachment", attachment);
+        /*
+        | `documents[]`, not `attachment`. The API reads
+        | $request->file('documents', []) and validates `documents.*`, and
+        | validated() drops anything the rules do not declare — so a file sent
+        | under any other name was accepted by the browser, uploaded in full,
+        | and then silently discarded. The report saved, the evidence did not.
+        */
+        formData.append("documents[]", attachment);
 
         res = await apiFetch("/carrier-reports", {
           method: "POST",
