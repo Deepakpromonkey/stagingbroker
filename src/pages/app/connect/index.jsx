@@ -235,6 +235,17 @@ export default function OnboardPage() {
         merged.agreement_url = previous.agreement_url;
       }
 
+      /*
+      | `documents` is exposed the same way and has bitten the same way: a
+      | response built without the relation loaded dropped the key, every
+      | compliance slot read as empty, and a carrier who had just uploaded
+      | their W-9 was handed the blank dropzone back with no name, no size and
+      | no way to view the file they had already sent.
+      */
+      if (!("documents" in request) && previous?.documents) {
+        merged.documents = previous.documents;
+      }
+
       return merged;
     });
 
