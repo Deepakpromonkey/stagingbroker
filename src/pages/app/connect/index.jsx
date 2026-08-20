@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 
@@ -18,8 +18,9 @@ import DragIndicator from "@mui/icons-material/DragIndicator";
 import FileUploadOutlined from "@mui/icons-material/FileUploadOutlined";
 import Close from "@mui/icons-material/Close";
 import DescriptionOutlined from "@mui/icons-material/DescriptionOutlined";
+import VisibilityOutlined from "@mui/icons-material/VisibilityOutlined";
 
-import { apiFetch } from "../../../lib/api";
+import { apiFetch, API_BASE } from "../../../lib/api";
 
 import OtpModal from "./OtpModal";
 import ESign from "./ESign";
@@ -96,6 +97,26 @@ export default function OnboardPage() {
   const isIdVerified = !!connectRequest?.identity_verified;
   const isBankVerified = !!connectRequest?.bank_verified;
   const isFactoringAnswered = !!connectRequest?.factoring_answered;
+
+  /*
+  | "Settled" means done, or deliberately skipped, and is what the wizard gates
+  | on. The plain *_verified flags are left untouched so nothing anywhere can
+  | mistake a skip for a completed check — the broker's profile relies on that
+  | distinction.
+  |
+  | Falls back to deriving it locally for an API that predates these fields.
+  */
+  const isIdSkipped = !!connectRequest?.identity_skipped;
+  const isBankSkipped = !!connectRequest?.bank_skipped;
+
+  const isIdSettled =
+    connectRequest?.identity_settled ?? (isIdVerified || isIdSkipped);
+
+  // A carrier paid through a factoring company has no payout account to give
+  // this broker, so answering yes retires the bank step outright.
+  const isBankSettled =
+    (connectRequest?.bank_settled ?? (isBankVerified || isBankSkipped)) ||
+    (usesFactoring && isFactoringAnswered);
   const isQuestionnaireDone = !!connectRequest?.questionnaire_completed;
   const isDocumentsDone = !!connectRequest?.documents_completed;
 
@@ -167,15 +188,55 @@ export default function OnboardPage() {
    */
   const resumeStep = (request) => {
     if (!request?.mobile_verified) return 1;
-    if (!request?.identity_verified) return 2;
-    if (!request?.bank_verified || !request?.factoring_answered) return 3;
+
+    // A skipped step is settled. Sending the carrier back to one they have
+    // already declined would be an inescapable loop.
+    const idSettled =
+      request?.identity_settled ??
+      (request?.identity_verified || request?.identity_skipped);
+
+    const bankSettled =
+      (request?.bank_settled ??
+        (request?.bank_verified || request?.bank_skipped)) ||
+      !!request?.factoring?.uses_factoring_company;
+
+    if (!idSettled) return 2;
+    if (!bankSettled || !request?.factoring_answered) return 3;
     if (!request?.questionnaire_completed) return 4;
     if (!request?.documents_completed) return 5;
     return 6;
   };
 
   const applyRequest = useCallback((request, { resume = false } = {}) => {
-    setConnectRequest(request);
+    /*
+    | Every step response replaces this object wholesale, which made the
+    | agreement fragile: the API exposes `agreement` and `agreement_url`
+    | through whenLoaded, so any response built without the relation
+    | eager-loaded omits both keys rather than sending null. One such response
+    | — the step 5 upload is the usual culprit, since it is the last call
+    | before the carrier reaches step 6 — wiped the document the wizard had
+    | already loaded, and step 6 told the carrier the broker had never
+    | uploaded an agreement.
+    |
+    | An absent key means "not reported", not "removed", so carry the last
+    | known value forward. A key that is present and null is a real answer and
+    | is allowed to clear it.
+    */
+    setConnectRequest((previous) => {
+      if (!request) return request;
+
+      const merged = { ...request };
+
+      if (!("agreement" in request) && previous?.agreement) {
+        merged.agreement = previous.agreement;
+      }
+
+      if (!("agreement_url" in request) && previous?.agreement_url) {
+        merged.agreement_url = previous.agreement_url;
+      }
+
+      return merged;
+    });
 
     if (request?.factoring) {
       setUsesFactoring(!!request.factoring.uses_factoring_company);
@@ -223,6 +284,50 @@ export default function OnboardPage() {
       cancelled = true;
     };
   }, [token, navigate, applyRequest]);
+
+  /*
+  | Step 6 is unusable without a document to sign, so treat a missing one as
+  | worth one retry rather than a verdict.
+  |
+  | /carrier-connect/load is the endpoint that repairs this: it re-binds an
+  | agreement the broker uploaded after the invitation went out, which is
+  | exactly the case where the wizard opened with nothing attached. Asking
+  | again on arrival costs one request and fixes the carrier who would
+  | otherwise be stranded one click from finishing.
+  |
+  | Guarded by a ref so a broker who genuinely has no agreement on file gets a
+  | single retry and the honest empty state, not a poll.
+  */
+  const agreementRefetched = useRef(false);
+
+  useEffect(() => {
+    if (initing || currentStep !== 6 || agreementUrl) return;
+    if (agreementRefetched.current) return;
+
+    agreementRefetched.current = true;
+
+    let cancelled = false;
+
+    apiFetch("/carrier-connect/load", {
+      method: "POST",
+      skipAuth: true,
+      body: JSON.stringify({ token }),
+    })
+      .then((res) => {
+        if (cancelled) return;
+
+        const refreshed = res?.data?.connect_request;
+
+        if (refreshed) applyRequest(refreshed);
+      })
+      .catch(() => {
+        // Nothing to recover: the empty state below already says so.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initing, currentStep, agreementUrl, token, applyRequest]);
 
   // Pull the broker's questions once, when the carrier first reaches step 4.
   useEffect(() => {
@@ -296,6 +401,32 @@ export default function OnboardPage() {
     } finally {
       setBusy(false);
       clearReturnFlag();
+    }
+  };
+
+  /**
+   * Moves past the government ID or bank step without completing it.
+   *
+   * Recorded as skipped rather than silently left blank, so the broker can tell
+   * "declined to do this" apart from "has not reached it yet" before they
+   * tender a load.
+   */
+  const skipStep = async (step) => {
+    setBusy(true);
+
+    try {
+      const res = await apiFetch("/carrier-connect/skip", {
+        method: "POST",
+        skipAuth: true,
+        body: JSON.stringify({ token, step }),
+      });
+
+      applyRequest(res.data);
+      setCurrentStep(step === "identity" ? 3 : 4);
+    } catch (err) {
+      setErrorMessage(err?.message || "Could not skip this step.");
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -634,8 +765,10 @@ export default function OnboardPage() {
     }
 
     if (currentStep === 2) {
-      if (!isIdVerified) {
-        setErrorMessage("Please verify your government ID first.");
+      if (!isIdSettled) {
+        setErrorMessage(
+          "Please verify your government ID, or skip this step to continue.",
+        );
         return;
       }
       setCurrentStep(3);
@@ -668,8 +801,12 @@ export default function OnboardPage() {
       }
 
       const advance = () => {
-        if (!isBankVerified) {
-          setErrorMessage("Please connect your bank account first.");
+        // A carrier who factors is paid by their factoring company, so there is
+        // no payout account to ask for and the bank gate does not apply.
+        if (!usesFactoring && !isBankSettled) {
+          setErrorMessage(
+            "Please connect your bank account, or skip this step to continue.",
+          );
           return;
         }
 
@@ -903,7 +1040,9 @@ export default function OnboardPage() {
                 className={`group flex min-h-[200px] w-full max-w-xl cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed transition-all ${
                   isIdVerified
                     ? "border-green-300 bg-green-50"
-                    : "border-gray-300 bg-[#FAFBFD] hover:border-blue-500"
+                    : isIdSkipped
+                      ? "border-gray-300 bg-gray-50"
+                      : "border-gray-300 bg-[#FAFBFD] hover:border-blue-500"
                 }`}
                 onClick={() => (isIdVerified ? setCurrentStep(3) : startIdentity())}
               >
@@ -925,7 +1064,7 @@ export default function OnboardPage() {
                   </div>
                 ) : (
                   <span className="text-md font-bold text-blue-200 uppercase group-hover:text-blue-300">
-                    Click to start
+                    {isIdSkipped ? "Skipped — click to verify" : "Click to start"}
                   </span>
                 )}
               </div>
@@ -935,54 +1074,35 @@ export default function OnboardPage() {
                   Current status: {connectRequest.identity_status}
                 </p>
               )}
+
+              {/* Skipping stays reversible — the carrier can still come back
+                  and verify, and the broker sees it as skipped either way. */}
+              {!isIdVerified && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => skipStep("identity")}
+                  className="mt-4 text-xs font-semibold text-[#6B7280] underline underline-offset-2 transition-colors hover:text-[#374151] disabled:opacity-40"
+                >
+                  {isIdSkipped
+                    ? "Skipped — continue without verifying"
+                    : "Skip for now, I'll verify later"}
+                </button>
+              )}
             </div>
           )}
 
           {/* Step 3 — bank + factoring */}
           {currentStep === 3 && (
             <div className="mb-8 flex w-full flex-col items-center">
-              <label className="mb-3 text-xs font-bold tracking-wider text-[#9CA3AF] uppercase">
-                Connect and verify your bank account
-              </label>
-
-              <div
-                className={`group flex min-h-[180px] w-full max-w-xl cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed transition-all ${
-                  isBankVerified
-                    ? "border-green-300 bg-green-50"
-                    : "border-gray-300 bg-[#FAFBFD] hover:border-blue-500"
-                }`}
-                onClick={() => !isBankVerified && connectBank()}
-              >
-                <AccountBalance
-                  style={{ fontSize: 80 }}
-                  className={
-                    isBankVerified
-                      ? "text-green-700 opacity-20"
-                      : "text-blue-100 group-hover:text-blue-200"
-                  }
-                />
-
-                {isBankVerified ? (
-                  <div className="flex items-center gap-2">
-                    <DoneAll className="text-green-600" />
-                    <span className="text-xl font-bold text-green-600">
-                      Verified
-                    </span>
-                  </div>
-                ) : (
-                  <span className="text-md font-bold text-blue-200 uppercase group-hover:text-blue-300">
-                    Click to start
-                  </span>
-                )}
-              </div>
-
-              <p className="mt-3 max-w-xl text-center text-xs text-[#9CA3AF]">
-                Payouts are handled by Stripe. Your bank details are entered on
-                Stripe's own form and are never stored here.
-              </p>
-
-              {/* Factoring */}
-              <div className="mt-8 w-full max-w-xl">
+              {/*
+                Factoring is asked first because the answer decides whether the
+                rest of this step applies at all — a factored carrier is paid by
+                their factoring company, so there is no payout account to
+                connect. Asking for bank details first and then retracting the
+                request reads as a mistake.
+              */}
+              <div className="w-full max-w-xl">
                 <div className="flex items-center justify-between rounded-xl border border-[#E5E7EB] bg-[#FAFBFD] px-4 py-3.5">
                   <div className="pr-4">
                     <span className="text-sm font-semibold text-[#374151]">
@@ -1135,6 +1255,89 @@ export default function OnboardPage() {
                   </div>
                 )}
               </div>
+
+              {/* Bank — only when the carrier is not factored. */}
+              {usesFactoring ? (
+                <div className="mt-8 w-full max-w-xl rounded-xl border border-emerald-200 bg-emerald-50/40 px-4 py-3.5">
+                  <div className="flex items-start gap-2.5">
+                    <DoneAll
+                      style={{ fontSize: 18 }}
+                      className="mt-0.5 shrink-0 text-emerald-600"
+                    />
+
+                    <div>
+                      <p className="text-sm font-semibold text-emerald-800">
+                        No bank account needed
+                      </p>
+
+                      <p className="mt-0.5 text-xs leading-relaxed text-emerald-700">
+                        Your factoring company is paid directly, so there is
+                        nothing to connect here. Continue once your notice of
+                        assignment is attached.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-8 flex w-full flex-col items-center">
+                  <label className="mb-3 text-xs font-bold tracking-wider text-[#9CA3AF] uppercase">
+                    Connect and verify your bank account
+                  </label>
+
+                  <div
+                    className={`group flex min-h-[180px] w-full max-w-xl cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed transition-all ${
+                      isBankVerified
+                        ? "border-green-300 bg-green-50"
+                        : isBankSkipped
+                          ? "border-gray-300 bg-gray-50"
+                          : "border-gray-300 bg-[#FAFBFD] hover:border-blue-500"
+                    }`}
+                    onClick={() => !isBankVerified && connectBank()}
+                  >
+                    <AccountBalance
+                      style={{ fontSize: 80 }}
+                      className={
+                        isBankVerified
+                          ? "text-green-700 opacity-20"
+                          : "text-blue-100 group-hover:text-blue-200"
+                      }
+                    />
+
+                    {isBankVerified ? (
+                      <div className="flex items-center gap-2">
+                        <DoneAll className="text-green-600" />
+                        <span className="text-xl font-bold text-green-600">
+                          Verified
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-md font-bold text-blue-200 uppercase group-hover:text-blue-300">
+                        {isBankSkipped
+                          ? "Skipped — click to connect"
+                          : "Click to start"}
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="mt-3 max-w-xl text-center text-xs text-[#9CA3AF]">
+                    Payouts are handled by Stripe. Your bank details are entered
+                    on Stripe's own form and are never stored here.
+                  </p>
+
+                  {!isBankVerified && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => skipStep("bank")}
+                      className="mt-4 text-xs font-semibold text-[#6B7280] underline underline-offset-2 transition-colors hover:text-[#374151] disabled:opacity-40"
+                    >
+                      {isBankSkipped
+                        ? "Skipped — continue without a bank account"
+                        : "Skip for now, I'll add this later"}
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -1208,9 +1411,27 @@ export default function OnboardPage() {
                             </p>
                           </div>
 
+                          {/*
+                            Opened straight from the API rather than through
+                            apiFetch: this streams a PDF or an image, and the
+                            carrier has no session — the invitation token in the
+                            path is what authorises it, so a plain link works
+                            and lets the browser render it natively.
+                          */}
+                          <a
+                            href={`${API_BASE}/carrier-connect/documents/${token}/${slot.type}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={`View ${slot.label}`}
+                            className="rounded-full p-1.5 text-gray-400 no-underline hover:bg-white hover:text-[#1D4ED8]"
+                          >
+                            <VisibilityOutlined style={{ fontSize: 18 }} />
+                          </a>
+
                           <button
                             type="button"
                             disabled={uploading}
+                            title={`Remove ${slot.label}`}
                             onClick={() => removeDocument(slot.type)}
                             className="rounded-full p-1.5 text-gray-400 hover:bg-white hover:text-gray-600 disabled:opacity-40"
                           >

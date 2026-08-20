@@ -6,6 +6,7 @@ import CheckCircleOutlined from '@mui/icons-material/CheckCircleOutlined';
 import ChevronRight from '@mui/icons-material/ChevronRight';
 import OpenInNew from '@mui/icons-material/OpenInNew';
 import AutoAwesomeOutlined from '@mui/icons-material/AutoAwesomeOutlined';
+import Close from '@mui/icons-material/Close';
 import LocalShippingOutlined from '@mui/icons-material/LocalShippingOutlined';
 import Chip from '@mui/material/Chip';
 import { format } from 'date-fns';
@@ -54,10 +55,22 @@ class Dashboard extends Component {
             user: false,
             initing: true,
             user_subscribed_plan: false,
+
+            // Live plan + allowance from GET /subscription. Kept apart from
+            // `user_subscribed_plan`, which is only the copy cached in
+            // localStorage at login and goes stale the moment a plan changes.
+            subscription: null,
+            load_usage: null,
+            subscription_loading: true,
+
             logged_in: false,
             error_message: '',
             success_message: '',
             aiQuery: '',
+
+            // The concierge is not built yet, so the bar explains that on use
+            // rather than looking broken when nothing happens.
+            ai_modal_open: false,
 
             // shipment totals — derived from /shipments pagination
             // metadata (see loadShipmentTotals) rather than a separate
@@ -83,6 +96,7 @@ class Dashboard extends Component {
                 this.loadShipmentTotals();
                 this.loadActiveShipmentCount();
                 this.loadShipments();
+                this.loadSubscription();
             });
         }
 
@@ -117,6 +131,33 @@ class Dashboard extends Component {
             .catch(() => {})
             .finally(() => {
                 this.setState({ initing: false });
+            });
+    };
+
+    /**
+     * The plan and this period's load allowance.
+     *
+     * Read from the API rather than the `plan` cached on the user in
+     * localStorage: that copy is written at login and never refreshed, so an
+     * upgrade — or a load consumed five minutes ago — would not show until the
+     * next sign-in.
+     *
+     * A failure here must not take the dashboard down with it. The widget falls
+     * back to the cached plan, and to the trial wording when there is none.
+     */
+    loadSubscription = () => {
+        apiFetch('/subscription', { method: 'GET' })
+            .then((res) => {
+                const data = res?.data || {};
+
+                this.setState({
+                    subscription: data.subscription || null,
+                    load_usage: data.load_usage || null,
+                });
+            })
+            .catch(() => {})
+            .finally(() => {
+                this.setState({ subscription_loading: false });
             });
     };
 
@@ -187,9 +228,69 @@ class Dashboard extends Component {
 
         const totalShipments = this.state.all_shipment || 0;
 
-        const loadsLimit = this.state.user_subscribed_plan ? (this.state.user_subscribed_plan.loads_limit || 0) : 0;
-        const loadsUsed = this.state.user_subscribed_plan ? (this.state.user_subscribed_plan.consumed || 0) : 0;
-        const loadsPercent = loadsLimit > 0 ? Math.round((loadsUsed / loadsLimit) * 100) : 0;
+        /*
+        | Plan and allowance, preferring the live subscription and falling back
+        | to the plan cached on the user at login.
+        |
+        | `limit` is null on an unlimited plan, which is different from a limit
+        | of zero — treating the two alike would draw a full red bar for the
+        | customers paying the most.
+        */
+        const subscription = this.state.subscription;
+        const loadUsage = this.state.load_usage;
+
+        const cachedPlan = this.state.user_subscribed_plan;
+
+        const planName =
+            subscription?.plan_name ||
+            cachedPlan?.title ||
+            'Demo Plan';
+
+        /*
+        | The API reports `unlimited: true` when there is no subscription at
+        | all — nothing is capped because no plan is in force. That is true, but
+        | showing "Unlimited" beside "Demo Plan" reads as a generous allowance
+        | rather than no plan, so only a real subscription is allowed to say it.
+        */
+        const isUnlimited = !!subscription && !!loadUsage?.unlimited;
+
+        const loadsLimit = loadUsage
+            ? loadUsage.limit
+            : (cachedPlan ? (cachedPlan.loads_limit || 0) : 0);
+
+        const loadsUsed = loadUsage
+            ? (loadUsage.used || 0)
+            : (cachedPlan ? (cachedPlan.consumed || 0) : 0);
+
+        // An unlimited plan has no meaningful percentage, so the bar is left
+        // full rather than dividing by null.
+        const loadsPercent = isUnlimited
+            ? 100
+            : (loadsLimit > 0
+                ? Math.min(100, Math.round((loadsUsed / loadsLimit) * 100))
+                : 0);
+
+        // Over-quota is worth seeing at a glance rather than as a bar that
+        // silently pins at 100%.
+        const isOverQuota = !isUnlimited && loadsLimit > 0 && loadsUsed > loadsLimit;
+
+        const usageLabel = this.state.subscription_loading
+            ? '…'
+            : isUnlimited
+                ? `${loadsUsed} Used · Unlimited`
+                : loadsLimit > 0
+                    ? `${loadsUsed} of ${loadsLimit} Used`
+                    : `${loadsUsed} Used`;
+
+        // Only a real subscription can describe itself; anything else is still
+        // the trial.
+        const planBlurb = subscription
+            ? (subscription.cancel_at_period_end
+                ? 'Your plan is set to cancel at the end of this billing period.'
+                : subscription.is_past_due
+                    ? 'Payment failed — update your card to keep your plan active.'
+                    : 'Your premium plan features are active.')
+            : 'You are currently using the trial environment. Upgrade to unlock cross-border automation.';
 
         const activeShipments = this.state.active_shipment;
 
@@ -321,9 +422,16 @@ class Dashboard extends Component {
                             placeholder={`"vet MC 1234567", "track SH000025", "who's expiring this week?"`}
                             value={this.state.aiQuery}
                             onChange={(e) => this.setState({ aiQuery: e.target.value })}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') this.setState({ ai_modal_open: true });
+                            }}
                         />
                     </div>
-                    <button className="w-full sm:w-auto bg-[#1d4ed8] hover:bg-blue-700 text-white font-semibold text-sm rounded-xl py-2.5 px-5 flex items-center justify-center gap-2 transition-all shadow-sm border-none cursor-pointer">
+                    <button
+                        type="button"
+                        onClick={() => this.setState({ ai_modal_open: true })}
+                        className="w-full sm:w-auto bg-[#1d4ed8] hover:bg-blue-700 text-white font-semibold text-sm rounded-xl py-2.5 px-5 flex items-center justify-center gap-2 transition-all shadow-sm border-none cursor-pointer"
+                    >
                         <AutoAwesomeOutlined style={{ fontSize: 16 }} />
                         Ask AI
                     </button>
@@ -401,6 +509,7 @@ class Dashboard extends Component {
                     <div className="bg-[#005EA4] rounded-2xl p-5 sm:p-6 text-white flex flex-col justify-between relative min-h-[240px] sm:min-h-[280px]">
                         <button
                             type="button"
+                            onClick={() => this.props.navigate?.('/subscribe')}
                             className="absolute top-4 right-4 z-50 rounded-lg w-8 h-8 flex items-center justify-center cursor-pointer"
                             style={{ backgroundColor: "rgba(255, 255, 255, 0.1)" }}
                         >
@@ -412,44 +521,61 @@ class Dashboard extends Component {
                                 Account Status
                             </div>
                             <h2 className="text-[22px] sm:text-[24px] md:text-[28px] font-bold text-white m-0 tracking-[-0.5px]">
-                                {this.state.user_subscribed_plan ? this.state.user_subscribed_plan.title : 'Demo Plan'}
+                                {planName}
                             </h2>
                             <p className="text-xs opacity-75 mt-2.5 leading-normal">
-                                {!this.state.user_subscribed_plan || this.state.user_subscribed_plan?.is_demo === '1'
-                                    ? 'You are currently using the trial environment. Upgrade to unlock cross-border automation.'
-                                    : (this.state.user_subscribed_plan?.sub_title && this.state.user_subscribed_plan.sub_title.trim() !== '' && this.state.user_subscribed_plan.sub_title !== 'Try DollarTraq'
-                                        ? this.state.user_subscribed_plan.sub_title
-                                        : 'Your premium plan features are active.')}
+                                {planBlurb}
                             </p>
                         </div>
 
                         <div className="my-5">
                             <div className="flex justify-between text-[11px] font-semibold opacity-90 mb-2">
                                 <span className="uppercase tracking-wider">Loads Utilization</span>
-                                <span>{loadsUsed} of {loadsLimit} Used</span>
+                                <span>{usageLabel}</span>
                             </div>
                             <div className="bg-white/20 rounded-full h-2 overflow-hidden">
                                 <div
-                                    className="bg-white rounded-full h-full transition-all duration-500 ease-in-out"
+                                    className={`rounded-full h-full transition-all duration-500 ease-in-out ${
+                                        isOverQuota ? 'bg-[#FCA5A5]' : 'bg-white'
+                                    }`}
                                     style={{ width: `${loadsPercent}%` }}
                                 />
                             </div>
+
+                            {isOverQuota && (
+                                <p className="text-[11px] mt-2 text-[#FCA5A5]">
+                                    You are over this period's load allowance.
+                                </p>
+                            )}
+
+                            {!isUnlimited && loadUsage?.period_ends_at && (
+                                <p className="text-[11px] mt-2 opacity-60">
+                                    Resets {format(new Date(loadUsage.period_ends_at), 'd MMM yyyy')}
+                                </p>
+                            )}
                         </div>
 
                         <div className="flex flex-col gap-3">
-                            <div className="block text-center bg-white text-[#185FA5] text-xs font-bold rounded-lg py-3.5">
-                                Upgrade to Professional
-                            </div>
-                            <div className="flex items-center justify-center gap-1 text-xs font-semibold text-white/85">
-                                View Plan Details <ChevronRight style={{ fontSize: 16 }} />
-                            </div>
+                            {/* Only offer an upgrade to someone who is not
+                                already paying — the CTA used to read "Upgrade
+                                to Professional" regardless of plan. */}
+                            {!subscription && (
+                                <a
+                                    href="/subscribe"
+                                    className="block text-center bg-white text-[#185FA5] text-xs font-bold rounded-lg py-3.5 no-underline"
+                                >
+                                    Upgrade to Professional
+                                </a>
+                            )}
+
+                          
                         </div>
                     </div>
                 </div>
 
                 <div className="flex items-center justify-between mb-4 gap-3">
                     <span className="text-base sm:text-lg font-bold text-[#1a1a1a]">Recent Activity</span>
-                    <a href="#" className="flex items-center gap-1 text-xs font-semibold text-[#185FA5] no-underline whitespace-nowrap">
+                    <a href="/load-search" className="flex items-center gap-1 text-xs font-semibold text-[#185FA5] no-underline whitespace-nowrap">
                         Full Activity Log <OpenInNew style={{ fontSize: 14 }} />
                     </a>
                 </div>
@@ -557,6 +683,63 @@ class Dashboard extends Component {
                         </tbody>
                     </table>
                 </div>
+
+                {/* ── Concierge: not built yet ── */}
+                {this.state.ai_modal_open && (
+                    <div
+                        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4"
+                        onClick={() => this.setState({ ai_modal_open: false })}
+                    >
+                        {/* Stops a click inside the card from closing it. */}
+                        <div
+                            className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-xl"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="flex items-start justify-between border-b border-[#F1F5F9] px-6 py-5">
+                                <div className="flex items-center gap-3">
+                                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#EFF6FF] text-[#1d4ed8]">
+                                        <AutoAwesomeOutlined style={{ fontSize: 20 }} />
+                                    </span>
+
+                                    <h3 className="m-0 text-lg font-bold tracking-tight text-[#111827]">
+                                        AI Services Launching Soon
+                                    </h3>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    aria-label="Close"
+                                    onClick={() => this.setState({ ai_modal_open: false })}
+                                    className="rounded-full border-none bg-transparent p-1 text-[#9ca3af] cursor-pointer hover:text-[#111827]"
+                                >
+                                    <Close style={{ fontSize: 20 }} />
+                                </button>
+                            </div>
+
+                            <div className="px-6 py-6">
+                                <p className="m-0 text-sm leading-relaxed text-[#4B5563]">
+                                    The Concierge is still being built. Soon you will be able to
+                                    vet a carrier, track a shipment or ask what is expiring this
+                                    week, straight from that bar.
+                                </p>
+
+                                <p className="mt-3 mb-0 text-xs text-[#9CA3AF]">
+                                    We will let you know the moment it is live.
+                                </p>
+                            </div>
+
+                            <div className="flex justify-end border-t border-[#F1F5F9] px-6 py-4">
+                                <button
+                                    type="button"
+                                    onClick={() => this.setState({ ai_modal_open: false })}
+                                    className="rounded-xl border-none bg-[#1d4ed8] px-6 py-2.5 text-sm font-semibold text-white cursor-pointer hover:bg-blue-700"
+                                >
+                                    Got it
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
             </div>
         );

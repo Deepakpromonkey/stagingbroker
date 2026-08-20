@@ -59,6 +59,7 @@ export default function ConnectCarrierModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [fieldError, setFieldError] = useState("");
+  const [needsAgreement, setNeedsAgreement] = useState(false);
 
   // A carrier with no address on their federal record can't approve anything,
   // so there is nothing to fall back to.
@@ -80,6 +81,7 @@ export default function ConnectCarrierModal({
 
       setError("");
       setFieldError("");
+      setNeedsAgreement(false);
     },
     [isOpen, hasFmcsaEmail, pendingEmail],
   );
@@ -146,6 +148,11 @@ export default function ConnectCarrierModal({
       setError(
         err?.message || "Could not send the invitation. Please try again.",
       );
+
+      // 422 here is almost always the missing broker agreement, which is fixed
+      // on a different screen — a bare error with no route to the fix leaves
+      // the broker stuck.
+      setNeedsAgreement(err?.status === 422 && /agreement/i.test(err?.message || ""));
     } finally {
       setSubmitting(false);
     }
@@ -353,6 +360,15 @@ export default function ConnectCarrierModal({
           {error && (
             <div className="mt-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-600">
               {error}
+
+              {needsAgreement && (
+                <a
+                  href="/settings/carrier"
+                  className="mt-2 block font-semibold text-red-700 underline"
+                >
+                  Go to Carrier Settings to upload your agreement →
+                </a>
+              )}
             </div>
           )}
         </div>
