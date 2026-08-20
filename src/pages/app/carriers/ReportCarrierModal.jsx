@@ -250,13 +250,32 @@ export default function ReportCarrierModal({
         // own multipart boundary.
         const formData = new FormData();
 
+        /*
+        | FormData stringifies whatever it is handed, which the values here
+        | have to be shaped for rather than passed through:
+        |
+        |   - an array JSON-encoded to `["a","b"]` arrives as one string and
+        |     fails `incidents` => array. PHP wants repeated `incidents[]`.
+        |   - `false` arrives as the string "false", which Laravel's boolean
+        |     rule rejects — it accepts only true/false/1/0/"1"/"0".
+        |
+        | Neither shows up on the JSON path below, so filing a report worked
+        | until someone attached a file.
+        */
         Object.entries(payload).forEach(([key, value]) => {
           if (value === null || value === undefined) return;
 
-          formData.append(
-            key,
-            typeof value === "object" ? JSON.stringify(value) : value,
-          );
+          if (Array.isArray(value)) {
+            value.forEach((item) => formData.append(`${key}[]`, item));
+            return;
+          }
+
+          if (typeof value === "boolean") {
+            formData.append(key, value ? "1" : "0");
+            return;
+          }
+
+          formData.append(key, value);
         });
 
         formData.append("attachment", attachment);
