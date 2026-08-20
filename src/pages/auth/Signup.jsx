@@ -17,8 +17,10 @@ import BadgeOutlinedIcon from '@mui/icons-material/BadgeOutlined';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlineOutlined';
 
 import { apiFetch } from '../../lib/api';
+import SignupOtpModal from './SignupOtpModal';
 
 import logo from '../../assets/images/logo.webp';
 import image from '../../assets/images/image.png';
@@ -258,6 +260,44 @@ const IconField = ({ icon, trailing, ...textFieldProps }) => (
     </div>
 );
 
+/**
+ * Sits beside a contact field and turns into a static "Verified" chip once the
+ * code has been accepted.
+ *
+ * Height is pinned to the input rather than the row: TextField carries helper
+ * text below it, and matching the row would leave the button floating whenever
+ * a validation message appears under the field.
+ */
+const VerifyButton = ({ verified, disabled, onClick }) => {
+    if (verified) {
+        return (
+            <div className="flex h-[54px] shrink-0 items-center gap-1 rounded-xl bg-emerald-50 px-3 text-xs font-bold text-emerald-700">
+                <CheckCircleOutlineIcon sx={{ fontSize: 16 }} />
+                Verified
+            </div>
+        );
+    }
+
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            disabled={disabled}
+            // Disabled until the field holds something worth sending a code to:
+            // an SMS to a half-typed number is spent either way.
+            title={disabled ? 'Enter a valid value first' : 'Send a verification code'}
+            className="h-[54px] shrink-0 cursor-pointer rounded-xl border px-4 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400"
+            style={
+                disabled
+                    ? undefined
+                    : { borderColor: COLOR_MAIN, color: COLOR_MAIN, backgroundColor: '#fff' }
+            }
+        >
+            Verify
+        </button>
+    );
+};
+
 const validEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
 // Letters only (plus hyphen/apostrophe for names like O'Brien or Anne-Marie) — no spaces or digits
@@ -290,9 +330,27 @@ const Signup = () => {
     const [passwordError, setPasswordError] = useState(false);
     const [passwordConfirmationError, setPasswordConfirmationError] = useState(false);
     const [phoneError, setPhoneError] = useState(false);
+    const [phoneErrorMessage, setPhoneErrorMessage] = useState('Please enter a valid phone number');
     const [businessTypeError, setBusinessTypeError] = useState(false);
     const [dotNumberError, setDotNumberError] = useState(false);
     const [companyError, setCompanyError] = useState(false);
+
+    /*
+    | Verification proofs, one per contact detail.
+    |
+    | Each token names the exact address it was earned for, so both are dropped
+    | the moment that field is edited — otherwise changing the email after
+    | verifying it would submit a proof for an address nobody confirmed. The
+    | API re-checks this, but clearing it here is what keeps the button honest.
+    */
+    const [emailToken, setEmailToken] = useState('');
+    const [phoneToken, setPhoneToken] = useState('');
+    const [otpChannel, setOtpChannel] = useState(null);
+
+    // Component scope rather than inside the submit handler: the dial code is
+    // half of the number the OTP is sent to, so the modal needs it as well.
+    const selectedCountry =
+        COUNTRY_CODES.find((c) => c.code === countryCode) || COUNTRY_CODES[1];
 
     const signupSubmit = (event) => {
 
@@ -318,6 +376,10 @@ const Signup = () => {
             setEmailError(true);
             setEmailErrorMessage('Please enter valid email address');
             _has_error = true;
+        }else if(!emailToken){
+            setEmailError(true);
+            setEmailErrorMessage('Verify your email address to continue');
+            _has_error = true;
         }else{
             setEmailError(false);
         }
@@ -336,11 +398,15 @@ const Signup = () => {
             setPasswordConfirmationError(false);
         }
 
-      const selectedCountry = COUNTRY_CODES.find((c) => c.code === countryCode) || COUNTRY_CODES[1];
 const phoneDigitCount = phoneDigits(phone).length;
 
 if(phone.trim() === '' || phoneDigitCount !== selectedCountry.digits){
     setPhoneError(true);
+    setPhoneErrorMessage(`Please enter a valid ${selectedCountry.digits}-digit phone number`);
+    _has_error = true;
+}else if(!phoneToken){
+    setPhoneError(true);
+    setPhoneErrorMessage('Verify your phone number to continue');
     _has_error = true;
 }else{
     setPhoneError(false);
@@ -393,6 +459,8 @@ if(phone.trim() === '' || phoneDigitCount !== selectedCountry.digits){
                 email: email,
                 phone: phone,
                 phone_country_code: selectedCountry.dial,
+                email_verification_token: emailToken,
+                phone_verification_token: phoneToken,
                 password: password,
                 password_confirmation: passwordConfirmation,
                 business_type: businessType,
@@ -566,20 +634,35 @@ if (userData) {
                                     helperText={lastNameError ? `Please enter your last name (max ${NAME_MAX_LENGTH} characters)` : ''}
                                 />
 
-                                <IconField
-                                    icon={<EmailOutlinedIcon sx={{ fontSize: 19 }} />}
-                                    placeholder="Email"
-                                    value={email}
-                                    onChange={(e) => {
-                                        setEmail(e.target.value);
-                                        if (emailError) {
-                                            setEmailError(false);
-                                            setEmailErrorMessage('Please enter valid email address');
-                                        }
-                                    }}
-                                    error={emailError}
-                                    helperText={emailError ? emailErrorMessage : ''}
-                                />
+                                <div className="flex gap-2 items-start">
+                                    <div className="flex-1 min-w-0">
+                                        <IconField
+                                            icon={<EmailOutlinedIcon sx={{ fontSize: 19 }} />}
+                                            placeholder="Email"
+                                            value={email}
+                                            onChange={(e) => {
+                                                setEmail(e.target.value);
+
+                                                // The proof names the old address, so it
+                                                // dies with the edit.
+                                                if (emailToken) setEmailToken('');
+
+                                                if (emailError) {
+                                                    setEmailError(false);
+                                                    setEmailErrorMessage('Please enter valid email address');
+                                                }
+                                            }}
+                                            error={emailError}
+                                            helperText={emailError ? emailErrorMessage : ''}
+                                        />
+                                    </div>
+
+                                    <VerifyButton
+                                        verified={!!emailToken}
+                                        disabled={!validEmail(email)}
+                                        onClick={() => setOtpChannel('email')}
+                                    />
+                                </div>
 
 <div className="flex gap-2 items-start">
     <CountryCodeDropdown
@@ -588,6 +671,10 @@ if (userData) {
             setCountryCode(code);
             const maxDigits = COUNTRY_CODES.find((c) => c.code === code)?.digits ?? 10;
             setPhone((prev) => phoneDigits(prev).slice(0, maxDigits));
+
+            // A different dial code is a different number.
+            if (phoneToken) setPhoneToken('');
+
             if (phoneError) setPhoneError(false);
         }}
     />
@@ -606,16 +693,19 @@ if (userData) {
                 const maxDigits = COUNTRY_CODES.find((c) => c.code === countryCode)?.digits ?? 10;
                 const digitsOnly = phoneDigits(e.target.value).slice(0, maxDigits);
                 setPhone(digitsOnly);
+                if (phoneToken) setPhoneToken('');
                 if (phoneError) setPhoneError(false);
             }}
             error={phoneError}
-            helperText={
-                phoneError
-                    ? `Please enter a valid ${COUNTRY_CODES.find((c) => c.code === countryCode)?.digits ?? 10}-digit phone number`
-                    : ''
-            }
+            helperText={phoneError ? phoneErrorMessage : ''}
         />
     </div>
+
+    <VerifyButton
+        verified={!!phoneToken}
+        disabled={phoneDigits(phone).length !== (COUNTRY_CODES.find((c) => c.code === countryCode)?.digits ?? 10)}
+        onClick={() => setOtpChannel('phone')}
+    />
 </div>
 
                                 <IconField
@@ -757,6 +847,28 @@ if (userData) {
                 </div>
 
             </div>
+
+            <SignupOtpModal
+                open={!!otpChannel}
+                channel={otpChannel}
+                destination={
+                    otpChannel === 'phone'
+                        ? `${selectedCountry.dial}${phoneDigits(phone)}`
+                        : email.trim()
+                }
+                onClose={() => setOtpChannel(null)}
+                onVerified={(channel, token) => {
+                    if (channel === 'email') {
+                        setEmailToken(token);
+                        setEmailError(false);
+                    } else {
+                        setPhoneToken(token);
+                        setPhoneError(false);
+                    }
+
+                    setOtpChannel(null);
+                }}
+            />
         </div>
     )
 }
