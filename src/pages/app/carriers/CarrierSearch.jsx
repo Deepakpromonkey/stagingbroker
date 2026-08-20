@@ -563,7 +563,7 @@ function CarrierSearch() {
                 console.log(err);
                 setCarriers([]);
                 setTotal(0);
-                setErrorMessage('Something went wrong while searching. Please try again.');
+               setErrorMessage(err?.message || 'Something went wrong while searching. Please try again.');
             })
             .finally(function () {
                 if (requestId !== searchRequestId.current) return;
@@ -693,7 +693,7 @@ function CarrierSearch() {
                                     <EmptyState onOpenOverlay={() => setOverlayOpen(true)} />
                                 )}
 
-                                {!loading && hasSearched && carriers.length === 0 && (
+                              {!loading && hasSearched && !errorMessage && carriers.length === 0 && (
 
                                     <NoResultsState
                                         query={query}
