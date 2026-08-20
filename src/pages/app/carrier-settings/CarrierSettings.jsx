@@ -199,7 +199,7 @@ function AgreementsPanel() {
         const extension = file.name.split('.').pop()?.toLowerCase();
 
         if (!ACCEPTED_EXTENSIONS.includes(extension)) {
-            return 'The agreement must be a PDF or Word document.';
+            return 'The agreement must be a PDF document.';
         }
         if (file.size > MAX_FILE_BYTES) {
             return 'The agreement may not be larger than 10 MB.';
