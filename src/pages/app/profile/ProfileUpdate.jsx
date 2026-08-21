@@ -89,6 +89,10 @@ function sanitizePhoneDigits(rawValue, countryCode) {
 
 const MAX_NAME_LENGTH = 50;
 
+// Password length bounds — applies to current / new / confirm password.
+const MIN_PASSWORD_LENGTH = 8;
+const MAX_PASSWORD_LENGTH = 16;
+
 // Strips digits/symbols from name fields — letters and spaces only,
 // capped at MAX_NAME_LENGTH.
 function sanitizeName(rawValue) {
@@ -318,7 +322,7 @@ const STRENGTH_META = [
     { label: 'Strong', color: '#059669' },
 ];
 
-function PasswordField({ label, value, onChange, error, show, onToggle, placeholder, name, autoComplete, meter }) {
+function PasswordField({ label, value, onChange, error, show, onToggle, placeholder, name, autoComplete, meter, maxLength }) {
     const strength = meter ? getPasswordStrength(value) : 0;
     const [focused, setFocused] = useState(false);
     const borderColor = error ? '#D92D20' : focused ? INDIGO : value ? '#D7DCE3' : '#E3E7EC';
@@ -361,6 +365,7 @@ function PasswordField({ label, value, onChange, error, show, onToggle, placehol
                         placeholder={placeholder}
                         name={name}
                         autoComplete={autoComplete}
+                        maxLength={maxLength}
                         className="flex-1 min-w-0 border-none outline-none bg-transparent text-[15px] font-semibold text-gray-900 placeholder:text-gray-300 placeholder:font-medium"
                     />
                     <button
@@ -699,7 +704,9 @@ const ProfileUpdate = () => {
         }
     };
 
-    const lengthMet = newPassword.length >= 6;
+    const lengthMet =
+        newPassword.length >= MIN_PASSWORD_LENGTH &&
+        newPassword.length <= MAX_PASSWORD_LENGTH;
     const matchMet = newPassword.length > 0 && confirmPassword === newPassword;
 
     const resetPasswordFields = () => {
@@ -723,9 +730,36 @@ const ProfileUpdate = () => {
         e.preventDefault();
 
         let hasError = false;
-        if (!oldPassword) { setOldPasswordError('Current password is required.'); hasError = true; } else setOldPasswordError('');
-        if (!newPassword || newPassword.length < 6) { setNewPasswordError('Password must be at least 6 characters.'); hasError = true; } else setNewPasswordError('');
-        if (!confirmPassword || confirmPassword !== newPassword) { setConfirmPasswordError('Must match new password.'); hasError = true; } else setConfirmPasswordError('');
+
+        if (!oldPassword) {
+            setOldPasswordError('Current password is required.');
+            hasError = true;
+        } else if (oldPassword.length < MIN_PASSWORD_LENGTH || oldPassword.length > MAX_PASSWORD_LENGTH) {
+            setOldPasswordError(`Password must be ${MIN_PASSWORD_LENGTH}-${MAX_PASSWORD_LENGTH} characters.`);
+            hasError = true;
+        } else {
+            setOldPasswordError('');
+        }
+
+        if (!newPassword) {
+            setNewPasswordError('New password is required.');
+            hasError = true;
+        } else if (newPassword.length < MIN_PASSWORD_LENGTH || newPassword.length > MAX_PASSWORD_LENGTH) {
+            setNewPasswordError(`Password must be ${MIN_PASSWORD_LENGTH}-${MAX_PASSWORD_LENGTH} characters.`);
+            hasError = true;
+        } else {
+            setNewPasswordError('');
+        }
+
+        if (!confirmPassword || confirmPassword !== newPassword) {
+            setConfirmPasswordError('Must match new password.');
+            hasError = true;
+        } else if (confirmPassword.length < MIN_PASSWORD_LENGTH || confirmPassword.length > MAX_PASSWORD_LENGTH) {
+            setConfirmPasswordError(`Password must be ${MIN_PASSWORD_LENGTH}-${MAX_PASSWORD_LENGTH} characters.`);
+            hasError = true;
+        } else {
+            setConfirmPasswordError('');
+        }
 
         if (hasError) return;
 
@@ -1117,6 +1151,7 @@ const ProfileUpdate = () => {
                                 placeholder="Enter current password"
                                 name="current-password"
                                 autoComplete="current-password"
+                                maxLength={MAX_PASSWORD_LENGTH}
                             />
 
                             <PasswordField
@@ -1130,10 +1165,11 @@ const ProfileUpdate = () => {
                                 error={newPasswordError}
                                 show={showNew}
                                 onToggle={() => setShowNew(v => !v)}
-                                placeholder="Min. 6 characters"
+                                placeholder="8-16 characters"
                                 name="new-password"
                                 autoComplete="new-password"
                                 meter
+                                maxLength={MAX_PASSWORD_LENGTH}
                             />
 
                             <PasswordField
@@ -1146,10 +1182,11 @@ const ProfileUpdate = () => {
                                 placeholder="Re-enter new password"
                                 name="confirm-password"
                                 autoComplete="new-password"
+                                maxLength={MAX_PASSWORD_LENGTH}
                             />
 
                             <div className="flex flex-col gap-2 bg-[#FAFBFC] border border-gray-100 rounded-xl px-4 py-3.5">
-                                <RequirementRow met={lengthMet}>At least 6 characters</RequirementRow>
+                                <RequirementRow met={lengthMet}>8–16 characters</RequirementRow>
                                 <RequirementRow met={matchMet}>Confirmation matches</RequirementRow>
                             </div>
 
