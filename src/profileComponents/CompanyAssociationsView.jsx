@@ -254,6 +254,7 @@ function buildCompanyCards(rawRows = [], sharedAddresses = {}) {
 function CompanyAssociationsView({ dotNumber, data, physicalAddress, mailingAddress }) {
     const [activeFilter, setActiveFilter] = useState('ALL');
     const [rows, setRows] = useState([]);
+    const [truncated, setTruncated] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [fetchError, setFetchError] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
@@ -320,6 +321,7 @@ useEffect(() => {
                     [result?.data, result?.records, result].find(Array.isArray) || [];
 
                 setRows(finalRows);
+                setTruncated(result?.truncated === true);
 
                 // 2. Cache it so next visit skips the API. Never cache an empty
                 // result - that would suppress every future fetch.
@@ -632,6 +634,13 @@ useEffect(() => {
                         </div>
                     );
                 })
+            )}
+
+            {truncated && (
+                <p className='text-center text-[10px] text-[#94a3b8]'>
+                    This carrier shares details with more companies than can be
+                    shown. Showing the strongest matches.
+                </p>
             )}
 
             {totalPages > 1 && filteredCompanies.length > 0 && (
