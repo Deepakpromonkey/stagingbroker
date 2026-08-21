@@ -131,6 +131,7 @@ function EquipmentInsightsView({ data = {}, dotNumber }) {
     const [currentPage, setCurrentPage] = useState(1);
 
     const [rows, setRows] = useState([]);
+    const [truncated, setTruncated] = useState(false);
 
     const [isLoading, setIsLoading] = useState(false);
 
@@ -202,6 +203,7 @@ useEffect(function () {
                     [result?.data, result?.records, result].find(Array.isArray) || [];
 
                 setRows(finalRows);
+                setTruncated(result?.truncated === true);
 
                 // Never cache an empty result - it would suppress future fetches.
                 if (finalRows.length > 0) {
@@ -526,6 +528,13 @@ useEffect(function () {
 
                     })
 
+                )}
+
+                {truncated && (
+                    <p className='text-center text-[10px] text-[#94a3b8]'>
+                        This carrier shares vehicles with more companies than can
+                        be shown. Showing the strongest matches.
+                    </p>
                 )}
 
                 {totalPages > 1 && (
