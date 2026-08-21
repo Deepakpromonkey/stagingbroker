@@ -3,6 +3,7 @@ import {
     LocationOnOutlined,
     PhoneOutlined,
     EmailOutlined,
+    BadgeOutlined,
     ChevronLeftRounded,
     ChevronRightRounded
 } from '@mui/icons-material';
@@ -48,6 +49,74 @@ const ASSOCIATION_TYPE_CONFIG = {
         sharedKey: 'physical',
         icon: 'address',
         filter: 'ADDRESS'
+    },
+    'LEGAL NAME': {
+        label: 'Legal Name',
+        field: 'legal_name',
+        icon: 'name',
+        filter: 'NAME'
+    },
+    'DBA NAME': {
+        label: 'DBA Name',
+        field: 'dba_name',
+        icon: 'name',
+        filter: 'NAME'
+    },
+
+    /*
+    | Matches against details this carrier used to be reachable on, from the
+    | FMCSA change log. A carrier that shares a phone number it dropped last
+    | year with whoever answers it now is the same finding as sharing one
+    | today, and the only one a current-values query cannot see. Every one of
+    | these rows carries `matched_value` — the former detail that produced the
+    | hit — so the panel can name it.
+    */
+    'FORMER EMAIL': {
+        label: 'Former Email',
+        field: 'email_address',
+        icon: 'email',
+        filter: 'EMAIL',
+        former: true
+    },
+    'FORMER PHONE': {
+        label: 'Former Contact Number',
+        field: 'telephone',
+        icon: 'phone',
+        filter: 'PHONE',
+        former: true
+    },
+    'FORMER FAX': {
+        label: 'Former Fax Number',
+        field: 'fax',
+        icon: 'phone',
+        filter: 'FAX',
+        former: true
+    },
+    'FORMER LEGAL NAME': {
+        label: 'Former Legal Name',
+        field: 'legal_name',
+        icon: 'name',
+        filter: 'NAME',
+        former: true
+    },
+    'FORMER DBA NAME': {
+        label: 'Former DBA Name',
+        field: 'dba_name',
+        icon: 'name',
+        filter: 'NAME',
+        former: true
+    },
+    'FORMER PHYSICAL ADDRESS': {
+        label: 'Former Physical Address',
+        icon: 'address',
+        filter: 'ADDRESS',
+        former: true
+    },
+    'FORMER MAILING ADDRESS': {
+        label: 'Former Mailing Address',
+        icon: 'address',
+        filter: 'ADDRESS',
+        former: true
     }
 };
 
@@ -65,8 +134,23 @@ const FILTERS = [
     { label: 'Address', value: 'ADDRESS' },
     { label: 'Email', value: 'EMAIL' },
     { label: 'Contact', value: 'PHONE' },
-    { label: 'Fax', value: 'FAX' }
+    { label: 'Fax', value: 'FAX' },
+    { label: 'Name', value: 'NAME' },
+    { label: 'Former Details', value: 'FORMER' }
 ];
+
+/** 'FORMER' cuts across the type filters rather than being one of them. */
+function matchesFilter(association, filter) {
+    if (filter === 'ALL') {
+        return true;
+    }
+
+    if (filter === 'FORMER') {
+        return association.former === true;
+    }
+
+    return association.type === filter;
+}
 
 function getAssociationIcon(iconKey) {
     switch (iconKey) {
@@ -86,6 +170,12 @@ function getAssociationIcon(iconKey) {
             return (
                 <div className='flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-full bg-[#eff6ff]'>
                     <EmailOutlined className='!text-[13px] text-[#2563eb]' />
+                </div>
+            );
+        case 'name':
+            return (
+                <div className='flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-full bg-[#eff6ff]'>
+                    <BadgeOutlined className='!text-[13px] text-[#2563eb]' />
                 </div>
             );
         default:
@@ -113,9 +203,12 @@ function buildCompanyCards(rawRows = [], sharedAddresses = {}) {
             return;
         }
 
-        // Prefer the value on the row; fall back to the profiled carrier's own
-        // address for match types the API does not send a value for.
-        let value = row[config.field];
+        // `matched_value` is what the two carriers actually share, and the only
+        // source for a former detail — the other carrier's current columns hold
+        // whatever they use today, which is not what produced the match.
+        let value = isValidValue(row.matched_value)
+            ? row.matched_value
+            : row[config.field];
 
         if (!isValidValue(value) && config.sharedKey) {
             value = sharedAddresses[config.sharedKey];
@@ -148,6 +241,7 @@ function buildCompanyCards(rawRows = [], sharedAddresses = {}) {
         companiesByKey.get(key).associations.push({
             type: config.filter,
             label: config.label,
+            former: config.former === true,
             value,
             period: row.observation_period || '--',
             icon: config.icon
@@ -183,7 +277,9 @@ useEffect(() => {
             return;
         }
 
-        const cacheKey = `company_associations_${dotNumber}`;
+        // Versioned: the cache has no expiry, so anyone who had already viewed
+        // a carrier would otherwise keep the pre-change-log rows forever.
+        const cacheKey = `company_associations_v2_${dotNumber}`;
 
         // 1. Check localStorage first
         const cached = localStorage.getItem(cacheKey);
@@ -269,7 +365,7 @@ useEffect(() => {
             return companies;
         }
         return companies.filter((company) =>
-            company.associations.some((item) => item.type === activeFilter)
+            company.associations.some((item) => matchesFilter(item, activeFilter))
         );
     }, [companies, activeFilter]);
 
@@ -281,7 +377,7 @@ useEffect(() => {
                 return;
             }
             counts[item.value] = companies.filter((company) =>
-                company.associations.some((assoc) => assoc.type === item.value)
+                company.associations.some((assoc) => matchesFilter(assoc, item.value))
             ).length;
         });
 
@@ -306,12 +402,8 @@ useEffect(() => {
         return filteredCompanies.slice(start, start + PAGE_SIZE);
     }, [filteredCompanies, currentPage]);
 
-    const getFilteredAssociations = (associations = []) => {
-        if (activeFilter === 'ALL') {
-            return associations;
-        }
-        return associations.filter((item) => item.type === activeFilter);
-    };
+    const getFilteredAssociations = (associations = []) =>
+        associations.filter((item) => matchesFilter(item, activeFilter));
 
     if (isLoading) {
         return (
@@ -405,6 +497,10 @@ useEffect(() => {
                             ? 'No Fax Numbers Found'
                             : activeFilter === 'ADDRESS'
                             ? 'No Address Found'
+                            : activeFilter === 'NAME'
+                            ? 'No Shared Names Found'
+                            : activeFilter === 'FORMER'
+                            ? 'No Former Details Shared With Other Carriers'
                             : 'No Data Found'}
                     </p>
                 </div>
@@ -516,6 +612,11 @@ useEffect(() => {
                                             <span className='text-[12px] font-[600] text-[#111827]'>
                                                 {row.label}
                                             </span>
+                                            {row.former && (
+                                                <span className='rounded-full bg-[#fef3c7] px-[7px] py-[2px] text-[8px] font-[700] uppercase tracking-[0.5px] text-[#92400e]'>
+                                                    No longer used
+                                                </span>
+                                            )}
                                         </div>
 
                                         <div className='pl-[30px] sm:col-span-7 sm:pl-0'>
