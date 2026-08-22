@@ -37,7 +37,7 @@ import { ScrId, PH, Steps, Card, Sum, SumRow, Callout, Tml, Te } from '../../com
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
-const stripePromise = loadStripe(loadStripe);
+const stripePromise = loadStripe(STRIPE_PUBLIC_KEY);
 
 function CheckoutForm() {
     const stripe = useStripe();
