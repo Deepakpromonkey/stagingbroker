@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useForm, useFieldArray, Controller } from "react-hook-form";
+import { useForm, useFieldArray, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { create } from "zustand";
@@ -9,7 +9,15 @@ import { apiFetch } from "../../../lib/api";
 import { toast } from "../../../components/ui/Toaster";
 
 import StepSidebar from "./StepSidebar";
-import { useShipmentDraftStore } from "./Step1";
+import {
+  useShipmentDraftStore,
+  COUNTRY_CODES,
+  PHONE_VALIDATION,
+  validatePhoneForCountry,
+  sanitizePhoneDigits,
+  CountryFlag,
+  CustomDropdown,
+} from "./Step1";
 
 import IconButton from "@mui/material/IconButton";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
@@ -48,14 +56,30 @@ const EMAIL_LIST_PATTERN = /^\s*[^\s@]+@[^\s@]+\.[^\s@]+\s*(,\s*[^\s@]+@[^\s@]+\
 // Only letters and spaces (used for the shipper / receiver contact name)
 const ALPHA_PATTERN = /^[A-Za-z\s]*$/;
 
+// Every phone field defaults to the US dial code.
+const DEFAULT_COUNTRY_CODE = "US";
+
+const dialFor = (countryCode) =>
+  COUNTRY_CODES.find((c) => c.code === (countryCode || DEFAULT_COUNTRY_CODE))?.dial || "+1";
+
+const COUNTRY_CODE_OPTIONS = COUNTRY_CODES.map((c) => ({
+  value: c.code,
+  label: `${c.code} ${c.dial}`,
+  searchText: `${c.code} ${c.dial} ${c.label}`,
+  render: (isSelected) => (
+    <span className="flex items-center gap-1.5">
+      <CountryFlag code={c.code} />
+      <span className={`text-[11px] font-bold uppercase ${isSelected ? "text-white" : "text-slate-500"}`}>
+        {c.code}
+      </span>
+      <span>{c.dial}</span>
+    </span>
+  ),
+}));
+
 // Strips digits/symbols from name-type fields — letters and spaces only.
 function sanitizeName(rawValue) {
   return (rawValue || "").replace(/[^A-Za-z\s]/g, "");
-}
-
-// Strips non-digits and caps the shipper/receiver contact phone at 10 digits.
-function sanitizePhoneDigits(rawValue) {
-  return (rawValue || "").replace(/\D/g, "").slice(0, 10);
 }
 
 const getStopTypeInfo = (index, total) => {
@@ -72,7 +96,9 @@ const blankStop = () => ({
   stopTypeLabel: "Pickup",
   stopName: "",
 
+  requiresOtp: false,
   contactName: "",
+  contactCountryCode: DEFAULT_COUNTRY_CODE,
   contactPhone: "",
 
   address: "",
@@ -112,17 +138,17 @@ const stopSchema = z.object({
   stopTypeLabel: z.string(),
   stopName: z.string().optional().or(z.literal("")),
 
+  // Contact name / phone are optional unless the stop has OTP turned on —
+  // the conditional requirement lives in step2Schema's superRefine below.
+  requiresOtp: z.boolean().optional(),
   contactName: z
     .string()
     .trim()
-    .min(1, "Name is required")
-    .regex(ALPHA_PATTERN, "Only letters and spaces are allowed"),
-  contactPhone: z
-    .string()
-    .trim()
-    .min(1, "Phone number is required — the OTP is sent here")
-    .transform((v) => v.replace(/\D/g, ""))
-    .refine((v) => v.length === 10, "Enter a valid 10-digit phone number"),
+    .regex(ALPHA_PATTERN, "Only letters and spaces are allowed")
+    .optional()
+    .or(z.literal("")),
+  contactCountryCode: z.string().optional().or(z.literal("")),
+  contactPhone: z.string().trim().optional().or(z.literal("")),
 
   address: z.string().trim().min(1, "Address is required"),
   address2: z.string().optional().or(z.literal("")),
@@ -157,6 +183,46 @@ const stopSchema = z.object({
 const step2Schema = z.object({ stops: z.array(stopSchema) }).superRefine((data, ctx) => {
   data.stops.forEach((stop, idx) => {
     const isPickup = stop.stopType === "pickup";
+
+    // Contact name / phone only matter when this stop asks the driver for an
+    // OTP — the code is texted to that number, so both become mandatory.
+    if (stop.requiresOtp) {
+      if (!stop.contactName?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["stops", idx, "contactName"],
+          message: "Name is required when OTP is enabled",
+        });
+      }
+
+      const digits = (stop.contactPhone || "").replace(/\D/g, "");
+      if (!digits) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["stops", idx, "contactPhone"],
+          message: "Phone number is required — the OTP is sent here",
+        });
+      } else {
+        const phoneCheck = validatePhoneForCountry(digits, stop.contactCountryCode || DEFAULT_COUNTRY_CODE);
+        if (phoneCheck !== true) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["stops", idx, "contactPhone"],
+            message: phoneCheck,
+          });
+        }
+      }
+    } else if (stop.contactPhone) {
+      // Optional, but if something was typed it still has to be a real number.
+      const phoneCheck = validatePhoneForCountry(stop.contactPhone, stop.contactCountryCode || DEFAULT_COUNTRY_CODE);
+      if (phoneCheck !== true) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["stops", idx, "contactPhone"],
+          message: phoneCheck,
+        });
+      }
+    }
 
     if (isPickup) {
       if (!stop.startDate) {
@@ -224,6 +290,35 @@ const SectionEyebrow = ({ icon: Icon, children }) => (
 );
 
 const subPanelClass = "rounded-2xl border border-slate-100 bg-slate-50/50 p-4";
+
+function ToggleSwitch({ checked, onChange, label, hint, id }) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <div>
+        <label htmlFor={id} className="block cursor-pointer text-sm font-semibold text-slate-800 font-sans">
+          {label}
+        </label>
+        {hint ? <p className="mt-1 text-xs text-slate-500 font-sans">{hint}</p> : null}
+      </div>
+      <button
+        id={id}
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-blue-200 ${
+          checked ? "bg-[#2F5CFB]" : "bg-slate-300"
+        }`}
+      >
+        <span
+          className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+            checked ? "translate-x-[22px]" : "translate-x-0.5"
+          }`}
+        />
+      </button>
+    </div>
+  );
+}
 
 const ErrorText = ({ children }) =>
   children ? <p className="mt-1.5 text-xs text-red-500 font-sans">{children}</p> : null;
@@ -459,7 +554,9 @@ function buildTripSheetPayload(stops) {
       stop_type: stop.stopTypeLabel || stop.stopType,
       stop_name: stop.stopName,
 
+      requires_otp: !!stop.requiresOtp,
       contact_name: stop.contactName || "",
+      contact_country_code: dialFor(stop.contactCountryCode),
       contact_phone: stop.contactPhone || "",
 
       address: stop.address,
@@ -537,7 +634,7 @@ function CustomEventRow({ stopIndex, ceIndex, control, register, remove }) {
   );
 }
 
-function StopCard({ index, total, control, register, errors, setValue, remove, canRemove }) {
+function StopCard({ index, total, control, register, errors, setValue, trigger, remove, canRemove }) {
   const [collapsed, setCollapsed] = useState(false);
 
   const {
@@ -550,6 +647,10 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
 
   const contactLabel =
     stopTypeValue === "pickup" ? "Shipper" : stopTypeValue === "delivery" ? "Receiver" : "Contact";
+
+  const requiresOtp = !!useWatch({ control, name: `stops.${index}.requiresOtp` });
+  const contactCountryCode =
+    useWatch({ control, name: `stops.${index}.contactCountryCode` }) || DEFAULT_COUNTRY_CODE;
 
   const toggleCollapsed = () => setCollapsed((v) => !v);
 
@@ -638,53 +739,96 @@ function StopCard({ index, total, control, register, errors, setValue, remove, c
               <input className={inputClass} placeholder="Enter stop name" {...register(`stops.${index}.stopName`)} />
             </div>
 
-            <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 rounded-xl border border-slate-100 bg-slate-50/50 p-4">
-              <div>
-                <FieldLabel required>{contactLabel} Name</FieldLabel>
-                <Controller
-                  control={control}
-                  name={`stops.${index}.contactName`}
-                  render={({ field: { value, onChange }, fieldState }) => (
-                    <>
-                      <input
-                        className={
-                          inputClass +
-                          (fieldState.error ? " border-red-400 focus:border-red-400 focus:ring-red-100" : "")
-                        }
-                        placeholder={`Who the driver reports to at ${stopTypeLabel.toLowerCase()}`}
-                        value={value}
-                        onChange={(e) => onChange(sanitizeName(e.target.value))}
-                      />
-                      <ErrorText>{fieldState.error?.message}</ErrorText>
-                    </>
-                  )}
-                />
-              </div>
-              <div>
-                <FieldLabel required>{contactLabel} Phone</FieldLabel>
-                <Controller
-                  control={control}
-                  name={`stops.${index}.contactPhone`}
-                  render={({ field: { value, onChange }, fieldState }) => (
-                    <>
-                      <input
-                        className={
-                          inputClass +
-                          (fieldState.error ? " border-red-400 focus:border-red-400 focus:ring-red-100" : "")
-                        }
-                        placeholder="5550001111"
-                        inputMode="numeric"
-                        maxLength={10}
-                        value={value}
-                        onChange={(e) => onChange(sanitizePhoneDigits(e.target.value))}
-                      />
-                      <ErrorText>{fieldState.error?.message}</ErrorText>
-                    </>
-                  )}
-                />
-                <p className="mt-1.5 text-xs text-slate-500 font-sans">
-                  The verification code for this stop is texted to this number.
-                </p>
+            <div className="mb-5 rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+              <Controller
+                control={control}
+                name={`stops.${index}.requiresOtp`}
+                render={({ field: { value, onChange } }) => (
+                  <ToggleSwitch
+                    id={`stop-${index}-requires-otp`}
+                    checked={!!value}
+                    onChange={(next) => {
+                      onChange(next);
+                      trigger([`stops.${index}.contactName`, `stops.${index}.contactPhone`]);
+                    }}
+                    label={`Do you need OTP enabled ${stopTypeLabel}`}
+                    hint={
+                      value
+                        ? `The verification code for this stop is texted to the ${contactLabel.toLowerCase()} phone below.`
+                        : "Off by default — the driver completes this stop without a verification code."
+                    }
+                  />
+                )}
+              />
+
+              <div className="mt-4 grid grid-cols-1 gap-4 border-t border-slate-100 pt-4 sm:grid-cols-2">
+                <div>
+                  <FieldLabel required={requiresOtp}>
+                    {contactLabel} Name{" "}
+                    {requiresOtp ? null : <span className="font-normal text-slate-400">optional</span>}
+                  </FieldLabel>
+                  <Controller
+                    control={control}
+                    name={`stops.${index}.contactName`}
+                    render={({ field: { value, onChange }, fieldState }) => (
+                      <>
+                        <input
+                          className={
+                            inputClass +
+                            (fieldState.error ? " border-red-400 focus:border-red-400 focus:ring-red-100" : "")
+                          }
+                          placeholder={`Who the driver reports to at ${stopTypeLabel.toLowerCase()}`}
+                          value={value || ""}
+                          onChange={(e) => onChange(sanitizeName(e.target.value))}
+                        />
+                        <ErrorText>{fieldState.error?.message}</ErrorText>
+                      </>
+                    )}
+                  />
+                </div>
+                <div>
+                  <FieldLabel required={requiresOtp}>
+                    {contactLabel} Phone{" "}
+                    {requiresOtp ? null : <span className="font-normal text-slate-400">optional</span>}
+                  </FieldLabel>
+                  <div className="grid grid-cols-[7.5rem_1fr] gap-2">
+                    <Controller
+                      control={control}
+                      name={`stops.${index}.contactCountryCode`}
+                      render={({ field: { value, onChange } }) => (
+                        <CustomDropdown
+                          value={value || DEFAULT_COUNTRY_CODE}
+                          onChange={(next) => {
+                            onChange(next);
+                            trigger(`stops.${index}.contactPhone`);
+                          }}
+                          options={COUNTRY_CODE_OPTIONS}
+                          placeholder="Code"
+                        />
+                      )}
+                    />
+                    <Controller
+                      control={control}
+                      name={`stops.${index}.contactPhone`}
+                      render={({ field: { value, onChange }, fieldState }) => (
+                        <div>
+                          <input
+                            className={
+                              inputClass +
+                              (fieldState.error ? " border-red-400 focus:border-red-400 focus:ring-red-100" : "")
+                            }
+                            placeholder="5550001111"
+                            inputMode="numeric"
+                            maxLength={(PHONE_VALIDATION[contactCountryCode] || PHONE_VALIDATION.US).length}
+                            value={value || ""}
+                            onChange={(e) => onChange(sanitizePhoneDigits(e.target.value, contactCountryCode))}
+                          />
+                          <ErrorText>{fieldState.error?.message}</ErrorText>
+                        </div>
+                      )}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -923,6 +1067,7 @@ export default function TrackShipmentStep2() {
     handleSubmit,
     watch,
     setValue,
+    trigger,
     formState: { isSubmitting, errors },
   } = useForm({
     resolver: zodResolver(step2Schema),
@@ -1024,6 +1169,7 @@ export default function TrackShipmentStep2() {
                 register={register}
                 errors={errors}
                 setValue={setValue}
+                trigger={trigger}
                 remove={remove}
                 canRemove={index !== 0 && index !== fields.length - 1}
               />

@@ -41,7 +41,7 @@ const DRIVER_TYPES = [
   { value: "other_company_driver", label: "Other carrier company driver" },
 ];
 
-const COUNTRY_CODES = [
+export const COUNTRY_CODES = [
   { code: "IN", dial: "+91", label: "India" },
   { code: "US", dial: "+1", label: "United States" },
   { code: "CA", dial: "+1", label: "Canada" },
@@ -81,7 +81,7 @@ const EMAIL_LIST_PATTERN = /^\s*[^\s@]+@[^\s@]+\.[^\s@]+\s*(,\s*[^\s@]+@[^\s@]+\
 // Only letters and spaces (used for dispatcher name)
 const ALPHA_PATTERN = /^[A-Za-z\s]*$/;
 
-const PHONE_VALIDATION = {
+export const PHONE_VALIDATION = {
   US: {
     length: 10,
     pattern: /^[2-9]\d{9}$/,
@@ -104,7 +104,7 @@ const PHONE_VALIDATION = {
   },
 };
 
-function validatePhoneForCountry(rawPhone, countryCode) {
+export function validatePhoneForCountry(rawPhone, countryCode) {
   const digits = (rawPhone || "").replace(/\D/g, "");
   const rule = PHONE_VALIDATION[countryCode] || PHONE_VALIDATION.US;
 
@@ -119,7 +119,7 @@ function validatePhoneForCountry(rawPhone, countryCode) {
   return true;
 }
 
-function sanitizePhoneDigits(rawValue, countryCode) {
+export function sanitizePhoneDigits(rawValue, countryCode) {
   const maxLength = (PHONE_VALIDATION[countryCode] || PHONE_VALIDATION.US).length;
   return (rawValue || "").replace(/\D/g, "").slice(0, maxLength);
 }
@@ -354,7 +354,7 @@ function useOutsideClick(ref, onOutside) {
   }, [ref, onOutside]);
 }
 
-const CountryFlag = ({ code, className = "" }) => (
+export const CountryFlag = ({ code, className = "" }) => (
   <img
     src={`https://flagcdn.com/24x18/${code.toLowerCase()}.png`}
     srcSet={`https://flagcdn.com/48x36/${code.toLowerCase()}.png 2x`}
@@ -469,7 +469,7 @@ const CustomToggle = ({ checked, onChange, label, icon: Icon }) => (
   </button>
 );
 
-function CustomDropdown({
+export function CustomDropdown({
   value,
   onChange,
   options,
