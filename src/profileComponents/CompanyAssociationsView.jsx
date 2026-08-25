@@ -31,11 +31,11 @@ const ASSOCIATION_TYPE_CONFIG = {
         icon: 'email',
         filter: 'EMAIL'
     },
-    // The API matches on address in its WHERE clause but never SELECTs the
-    // address columns, so `field` is absent on these rows. `sharedKey` points at
-    // the profiled carrier's own address, which is by definition the value that
-    // matched. Without this the rows were silently dropped and the panel showed
-    // "no data found" despite a successful response.
+    // `matched_value` carries the shared address and the API now selects the
+    // other carrier's own as well, so `field` resolves. `sharedKey` stays as the
+    // last fallback - it points at the profiled carrier's own address, which is
+    // by definition the value that matched. Without it these rows were silently
+    // dropped and the panel showed "no data found" on a successful response.
     'MAILING ADDRESS': {
         label: 'Mailing Address',
         field: 'mailing_address',
@@ -234,6 +234,17 @@ function buildCompanyCards(rawRows = [], sharedAddresses = {}) {
                 duns_number: row.duns_number || null,
                 annual_mileage: row.annual_mileage || null,
                 fleet_size: row.fleet_size || null,
+                // The carrier's own details, independent of what matched. A
+                // profile is being read to decide whether these two companies
+                // are the same operation, and that needs who they are and how
+                // to reach them - not only the single field that collided.
+                contact: {
+                    email: isValidValue(row.email_address) ? row.email_address : null,
+                    telephone: isValidValue(row.telephone) ? row.telephone : null,
+                    fax: isValidValue(row.fax) ? row.fax : null,
+                    physical_address: isValidValue(row.physical_address) ? row.physical_address : null,
+                    mailing_address: isValidValue(row.mailing_address) ? row.mailing_address : null
+                },
                 associations: []
             });
         }
@@ -249,6 +260,46 @@ function buildCompanyCards(rawRows = [], sharedAddresses = {}) {
     });
 
     return Array.from(companiesByKey.values());
+}
+
+const CONTACT_FIELDS = [
+    { key: 'email', label: 'Email', icon: 'email' },
+    { key: 'telephone', label: 'Contact Number', icon: 'phone' },
+    { key: 'fax', label: 'Fax', icon: 'phone' },
+    { key: 'physical_address', label: 'Physical Address', icon: 'address' },
+    { key: 'mailing_address', label: 'Mailing Address', icon: 'address' }
+];
+
+function CompanyContactDetails({ contact }) {
+    const fields = CONTACT_FIELDS.filter((item) => isValidValue(contact?.[item.key]));
+
+    if (!fields.length) {
+        return null;
+    }
+
+    return (
+        <div className='mt-[16px] rounded-[14px] border border-[#e5e7eb] bg-[#fbfdff] px-[16px] py-[14px]'>
+            <p className='text-[9px] font-[700] uppercase tracking-[1px] text-[#94a3b8]'>
+                Company Details
+            </p>
+
+            <div className='mt-[12px] grid grid-cols-1 gap-[12px] sm:grid-cols-2'>
+                {fields.map((item) => (
+                    <div key={item.key} className='flex items-start gap-[10px]'>
+                        {getAssociationIcon(item.icon)}
+                        <div className='min-w-0'>
+                            <p className='text-[9px] font-[600] uppercase tracking-[0.8px] text-[#94a3b8]'>
+                                {item.label}
+                            </p>
+                            <p className='mt-[2px] break-words text-[12px] font-[500] text-[#334155]'>
+                                {contact[item.key]}
+                            </p>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
 }
 
 function CompanyAssociationsView({ dotNumber, data, physicalAddress, mailingAddress }) {
@@ -280,7 +331,7 @@ useEffect(() => {
 
         // Versioned: the cache has no expiry, so anyone who had already viewed
         // a carrier would otherwise keep the pre-change-log rows forever.
-        const cacheKey = `company_associations_v2_${dotNumber}`;
+        const cacheKey = `company_associations_v3_${dotNumber}`;
 
         // 1. Check localStorage first
         const cached = localStorage.getItem(cacheKey);
@@ -588,6 +639,8 @@ useEffect(() => {
                                     </h3>
                                 </div>
                             </div>
+
+                            <CompanyContactDetails contact={company.contact} />
 
                             <div className='mt-[16px] overflow-hidden rounded-[14px] border border-[#e5e7eb]'>
                                 <div className='hidden bg-[#f8fafc] px-[28px] py-[10px] sm:grid sm:grid-cols-12'>
