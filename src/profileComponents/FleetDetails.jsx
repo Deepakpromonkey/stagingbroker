@@ -82,6 +82,11 @@ function FleetDetails({ data }) {
             const currentLevelId = item.insp_level_id;
             const mappedClass = levelMapping[currentLevelId] || (currentLevelId ? `Level ${currentLevelId}` : '-');
 
+            // Year, make and model are decoded from the VIN by the API (NHTSA
+            // vPIC, cached server-side). The FMCSA feed itself carries neither
+            // a model nor a model year. Null until that VIN has been decoded.
+            const decoded = (item.vin ? item.vin_decoded : item.vin2_decoded) || {};
+
             return {
                 type:
     item.unit_type_desc?.toLowerCase() === 'truck tractor'
@@ -91,10 +96,10 @@ function FleetDetails({ data }) {
                 plate: item.unit_license || item.unit_license2 || '-',
                 class: mappedClass,
                 desc: item.unit_type_desc2 || '-',
-                year: item.insp_date || '-',
-                make: item.unit_make || item.unit_make2 || '-',
-                model: 'N/A',
-                lastSeen: 'N/A',
+                year: decoded.model_year || '-',
+                make: item.unit_make || item.unit_make2 || decoded.make || '-',
+                model: decoded.model || '-',
+                lastSeen: item.insp_date || '-',
                 category: item.unit_type_desc || '' ,
                 regState: item.report_state || '-',
                 
@@ -131,6 +136,19 @@ function FleetDetails({ data }) {
 
             if (sortField === 'year') {
 
+                const aYear = parseInt(aValue, 10);
+                const bYear = parseInt(bValue, 10);
+
+                const aSafe = isNaN(aYear) ? 0 : aYear;
+                const bSafe = isNaN(bYear) ? 0 : bYear;
+
+                return sortDirection === 'asc'
+                    ? aSafe - bSafe
+                    : bSafe - aSafe;
+            }
+
+            if (sortField === 'lastSeen') {
+
                 const aTime = new Date(aValue).getTime();
                 const bTime = new Date(bValue).getTime();
 
@@ -162,6 +180,48 @@ function FleetDetails({ data }) {
         // activeTrailer
     ]);
 
+    /*
+     * Average equipment age. Precomputed server-side over every distinct VIN
+     * the carrier has ever been inspected with — not just the inspections in
+     * this response, which are capped at the most recent 25. Null while the
+     * carrier's VINs are still working through the decode queue.
+     */
+    const defaultCards = useMemo(() => {
+        const fleetAge = fleet?.fleet_age || {};
+
+        const ageCard = (value, count) => ({
+            value: value != null ? Number(value).toFixed(1) : 'NA',
+            unit: value != null ? 'Years' : '',
+            subtitle: count
+                ? `Based on ${count} VIN${count === 1 ? '' : 's'}`
+                : 'Awaiting VIN decode',
+        });
+
+        const power = ageCard(fleetAge.avg_power_age, fleetAge.power_units);
+        const trailer = ageCard(fleetAge.avg_trailer_age, fleetAge.trailers);
+
+        return [
+            {
+                id: 1,
+                title: 'OBSERVED IN LAST 120 DAYS',
+                value: `${fleet?.observed_last_120_days?.percentage ?? 'NA'}%`,
+                type: 'blue'
+            },
+            {
+                id: 2,
+                title: 'AVG POWER AGE',
+                ...power,
+                type: 'orange'
+            },
+            {
+                id: 3,
+                title: 'AVG TRAILER AGE',
+                ...trailer,
+                type: 'purple'
+            },
+        ];
+    }, [fleet]);
+
     const totalPages = Math.ceil(filteredTableData.length / rowsPerPage);
 
     const paginatedData = filteredTableData.slice(
@@ -187,44 +247,7 @@ function FleetDetails({ data }) {
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-[14px] mt-5 sm:mt-[24px]">
-                    {(
-                    fleet?.topCards || [
-                        {
-                            id: 1,
-                            title: 'OBSERVED IN LAST 120 DAYS',
-                            value: `${fleet?.observed_last_120_days?.percentage ?? 'NA'}%`,
-                            type: 'blue'
-                        },
-                        {
-                            id: 2,
-                            title: 'AVG POWER AGE',
-                            value: 'TBC',
-                            unit: 'Years',
-                            type: 'orange'
-                        },
-                        {
-                            id: 3,
-                            title: 'AVG TRAILER AGE',
-                            value: 'TBC',
-                            unit: 'Years',
-                            type: 'purple'
-                        },
-                        // {
-                        //     id: 4,
-                        //     title: 'POWER CLASS 8',
-                        //     value: 'NA',
-                        //     subtitle: 'NA',
-                        //     type: 'dark'
-                        // },
-                        // {
-                        //     id: 5,
-                        //     title: 'TRAILER MIX',
-                        //     value: 'NA',
-                        //     subtitle: 'NA',
-                        //     type: 'green'
-                        // }
-                    ]
-                ).map((card) => {
+                    {(fleet?.topCards || defaultCards).map((card) => {
                         const theme = cardThemes[card.type] || cardThemes.blue;
 
                         return (
@@ -415,7 +438,7 @@ function FleetDetails({ data }) {
                                 {row.plate}
                             </td>
                             <td className="px-[18px] py-[14px] text-[11px] text-[#64748b] whitespace-nowrap">
-                                {row.years}
+                                {row.year}
                             </td>
                             <td className="px-[18px] py-[14px] text-[11px] text-[#475569] whitespace-nowrap">
                                 {row.make}
@@ -427,7 +450,7 @@ function FleetDetails({ data }) {
                                 {row.vin}
                             </td>
                             <td className="px-[18px] py-[14px] text-[11px] text-[#94a3b8] whitespace-nowrap">
-                                 {row.year}
+                                 {row.lastSeen}
                             </td>
                             <td className="px-[18px] py-[14px] text-[11px] text-[#111827] whitespace-nowrap">
                                 {row.class}
