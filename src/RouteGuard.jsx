@@ -19,7 +19,16 @@ const PLAN_STORAGE_KEY = "crm_plan_selected";
 // customer, and at that moment the subscription is still 'incomplete' — the
 // page's whole job is to confirm it — so gating it on being subscribed would
 // bounce every paying customer back to the pricing table.
-const PAYWALL_EXEMPT_PATHS = [SUBSCRIBE_PATH, "/billing/success", "/billing/plans"];
+//
+// /billing is exempt for the opposite reason: someone whose subscription has
+// lapsed or been cancelled is exactly who needs to read their invoices and
+// resubscribe, and the paywall would put the door on the inside.
+const PAYWALL_EXEMPT_PATHS = [
+  SUBSCRIBE_PATH,
+  "/billing",
+  "/billing/success",
+  "/billing/plans",
+];
 
 /*
 | Whether this account is allowed past the paywall.
@@ -97,6 +106,14 @@ const ROUTE_PERMISSIONS = [
   {
     match: (pathname) => pathname.startsWith("/profile/scoring-weights"),
     permission: "edit-scoring-config",
+  },
+  {
+    // The API gates every /billing endpoint on this permission, so without it
+    // the page would load and then fail every request it makes. Excludes
+    // /billing/success, which is the checkout return and is reached by whoever
+    // just paid.
+    match: (pathname) => pathname === "/billing",
+    permission: "edit-company-profile-billing",
   },
 ];
 

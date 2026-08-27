@@ -27,6 +27,7 @@ import BlockOutlined from '@mui/icons-material/BlockOutlined';
 import SettingsOutlined from '@mui/icons-material/SettingsOutlined';
 import DescriptionOutlined from '@mui/icons-material/DescriptionOutlined';
 import Group from '@mui/icons-material/Group';
+import CreditCardOutlined from '@mui/icons-material/CreditCardOutlined';
 import MenuIcon from '@mui/icons-material/Menu';
 import CloseIcon from '@mui/icons-material/Close';
 
@@ -56,7 +57,18 @@ const NAV_LINKS = [
 // or via RouteGuard's plan-selection redirect) and isn't shown as part of
 // the app header/nav — that page renders full-page with the header hidden
 // (see App.jsx's NO_HEADER_PATHS), so there's no header link to it.
+//
+// /billing is different: it's the ongoing screen for the plan, the invoices
+// and the spend report, so it does belong in this menu — behind the same
+// permission the API gates the billing endpoints on.
 const PROFILE_LINKS = [
+    {
+        key: 'billing',
+        label: 'Billing & Plan',
+        icon: <CreditCardOutlined sx={{ fontSize: 18 }} />,
+        to: '/billing',
+        permission: 'edit-company-profile-billing',
+    },
     { key: 'profile_page', label: 'Profile', icon: <AssignmentIndOutlinedIcon sx={{ fontSize: 18 }} />, to: '/profile' },
     { key: 'profile_shortlisting', label: 'Carriers Shortlisted', icon: <Checklist sx={{ fontSize: 18 }} />, to: '/profile/carriers/shortlisted' },
     { key: 'profile_blocked', label: 'Carriers Blocked', icon: <BlockOutlined sx={{ fontSize: 18 }} />, to: '/profile/carriers/blocked' },

@@ -19,6 +19,7 @@ import ControlTowerShipment from './pages/app/control_tower/ControlTowerShipment
 
 import Subscription from './pages/app/subscription/Subscription'
 import BillingSuccess from './pages/app/subscription/BillingSuccess'
+import Billing from './pages/app/billing/Billing'
 
 import AppHeader from './components/AppHeader';
 import RouteGuard from './RouteGuard'
@@ -108,6 +109,11 @@ function AppShell() {
               cancelling just returns to the pricing table. */}
           <Route path="/billing/success" element={<BillingSuccess />} />
           <Route path="/billing/plans" element={<Navigate to="/subscribe" replace />} />
+
+          {/* Billing: plan, invoices and spend. Also the API's
+              portal_return_path, so this is where Stripe's hosted portal
+              hands the customer back. */}
+          <Route path="/billing" element={<Billing />} />
 
           <Route path="/carrier-questions" element={<CarrierQuestions />} />
 
