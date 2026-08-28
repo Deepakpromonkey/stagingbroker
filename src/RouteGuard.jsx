@@ -4,7 +4,10 @@ import { toast } from "./components/ui/Toaster";
 import { apiFetch } from "./lib/api";
 
 const LOGIN_PATH = "/";
-const PUBLIC_PATHS = [LOGIN_PATH, "/signup", "/guest-pay"];
+// /accept-invitation is reached from the team invitation email by someone
+// who has no session yet — the 64-character token in the query string is what
+// authorises them, not a login.
+const PUBLIC_PATHS = [LOGIN_PATH, "/signup", "/guest-pay", "/accept-invitation"];
 const AUTH_USER_KEY = "crm_user";
 
 // Where the user picks a subscription plan, and the localStorage key

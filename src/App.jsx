@@ -33,6 +33,8 @@ import CarrierSettings from './pages/app/carrier-settings/CarrierSettings'
 import CarrierQuestions from './pages/app/carrier-questions/CarrierQuestion'
 import ScoringWeights from './pages/app/scoringweight/ScoringWeight'
 
+import AcceptInvitation from './pages/auth/AcceptInvitation'
+
 import CarrierOnboard from './pages/app/connect'
 import CarrierNoData from './pages/app/connect/CarrierNoData'
 import EmailApproval from './pages/app/connect/EmailApproval'
@@ -63,7 +65,7 @@ import DtPayGuestPay from './pages/app/DtPayGuestPay';
 // /subscribe is one of these: it's shown as a forced, standalone step
 // (right after signup, or when RouteGuard redirects here for not having
 // a plan yet) and shouldn't look like a page nested inside the app shell.
-const NO_HEADER_PATHS = ['/subscribe'];
+const NO_HEADER_PATHS = ['/subscribe', '/accept-invitation'];
 
 // Needs to live inside <BrowserRouter> so it can call useLocation() —
 // App() itself renders BrowserRouter, so it isn't inside the router
@@ -85,6 +87,10 @@ function AppShell() {
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+
+          {/* Public — opened from the team invitation email by someone who has
+              no account yet. Authorised by the token in the query string. */}
+          <Route path="/accept-invitation" element={<AcceptInvitation />} />
 
           {/* Carrier onboarding. Public — reached from the invitation email,
               by a carrier who has no account here. Authorised by the token in
