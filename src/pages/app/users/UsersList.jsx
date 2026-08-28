@@ -12,13 +12,15 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import PersonAddAlt1Icon from "@mui/icons-material/PersonAddAlt1";
-import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import CloseIcon from "@mui/icons-material/Close";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutlined";
 import MailOutlineIcon from "@mui/icons-material/MailOutlined";
 import PhoneIphoneIcon from "@mui/icons-material/PhoneIphone";
-import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutlined";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
+import ForwardToInboxIcon from "@mui/icons-material/ForwardToInbox";
+import WarningAmberOutlinedIcon from "@mui/icons-material/WarningAmberOutlined";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import PeopleOutlineIcon from "@mui/icons-material/PeopleOutlined";
 import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
@@ -32,6 +34,7 @@ import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
 import Autocomplete from "@mui/material/Autocomplete";
 import Avatar from "@mui/material/Avatar";
+import Tooltip from "@mui/material/Tooltip";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import InputAdornment from "@mui/material/InputAdornment";
@@ -41,10 +44,11 @@ import { apiFetch } from "../../../lib/api";
 import { toast } from "../../../components/ui/Toaster";
 
 const USERS_ENDPOINT = "/users";
-const USER_SAVE_ENDPOINT = "/users/save";
-const USER_SINGLE_ENDPOINT = "/users/single";
 const USER_INVITE_ENDPOINT = "/invitations";
 const ROLES_ENDPOINT = "/roles";
+
+const userEndpoint = (uuid) => `/users/${encodeURIComponent(uuid)}`;
+const resendInviteEndpoint = (uuid) => `${userEndpoint(uuid)}/resend-invitation`;
 
 const AUTH_USER_KEY = "crm_user";
 
@@ -217,7 +221,7 @@ function roleToDisplayName(role) {
 }
 
 // ---------------------------------------------------------------------------
-// Shared roles hook — both AddEditUserForm and InviteUserForm read from here.
+// Shared roles hook — both EditUserForm and InviteUserForm read from here.
 //
 // GET /roles ->
 // { data: { roles: [ { id, slug, name, ... } ], assignable_slugs: [...] } }
@@ -289,6 +293,14 @@ const mapped = records.map((u) => ({
   phone: u.phone,
   role_names: roleToDisplayName(u.role),
   role_id: u.role?.id,
+
+  // The company creator. Their seat is fixed and their account cannot be
+  // removed, so the row actions have to know.
+  is_owner: !!u.is_owner,
+
+  // Still on the temporary password from their invitation email, which
+  // means the invite is the thing worth resending.
+  must_change_password: !!u.must_change_password,
 }));
         setRows(mapped);
         setTotal(Number(res?.data?.pagination?.total ?? mapped.length) || 0);
@@ -368,74 +380,55 @@ function ModalHeader({ icon, title, subtitle, onClose }) {
 }
 
 // ---------------------------------------------------------------------------
-// Add / Edit / View User modal
+// Edit User modal
 //
-// `readOnly` puts the form into a view-only mode: every field is disabled,
-// the password field is hidden entirely (there's nothing meaningful to show
-// there), and the footer only has a "Close" button — no save action, no
-// submit handler runs.
+// Changes a teammate's seat and contact details via PUT /users/{uuid}.
+//
+// Prefilled straight from the row the table already has, so opening it makes
+// no network call. Email is shown but not editable — it is the login
+// identifier, and changing it is a different job from re-seating someone.
+//
+// Only the fields that actually changed are sent. The role in particular is
+// omitted when untouched, because re-sending it would sign the person out
+// (a seat change invalidates their tokens) for no reason.
 // ---------------------------------------------------------------------------
-function AddEditUserForm({ open, onClose, rowId, roles, usersOf, onSuccess }) {
-  const isEdit = !!rowId;
+function EditUserForm({ open, onClose, user, roles, onSuccess }) {
   const [submitError, setSubmitError] = useState("");
-  const [loadingUser, setLoadingUser] = useState(false);
 
-const {
-  register,
- handleSubmit,
-  control,
-  watch,
-  reset,
-  formState: { errors, isSubmitting },
-} = useForm({
-  
+  const {
+    register,
+    handleSubmit,
+    control,
+    watch,
+    reset,
+    formState: { errors, isSubmitting, dirtyFields },
+  } = useForm({
     mode: "onTouched",
     defaultValues: {
       first_name: "",
       last_name: "",
       email: "",
       phone: "",
-      password: "",
       roles: null,
     },
   });
-const selectedRole = watch("roles");
+
+  const selectedRole = watch("roles");
+  // `roles` arrives asynchronously, so this re-runs once the list lands and
+  // the seat the user currently holds can be matched to an option.
   useEffect(() => {
-    if (!open) return;
+    if (!open || !user) return;
 
     setSubmitError("");
 
-    if (!isEdit) {
-      reset({ first_name: "", last_name: "", email: "", phone: "", password: "", roles: null });
-      return;
-    }
-
-    setLoadingUser(true);
-    apiFetch(`${USER_SINGLE_ENDPOINT}?row_id=${encodeURIComponent(rowId)}`)
-      .then((res) => {
-        if (res && res.status && res.data) {
-          const u = res.data;
-
-          const matchedRole =
-            typeof u.role === "object" && u.role !== null
-              ? roles.find((r) => r.key === u.role.id) || null
-              : roles.find((r) => r.value === u.role) || null;
-
-          reset({
-            first_name: u.first_name || "",
-            last_name: u.last_name || "",
-            email: u.email || "",
-            phone: u.phone || "",
-            password: "",
-            roles: matchedRole,
-          });
-        }
-      })
-      .catch(() => {
-        setSubmitError("Could not load user details.");
-      })
-      .finally(() => setLoadingUser(false));
-  }, [open, isEdit, rowId, roles, reset]);
+    reset({
+      first_name: user.first_name || "",
+      last_name: user.last_name || "",
+      email: user.email || "",
+      phone: user.phone || "",
+      roles: roles.find((r) => r.key === user.role_id) || null,
+    });
+  }, [open, user, roles, reset]);
 
   const handleClose = () => {
     reset();
@@ -444,28 +437,33 @@ const selectedRole = watch("roles");
   };
 
   const onSubmit = async (data) => {
-    const payload = {
-      users_of: usersOf,
-      first_name: data.first_name,
-      last_name: data.last_name,
-      email: data.email,
-      phone: data.phone,
-      roles: data.roles?.key ?? "",
-    };
+    const payload = {};
 
-    if (isEdit) payload.row_id = rowId;
-    if (data.password) payload.password = data.password;
+    // Every field on this form is `sometimes` on the API side, so sending
+    // only what moved keeps the request honest about what is being changed.
+    if (dirtyFields.first_name) payload.first_name = data.first_name;
+    if (dirtyFields.last_name) payload.last_name = data.last_name || null;
+    if (dirtyFields.phone) payload.phone = data.phone || null;
+
+    if (data.roles?.key && data.roles.key !== user?.role_id) {
+      payload.role_id = data.roles.key;
+    }
+
+    if (Object.keys(payload).length === 0) {
+      handleClose();
+      return;
+    }
 
     try {
-      const res = await apiFetch(USER_SAVE_ENDPOINT, {
-        method: "POST",
+      const res = await apiFetch(userEndpoint(user.row_id), {
+        method: "PUT",
         body: JSON.stringify(payload),
       });
 
       if (res && res.status) {
         setSubmitError("");
         reset();
-        onSuccess();
+        onSuccess(!!payload.role_id);
       } else {
         setSubmitError((res && res.message) || "Could not save user.");
       }
@@ -477,20 +475,14 @@ const selectedRole = watch("roles");
   return (
     <Dialog open={open} maxWidth="sm" fullWidth onClose={handleClose} slotProps={{ paper: { sx: dialogPaperSx } }}>
       <ModalHeader
-        icon={<PersonAddIcon fontSize="small" />}
-        title={isEdit ? "Edit user" : "Add a new user"}
-        subtitle={isEdit ? "Update this teammate's details and access." : "Create an account for a new teammate."}
+        icon={<EditOutlinedIcon fontSize="small" />}
+        title="Edit user"
+        subtitle="Update this teammate's details and access."
         onClose={handleClose}
       />
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
         <DialogContent sx={{ px: { xs: 2.5, sm: 4 }, py: { xs: 2.5, sm: 3.5 }, backgroundColor: "#f8fafc", maxHeight: "64vh", overflowY: "auto" }}>
-          {loadingUser ? (
-            <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
-              <CircularProgress size={22} sx={{ color: BRAND }} />
-            </Box>
-          ) : (
-            <>
               <Box sx={{ ...cardSx, mb: 2.5 }}>
                 <SectionLabel icon={<BadgeOutlinedIcon sx={{ fontSize: 16 }} />} text="PERSONAL DETAILS" />
 
@@ -534,13 +526,13 @@ const selectedRole = watch("roles");
                   />
 
                   <TextField
-                    label={<RequiredLabel text="Email" />}
+                    label="Email"
                     type="email"
                     fullWidth
                     size="small"
+                    disabled
                     sx={fieldSx}
-                    error={!!errors.email}
-                    helperText={errors.email?.message || " "}
+                    helperText="Sign-in email can't be changed here"
                     slotProps={{
                       input: {
                         startAdornment: (
@@ -550,10 +542,7 @@ const selectedRole = watch("roles");
                         ),
                       },
                     }}
-                    {...register("email", {
-                      required: "Email is required",
-                      pattern: { value: EMAIL_PATTERN, message: "Enter a valid email address" },
-                    })}
+                    {...register("email")}
                   />
 
 <TextField
@@ -583,28 +572,6 @@ const selectedRole = watch("roles");
   })}
 />
 
-                  <TextField
-                    label={isEdit ? "New password (optional)" : <RequiredLabel text="Password" />}
-                    type="password"
-                    fullWidth
-                    size="small"
-                    sx={{ ...fieldSx, gridColumn: "1 / -1" }}
-                    error={!!errors.password}
-                    helperText={errors.password?.message || (isEdit ? "Leave blank to keep the current password" : " ")}
-                    slotProps={{
-                      input: {
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <LockOutlinedIcon sx={adornmentIconSx} />
-                          </InputAdornment>
-                        ),
-                      },
-                    }}
-                    {...register("password", {
-                      required: isEdit ? false : "Password is required",
-                      minLength: { value: 6, message: "At least 6 characters" },
-                    })}
-                  />
                 </Box>
               </Box>
 
@@ -694,8 +661,6 @@ const selectedRole = watch("roles");
                   <Typography sx={{ fontSize: "13px", color: "#b91c1c" }}>{submitError}</Typography>
                 </Box>
               )}
-            </>
-          )}
         </DialogContent>
 
         <DialogActions sx={{ px: { xs: 2.5, sm: 4 }, py: 2.5, borderTop: `1px solid ${BORDER}`, backgroundColor: "#ffffff" }}>
@@ -706,14 +671,113 @@ const selectedRole = watch("roles");
           <Button
             type="submit"
             variant="contained"
-            disabled={isSubmitting || loadingUser}
+            disabled={isSubmitting}
             startIcon={isSubmitting ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : null}
             sx={submitButtonSx}
           >
-            {isSubmitting ? "Saving…" : isEdit ? "Save changes" : "Add user"}
+            {isSubmitting ? "Saving…" : "Save changes"}
           </Button>
         </DialogActions>
       </form>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Delete User confirmation
+//
+// Deleting is not reversible from this screen, so it asks first and names the
+// person being removed rather than showing a generic "Are you sure?".
+//
+// The account is soft-deleted server side: the person loses access straight
+// away, but the loads they booked and the payments they released keep
+// pointing at a real record.
+// ---------------------------------------------------------------------------
+function DeleteUserDialog({ open, user, onClose, onDeleted }) {
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const fullName = [user?.first_name, user?.last_name].filter(Boolean).join(" ") || user?.email || "this user";
+
+  // Clearing here rather than on open means a dialog dismissed after a failed
+  // attempt does not come back still showing the old error.
+  const handleClose = () => {
+    setError("");
+    onClose();
+  };
+
+  const handleDelete = () => {
+    setSubmitting(true);
+    setError("");
+
+    apiFetch(userEndpoint(user.row_id), { method: "DELETE" })
+      .then(() => {
+        onDeleted(fullName);
+      })
+      .catch((err) => {
+        setError(err?.message || "Could not delete this user.");
+      })
+      .finally(() => setSubmitting(false));
+  };
+
+  return (
+    <Dialog
+      open={open}
+      maxWidth="xs"
+      fullWidth
+      onClose={submitting ? undefined : handleClose}
+      slotProps={{ paper: { sx: dialogPaperSx } }}
+    >
+      <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2, px: { xs: 2.5, sm: 3.5 }, pt: 3.5, pb: 2.5, borderBottom: `1px solid ${BORDER}` }}>
+        <Avatar sx={{ backgroundColor: "#fef2f2", color: "#dc2626", width: 44, height: 44 }}>
+          <WarningAmberOutlinedIcon fontSize="small" />
+        </Avatar>
+
+        <Box sx={{ minWidth: 0 }}>
+          <Typography sx={{ fontSize: "17px", fontWeight: 800, color: INK, lineHeight: 1.3 }}>
+            Remove {fullName}?
+          </Typography>
+          <Typography sx={{ fontSize: "13px", color: SUBTLE, mt: 0.5, lineHeight: 1.6 }}>
+            They'll be signed out immediately and lose access to this account. Work
+            they've already done — loads, carriers, payments — stays exactly as it is.
+          </Typography>
+        </Box>
+      </Box>
+
+      <DialogContent sx={{ px: { xs: 2.5, sm: 3.5 }, py: 2.5, backgroundColor: "#f8fafc" }}>
+        <Box sx={{ ...cardSx, p: 2 }}>
+          <DetailRow icon={<MailOutlineIcon sx={{ fontSize: 17 }} />} label="Email" value={user?.email} />
+          <Box sx={{ borderTop: `1px solid ${BORDER}` }} />
+          <DetailRow icon={<ShieldOutlinedIcon sx={{ fontSize: 17 }} />} label="Role" value={user?.role_names} />
+        </Box>
+
+        {error && (
+          <Box sx={{ mt: 2, display: "flex", alignItems: "center", gap: 1, px: 1.5, py: 1, borderRadius: "10px", backgroundColor: "#fef2f2", border: "1px solid #fecaca" }}>
+            <ErrorOutlineIcon sx={{ fontSize: "18px", color: "#dc2626" }} />
+            <Typography sx={{ fontSize: "13px", color: "#b91c1c" }}>{error}</Typography>
+          </Box>
+        )}
+      </DialogContent>
+
+      <DialogActions sx={{ px: { xs: 2.5, sm: 3.5 }, py: 2.5, borderTop: `1px solid ${BORDER}`, backgroundColor: "#ffffff" }}>
+        <Button onClick={handleClose} disabled={submitting} sx={cancelButtonSx}>
+          Cancel
+        </Button>
+
+        <Button
+          variant="contained"
+          onClick={handleDelete}
+          disabled={submitting}
+          startIcon={submitting ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : <DeleteOutlineIcon sx={{ fontSize: 17 }} />}
+          sx={{
+            ...submitButtonSx,
+            background: "#dc2626",
+            "&:hover": { background: "#dc2626", opacity: 0.9, boxShadow: "none" },
+          }}
+        >
+          {submitting ? "Removing…" : "Remove user"}
+        </Button>
+      </DialogActions>
     </Dialog>
   );
 }
@@ -1127,6 +1191,7 @@ const columnHelper = createColumnHelper();
 export default function UsersList() {
   const currentUser = useMemo(() => getCurrentUser(), []);
   const usersOf = currentUser?.row_id ?? currentUser?.id ?? null;
+  const currentUserUuid = currentUser?.uuid ?? null;
 
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(10);
@@ -1134,11 +1199,37 @@ export default function UsersList() {
 
   const [viewData, setViewData] = useState(null);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [editUser, setEditUser] = useState(null);
+  const [deleteUser, setDeleteUser] = useState(null);
+
+  // uuid of the row whose invite is currently being resent, so only that
+  // row's button shows a spinner.
+  const [resendingUuid, setResendingUuid] = useState(null);
 
   const { roles } = useRoles();
   const { rows, total, loading } = useUsers(pageIndex, pageSize, reloadKey);
 
   const triggerReload = useCallback(() => setReloadKey((k) => k + 1), []);
+
+  const handleResendInvite = useCallback((row) => {
+    setResendingUuid(row.row_id);
+
+    apiFetch(resendInviteEndpoint(row.row_id), { method: "POST" })
+      .then(() => {
+        toast.success({
+          title: "Invitation resent",
+          message: `A fresh invitation is on its way to ${row.email}.`,
+          duration: 4000,
+        });
+      })
+      .catch((err) => {
+        toast.error({
+          title: "Could not resend",
+          message: err?.message || "Please try again in a moment.",
+        });
+      })
+      .finally(() => setResendingUuid(null));
+  }, []);
 
   const columns = useMemo(
     () => [
@@ -1165,19 +1256,79 @@ export default function UsersList() {
       columnHelper.display({
         id: "actions",
         header: "Actions",
-        cell: (info) => (
-          <button
-            type="button"
-            className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-blue-800 bg-transparent border-0 cursor-pointer"
-            onClick={() => setViewData(info.row.original)}
-          >
-            View
-            <ArrowForwardIcon sx={{ fontSize: "13px" }} />
-          </button>
-        ),
+        cell: (info) => {
+          const row = info.row.original;
+
+          // The company owner's seat is fixed and their account cannot be
+          // removed; you cannot re-seat or remove yourself either. Rather
+          // than show buttons that always fail, leave them out.
+          const isSelf = !!currentUserUuid && row.row_id === currentUserUuid;
+          const locked = row.is_owner || isSelf;
+
+          // Only worth offering while they are still on the temporary
+          // password from the invite — once they've set their own, the
+          // invitation is spent and they want a password reset instead.
+          const canResend = !locked && row.must_change_password;
+
+          const resending = resendingUuid === row.row_id;
+
+          return (
+            <div className="flex items-center gap-0.5">
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-blue-800 bg-transparent border-0 cursor-pointer pr-1"
+                onClick={() => setViewData(row)}
+              >
+                View
+                <ArrowForwardIcon sx={{ fontSize: "13px" }} />
+              </button>
+
+              {canResend && (
+                <Tooltip title="Resend invitation email">
+                  <span>
+                    <IconButton
+                      size="small"
+                      disabled={resending}
+                      onClick={() => handleResendInvite(row)}
+                      sx={{ color: SUBTLE, "&:hover": { color: BRAND, backgroundColor: BRAND_SOFT } }}
+                    >
+                      {resending
+                        ? <CircularProgress size={15} sx={{ color: SUBTLE }} />
+                        : <ForwardToInboxIcon sx={{ fontSize: 18 }} />}
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              )}
+
+              {!locked && (
+                <Tooltip title="Edit details & role">
+                  <IconButton
+                    size="small"
+                    onClick={() => setEditUser(row)}
+                    sx={{ color: SUBTLE, "&:hover": { color: BRAND, backgroundColor: BRAND_SOFT } }}
+                  >
+                    <EditOutlinedIcon sx={{ fontSize: 18 }} />
+                  </IconButton>
+                </Tooltip>
+              )}
+
+              {!locked && (
+                <Tooltip title="Remove user">
+                  <IconButton
+                    size="small"
+                    onClick={() => setDeleteUser(row)}
+                    sx={{ color: SUBTLE, "&:hover": { color: "#dc2626", backgroundColor: "#fef2f2" } }}
+                  >
+                    <DeleteOutlineIcon sx={{ fontSize: 18 }} />
+                  </IconButton>
+                </Tooltip>
+              )}
+            </div>
+          );
+        },
       }),
     ],
-    []
+    [currentUserUuid, resendingUuid, handleResendInvite]
   );
 
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
@@ -1327,6 +1478,47 @@ export default function UsersList() {
           setInviteOpen(false);
           triggerReload();
           toast.success({ title: "Invite sent", message: "Invitation sent successfully.", duration: 3000 });
+        }}
+      />
+
+      <EditUserForm
+        open={!!editUser}
+        user={editUser}
+        roles={roles}
+        onClose={() => setEditUser(null)}
+        onSuccess={(roleChanged) => {
+          setEditUser(null);
+          triggerReload();
+          toast.success({
+            title: "User updated",
+            message: roleChanged
+              ? "Their role has been changed. They'll need to sign in again."
+              : "Their details have been updated.",
+            duration: 4000,
+          });
+        }}
+      />
+
+      <DeleteUserDialog
+        open={!!deleteUser}
+        user={deleteUser}
+        onClose={() => setDeleteUser(null)}
+        onDeleted={(name) => {
+          setDeleteUser(null);
+
+          // Removing the only row on a page would otherwise leave you
+          // staring at an empty table on a page that no longer exists.
+          if (rows.length === 1 && pageIndex > 0) {
+            setPageIndex((p) => p - 1);
+          } else {
+            triggerReload();
+          }
+
+          toast.success({
+            title: "User removed",
+            message: `${name} no longer has access to this account.`,
+            duration: 4000,
+          });
         }}
       />
     </div>
