@@ -11,6 +11,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Badge from "@mui/icons-material/Badge";
 import DoneAll from "@mui/icons-material/DoneAll";
 import AccountBalance from "@mui/icons-material/AccountBalance";
+import SensorsOutlined from "@mui/icons-material/SensorsOutlined";
 import Edit from "@mui/icons-material/Edit";
 import Upload from "@mui/icons-material/Upload";
 import HeadsetMic from "@mui/icons-material/HeadsetMic";
@@ -33,18 +34,20 @@ const steps = [
   { id: 1, label: "CARRIER DETAILS" },
   { id: 2, label: "GOVERNMENT ID" },
   { id: 3, label: "BANK & FACTORING" },
-  { id: 4, label: "BROKER QUESTIONS" },
-  { id: 5, label: "DOCUMENTS" },
-  { id: 6, label: "E-SIGN & SUBMIT" },
+  { id: 4, label: "ELD CONNECTION" },
+  { id: 5, label: "BROKER QUESTIONS" },
+  { id: 6, label: "DOCUMENTS" },
+  { id: 7, label: "E-SIGN & SUBMIT" },
 ];
 
 const stepTitles = {
   1: "Carrier Details",
   2: "Government ID",
   3: "Bank Verification",
-  4: "Broker Questions",
-  5: "Compliance Documents",
-  6: "E-Sign",
+  4: "ELD Connection",
+  5: "Broker Questions",
+  6: "Compliance Documents",
+  7: "E-Sign",
 };
 
 /**
@@ -117,6 +120,16 @@ export default function OnboardPage() {
   const isBankSettled =
     (connectRequest?.bank_settled ?? (isBankVerified || isBankSkipped)) ||
     (usesFactoring && isFactoringAnswered);
+  const isEldConnected = !!connectRequest?.eld_connected;
+  const isEldSkipped = !!connectRequest?.eld_skipped;
+
+  const isEldSettled =
+    connectRequest?.eld_settled ?? (isEldConnected || isEldSkipped);
+
+  // Provider name, sync state and fleet counts, present only once the API has
+  // the connection loaded. Absent while the carrier has not linked anything.
+  const eld = connectRequest?.eld ?? null;
+
   const isQuestionnaireDone = !!connectRequest?.questionnaire_completed;
   const isDocumentsDone = !!connectRequest?.documents_completed;
 
@@ -200,11 +213,18 @@ export default function OnboardPage() {
         (request?.bank_verified || request?.bank_skipped)) ||
       !!request?.factoring?.uses_factoring_company;
 
+    // Same reasoning as the other two: a carrier who declined an ELD, or whose
+    // provider Terminal cannot reach, must not be walked back to it forever.
+    const eldSettled =
+      request?.eld_settled ??
+      (request?.eld_connected || request?.eld_skipped);
+
     if (!idSettled) return 2;
     if (!bankSettled || !request?.factoring_answered) return 3;
-    if (!request?.questionnaire_completed) return 4;
-    if (!request?.documents_completed) return 5;
-    return 6;
+    if (!eldSettled) return 4;
+    if (!request?.questionnaire_completed) return 5;
+    if (!request?.documents_completed) return 6;
+    return 7;
   };
 
   const applyRequest = useCallback((request, { resume = false } = {}) => {
@@ -312,7 +332,7 @@ export default function OnboardPage() {
   const agreementRefetched = useRef(false);
 
   useEffect(() => {
-    if (initing || currentStep !== 6 || agreementUrl) return;
+    if (initing || currentStep !== 7 || agreementUrl) return;
     if (agreementRefetched.current) return;
 
     agreementRefetched.current = true;
@@ -342,7 +362,7 @@ export default function OnboardPage() {
 
   // Pull the broker's questions once, when the carrier first reaches step 4.
   useEffect(() => {
-    if (initing || currentStep !== 4 || questions.length > 0) return;
+    if (initing || currentStep !== 5 || questions.length > 0) return;
 
     apiFetch("/carrier-connect/questions", {
       method: "POST",
@@ -371,6 +391,12 @@ export default function OnboardPage() {
     const next = new URLSearchParams(searchParams);
     next.delete("verificationSessionId");
     next.delete("stripeConnect");
+
+    // Terminal Link appends its own three on the way back.
+    next.delete("eld");
+    next.delete("result");
+    next.delete("token");
+    next.delete("state");
     setSearchParams(next, { replace: true });
   };
 
@@ -433,7 +459,9 @@ export default function OnboardPage() {
       });
 
       applyRequest(res.data);
-      setCurrentStep(step === "identity" ? 3 : 4);
+
+      // Each skip lands on the step after the one declined.
+      setCurrentStep({ identity: 3, bank: 4, eld: 5 }[step] ?? 4);
     } catch (err) {
       setErrorMessage(err?.message || "Could not skip this step.");
     } finally {
@@ -476,6 +504,57 @@ export default function OnboardPage() {
       setErrorMessage(err?.message || "Your bank details are incomplete.");
     } finally {
       setCurrentStep(3);
+      setBusy(false);
+      clearReturnFlag();
+    }
+  };
+
+  // ── Step 4: ELD ──────────────────────────────────────────────────────────
+
+  const connectEld = async () => {
+    setBusy(true);
+
+    try {
+      const res = await apiFetch("/carrier-connect/eld/connect", {
+        method: "POST",
+        skipAuth: true,
+        body: JSON.stringify({ token }),
+      });
+
+      window.location.href = res.data.url;
+    } catch (err) {
+      setBusy(false);
+      setErrorMessage(err?.message || "Could not open the ELD connection page.");
+    }
+  };
+
+  /**
+   * Finish the connection the carrier just made at Terminal.
+   *
+   * Terminal appends `result`, `token` and `state` to the return URL. The
+   * public token is single-use and worthless without the state, which the API
+   * checks against what it stored when the link was opened.
+   */
+  const verifyEld = async (publicToken, state) => {
+    setBusy(true);
+
+    try {
+      const res = await apiFetch("/carrier-connect/eld/verify", {
+        method: "POST",
+        skipAuth: true,
+        body: JSON.stringify({
+          token,
+          public_token: publicToken,
+          state,
+        }),
+      });
+
+      applyRequest(res.data);
+      setSuccessMessage(res.message || "ELD connected.");
+    } catch (err) {
+      setErrorMessage(err?.message || "Could not finish connecting your ELD.");
+    } finally {
+      setCurrentStep(4);
       setBusy(false);
       clearReturnFlag();
     }
@@ -598,7 +677,7 @@ export default function OnboardPage() {
 
   const submitAnswers = async () => {
     if (questions.length === 0) {
-      setCurrentStep(5);
+      setCurrentStep(6);
       return;
     }
 
@@ -630,7 +709,7 @@ export default function OnboardPage() {
       });
 
       applyRequest(res.data);
-      setCurrentStep(5);
+      setCurrentStep(6);
       setSuccessMessage(res.message || "Answers saved.");
     } catch (err) {
       // The API reports which question failed, so surface it inline rather than
@@ -759,6 +838,18 @@ export default function OnboardPage() {
 
     if (searchParams.get("stripeConnect")) {
       verifyBank();
+      return;
+    }
+
+    if (searchParams.get("eld")) {
+      // "exit" means they closed Terminal without linking anything. Nothing to
+      // verify, and nothing went wrong — just drop them back on the step.
+      if (searchParams.get("result") === "success") {
+        verifyEld(searchParams.get("token"), searchParams.get("state"));
+      } else {
+        setCurrentStep(4);
+        clearReturnFlag();
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initing]);
@@ -846,11 +937,23 @@ export default function OnboardPage() {
     }
 
     if (currentStep === 4) {
-      submitAnswers();
+      if (!isEldSettled) {
+        setErrorMessage(
+          "Please connect your ELD, or skip this step to continue.",
+        );
+        return;
+      }
+
+      setCurrentStep(5);
       return;
     }
 
     if (currentStep === 5) {
+      submitAnswers();
+      return;
+    }
+
+    if (currentStep === 6) {
       if (!isDocumentsDone) {
         setErrorMessage(
           "Please upload both your W-9 and your certificate of insurance.",
@@ -858,7 +961,7 @@ export default function OnboardPage() {
         return;
       }
 
-      setCurrentStep(6);
+      setCurrentStep(7);
     }
   };
 
@@ -993,7 +1096,7 @@ export default function OnboardPage() {
       ) : (
         <div
           className={`flex w-full flex-col ${
-            currentStep === 6 ? "max-w-6xl" : "max-w-3xl"
+            currentStep === 7 ? "max-w-6xl" : "max-w-3xl"
           }`}
         >
           {/* Step 1 — carrier details + phone */}
@@ -1352,8 +1455,91 @@ export default function OnboardPage() {
             </div>
           )}
 
-          {/* Step 4 — the broker's questions */}
+          {/* Step 4 — ELD / telematics, connected through Terminal */}
           {currentStep === 4 && (
+            <div className="mb-8 flex w-full flex-col items-center">
+              <p className="mb-6 max-w-xl text-center text-sm text-[#4B5563]">
+                Connect your ELD so {broker?.company_name || "this broker"} can
+                see your hours of service and vehicle locations without asking
+                you for them load by load.
+              </p>
+
+              <div className="flex w-full flex-col items-center">
+                <label className="mb-3 text-xs font-bold tracking-wider text-[#9CA3AF] uppercase">
+                  Connect your ELD provider
+                </label>
+
+                <div
+                  className={`group flex min-h-[180px] w-full max-w-xl cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed transition-all ${
+                    isEldConnected
+                      ? "border-green-300 bg-green-50"
+                      : isEldSkipped
+                        ? "border-gray-300 bg-gray-50"
+                        : "border-gray-300 bg-[#FAFBFD] hover:border-blue-500"
+                  }`}
+                  onClick={() => !isEldConnected && connectEld()}
+                >
+                  <SensorsOutlined
+                    style={{ fontSize: 80 }}
+                    className={
+                      isEldConnected
+                        ? "text-green-700 opacity-20"
+                        : "text-blue-100 group-hover:text-blue-200"
+                    }
+                  />
+
+                  {isEldConnected ? (
+                    <div className="flex flex-col items-center gap-1">
+                      <div className="flex items-center gap-2">
+                        <DoneAll className="text-green-600" />
+                        <span className="text-xl font-bold text-green-600">
+                          {eld?.provider ? `${eld.provider} connected` : "Connected"}
+                        </span>
+                      </div>
+
+                      {/*
+                        The fleet arrives on a queue, so the carrier reaches the
+                        next step while it is still importing. Saying so beats a
+                        tick next to an empty fleet.
+                      */}
+                      <span className="text-xs text-[#6B7280]">
+                        {eld?.sync_status === "completed"
+                          ? `${eld?.vehicles ?? 0} vehicles, ${eld?.drivers ?? 0} drivers`
+                          : "Importing your fleet — this continues in the background."}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-md font-bold text-blue-200 uppercase group-hover:text-blue-300">
+                      {isEldSkipped
+                        ? "Skipped — click to connect"
+                        : "Click to start"}
+                    </span>
+                  )}
+                </div>
+
+                <p className="mt-3 max-w-xl text-center text-xs text-[#9CA3AF]">
+                  You sign in with your ELD provider directly. Your provider
+                  login is never entered here and is not stored by us.
+                </p>
+
+                {!isEldConnected && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => skipStep("eld")}
+                    className="mt-4 text-xs font-semibold text-[#6B7280] underline underline-offset-2 transition-colors hover:text-[#374151] disabled:opacity-40"
+                  >
+                    {isEldSkipped
+                      ? "Skipped — continue without an ELD"
+                      : "Skip for now, my provider isn't supported"}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Step 5 — the broker's questions */}
+          {currentStep === 5 && (
             <div className="mb-8 w-full">
               <p className="mb-6 text-sm text-[#4B5563]">
                 {broker?.company_name || "This broker"} asks every carrier the
@@ -1371,7 +1557,7 @@ export default function OnboardPage() {
           )}
 
           {/* Step 5 — compliance documents */}
-          {currentStep === 5 && (
+          {currentStep === 6 && (
             <div className="mb-8 w-full">
               <p className="mb-6 text-sm text-[#4B5563]">
                 {broker?.company_name || "This broker"} needs these on file
@@ -1486,7 +1672,7 @@ export default function OnboardPage() {
           )}
 
           {/* Step 6 — e-sign */}
-          {currentStep === 6 && (
+          {currentStep === 7 && (
             <div className="w-full">
               <div className="grid grid-cols-12 gap-8">
                 <div className="col-span-12 lg:col-span-7">
@@ -1665,7 +1851,7 @@ export default function OnboardPage() {
 
           <div className="my-6 h-[1px] w-full bg-[#E5E7EB]" />
 
-          {currentStep !== 6 && (
+          {currentStep !== 7 && (
             <div className="mt-2 flex items-center justify-between">
               {currentStep === 1 ? (
                 <span className="flex items-center space-x-2 text-sm font-semibold text-[#4B5563]">
