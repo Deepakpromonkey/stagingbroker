@@ -64,6 +64,17 @@ export default function OnboardPage() {
 
   const [searchParams, setSearchParams] = useSearchParams();
 
+  /*
+  | StrictMode runs effects twice in development, so the redirect handler below
+  | fired every confirmation twice. On the ELD step the first call spends the
+  | one-time token and clears the state, and the second then reported "could
+  | not be verified" over a connection that had in fact just succeeded.
+  |
+  | A ref, not state: this has to be set synchronously, before the second
+  | invocation reads it. A state update would not have landed by then.
+  */
+  const returnHandled = useRef(false);
+
   const [initing, setIniting] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -830,6 +841,9 @@ export default function OnboardPage() {
   // handlers so they exist by the time it runs.
   useEffect(() => {
     if (initing || !token) return;
+
+    if (returnHandled.current) return;
+    returnHandled.current = true;
 
     if (searchParams.get("verificationSessionId")) {
       checkIdentity();
