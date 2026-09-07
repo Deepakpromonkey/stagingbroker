@@ -9,15 +9,14 @@ import { apiFetch } from "../../../lib/api";
 import { toast } from "../../../components/ui/Toaster";
 
 import StepSidebar from "./StepSidebar";
+import { useShipmentDraftStore, CustomDropdown } from "./Step1";
 import {
-  useShipmentDraftStore,
   COUNTRY_CODES,
   PHONE_VALIDATION,
   validatePhoneForCountry,
   sanitizePhoneDigits,
-  CountryFlag,
-  CustomDropdown,
-} from "./Step1";
+} from "../../../lib/phone";
+import CountryFlag from "../../../components/CountryFlag";
 
 import IconButton from "@mui/material/IconButton";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutlined";
