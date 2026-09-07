@@ -137,11 +137,14 @@ function CarrierCardSkeleton() {
 function Pagination(props) {
 
     const currentPage = props.currentPage;
+    // Null while the total is still being counted server-side; paging runs off
+    // hasMore in that window, which the API always knows exactly.
     const lastPage = props.lastPage;
+    const hasMore = props.hasMore;
     const onPrev = props.onPrev;
     const onNext = props.onNext;
 
-    if (lastPage <= 1) return null;
+    if (!hasMore && currentPage <= 1) return null;
 
     const iconButtonClass =
         'w-[36px] h-[36px] flex items-center justify-center rounded-full text-[#4b5563] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#f1f5f9] transition-colors';
@@ -160,12 +163,13 @@ function Pagination(props) {
             </button>
 
             <span className='text-[13px] text-[#6b7280] font-[500]'>
-                Page <span className='text-[#111827] font-[700]'>{currentPage}</span> of {lastPage.toLocaleString()}
+                Page <span className='text-[#111827] font-[700]'>{currentPage}</span>
+                {lastPage ? ` of ${lastPage.toLocaleString()}` : ''}
             </span>
 
             <button
                 onClick={onNext}
-                disabled={currentPage === lastPage}
+                disabled={!hasMore}
                 aria-label='Next page'
                 className={iconButtonClass}
             >
@@ -349,6 +353,7 @@ function NoResultsState(props) {
 function ResultsHeader(props) {
 
     const total = props.total;
+    const shownSoFar = props.shownSoFar;
     const query = props.query;
     const searchType = props.searchType;
     const onOpenOverlay = props.onOpenOverlay;
@@ -371,7 +376,9 @@ function ResultsHeader(props) {
 
                 <div className='flex flex-col min-w-0'>
                     <span className='text-[15px] font-[800] text-[#111827] truncate'>
-                        {total.toLocaleString()} {total === 1 ? 'result' : 'results'}
+                        {total === null
+                            ? `${shownSoFar.toLocaleString()}+ results`
+                            : `${total.toLocaleString()} ${total === 1 ? 'result' : 'results'}`}
                     </span>
                     <span className='text-[12px] text-[#6b7280] truncate'>
                         {meta.label} · "{query}"
@@ -395,6 +402,7 @@ function ResultsFooter(props) {
 
     const currentPage = props.currentPage;
     const lastPage = props.lastPage;
+    const hasMore = props.hasMore;
     const onPrev = props.onPrev;
     const onNext = props.onNext;
     const onPageSelect = props.onPageSelect;
@@ -406,6 +414,7 @@ function ResultsFooter(props) {
             <Pagination
                 currentPage={currentPage}
                 lastPage={lastPage}
+                hasMore={hasMore}
                 onPrev={onPrev}
                 onNext={onNext}
                 onPageSelect={onPageSelect}
@@ -425,13 +434,14 @@ function CarrierSearch() {
     const [sortBy, setSortBy] = useState('sortByNameAsc');
     const [filters] = useState(DEFAULT_FILTERS);
     const [carriers, setCarriers] = useState([]);
-    const [total, setTotal] = useState(0);
+    const [total, setTotal] = useState(null);
     const [loading, setLoading] = useState(false);
     const [sortOptions, setSortOptions] = useState([]);
     const [errorMessage, setErrorMessage] = useState('');
     const [successMessage] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
-    const [lastPage, setLastPage] = useState(1);
+    const [lastPage, setLastPage] = useState(null);
+    const [hasMore, setHasMore] = useState(false);
     const [selectedRisk, setSelectedRisk] = useState('');
     const [authorityVerified, setAuthorityVerified] = useState('');
     const [overlayOpen, setOverlayOpen] = useState(false);
@@ -516,7 +526,8 @@ function CarrierSearch() {
             setCarriers([]);
             setTotal(0);
             setCurrentPage(1);
-            setLastPage(1);
+            setLastPage(null);
+            setHasMore(false);
             setHasSearched(false);
             return;
         }
@@ -553,9 +564,12 @@ function CarrierSearch() {
                 const payload = res || null;
 
                 setCarriers(payload && Array.isArray(payload.data) ? payload.data : []);
-                setTotal(payload ? payload.total || 0 : 0);
+                // total / last_page are null until the server has counted the
+                // matches; ?? rather than || so a real zero is not thrown away.
+                setTotal(payload ? payload.total ?? null : 0);
                 setCurrentPage(payload ? payload.current_page || pageNumber : pageNumber);
-                setLastPage(payload ? payload.last_page || 1 : 1);
+                setLastPage(payload ? payload.last_page ?? null : null);
+                setHasMore(payload ? !!payload.has_more_pages : false);
                 setErrorMessage('');
             })
             .catch(function (err) {
@@ -599,7 +613,7 @@ function CarrierSearch() {
 
     function handleNextPage() {
 
-        if (currentPage < lastPage) {
+        if (hasMore) {
 
             runSearch(query, currentPage + 1, sortBy, searchType);
         }
@@ -709,6 +723,7 @@ function CarrierSearch() {
 
                                         <ResultsHeader
                                             total={total}
+                                            shownSoFar={(currentPage - 1) * 10 + carriers.length}
                                             query={query}
                                             searchType={searchType}
                                             onOpenOverlay={() => setOverlayOpen(true)}
@@ -733,6 +748,7 @@ function CarrierSearch() {
                                         <ResultsFooter
                                             currentPage={currentPage}
                                             lastPage={lastPage}
+                                            hasMore={hasMore}
                                             onPrev={handlePrevPage}
                                             onNext={handleNextPage}
                                             onPageSelect={handlePageSelect}
