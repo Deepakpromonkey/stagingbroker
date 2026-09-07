@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import {
   useReactTable,
   getCoreRowModel,
@@ -38,9 +38,20 @@ import Tooltip from "@mui/material/Tooltip";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import InputAdornment from "@mui/material/InputAdornment";
+import Select from "@mui/material/Select";
+import MenuItem from "@mui/material/MenuItem";
 import CircularProgress from "@mui/material/CircularProgress";
 
 import { apiFetch } from "../../../lib/api";
+import {
+  COUNTRY_CODES,
+  PHONE_VALIDATION,
+  validatePhoneForCountry,
+  sanitizePhoneDigits,
+  resolveCountryCode,
+  dialFor,
+} from "../../../lib/phone";
+import CountryFlag from "../../../components/CountryFlag";
 import { toast } from "../../../components/ui/Toaster";
 
 const USERS_ENDPOINT = "/users";
@@ -62,7 +73,6 @@ const SUBTLE = "#64748b";
 const BORDER = "#e2e8f0";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MOBILE_PATTERN = /^\d{10,}$/;
 
 const fieldSx = {
   "& .MuiOutlinedInput-root": {
@@ -191,6 +201,101 @@ const DetailRow = ({ icon, label, value }) => (
   </Box>
 );
 
+// ---------------------------------------------------------------------------
+// Mobile number, with the dialling country in front of it
+//
+// The four countries the product operates in, read from the shared list in
+// lib/phone.js so this form, the profile screen and Track Shipment cannot
+// drift apart.
+//
+// Validation is per country rather than one "at least 10 digits" rule: every
+// country here uses 10 digits, but the valid leading digits differ (a US
+// number never starts 0 or 1; an Indian mobile always starts 6-9), and the
+// old shared pattern accepted all of them.
+// ---------------------------------------------------------------------------
+function MobileField({ control, setValue }) {
+  const countryCode = useWatch({ control, name: "country_code" }) || "US";
+
+  const rule = PHONE_VALIDATION[countryCode] || PHONE_VALIDATION.US;
+
+  return (
+    <Controller
+      name="phone"
+      control={control}
+      rules={{
+        required: "Mobile number is required",
+        validate: (value) => validatePhoneForCountry(value, countryCode),
+      }}
+      render={({ field, fieldState }) => (
+        <TextField
+          label={<RequiredLabel text="Mobile" />}
+          type="tel"
+          fullWidth
+          size="small"
+          sx={fieldSx}
+          error={!!fieldState.error}
+          helperText={fieldState.error?.message || " "}
+          value={field.value ?? ""}
+          onBlur={field.onBlur}
+          onChange={(e) => field.onChange(sanitizePhoneDigits(e.target.value, countryCode))}
+          slotProps={{
+            htmlInput: { inputMode: "numeric", maxLength: rule.length },
+            input: {
+              startAdornment: (
+                <InputAdornment position="start" sx={{ mr: 0.75 }}>
+                  <Select
+                    value={countryCode}
+                    onChange={(event) => {
+                      const next = event.target.value;
+
+                      setValue("country_code", next, { shouldDirty: true });
+
+                      // A number typed for a longer country must not survive
+                      // the switch — it would fail validation with no visible
+                      // reason why.
+                      setValue("phone", sanitizePhoneDigits(field.value, next), {
+                        shouldDirty: true,
+                        shouldValidate: fieldState.isTouched,
+                      });
+                    }}
+                    variant="standard"
+                    disableUnderline
+                    renderValue={(value) => (
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                        <CountryFlag code={value} />
+                        <Typography sx={{ fontSize: "13px", color: INK }}>
+                          {COUNTRY_CODES.find((c) => c.code === value)?.dial}
+                        </Typography>
+                      </Box>
+                    )}
+                    sx={{
+                      "& .MuiSelect-select": { pr: "20px !important", py: 0 },
+                      "&:before, &:after": { display: "none" },
+                    }}
+                    slotProps={{
+                      input: { "aria-label": "Dialling country" },
+                    }}
+                  >
+                    {COUNTRY_CODES.map((country) => (
+                      <MenuItem key={country.code} value={country.code} sx={{ gap: 1.25, fontSize: "13px" }}>
+                        <CountryFlag code={country.code} />
+                        <span>{country.label}</span>
+                        <Typography sx={{ ml: "auto", fontSize: "12.5px", color: SUBTLE }}>
+                          {country.dial}
+                        </Typography>
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </InputAdornment>
+              ),
+            },
+          }}
+        />
+      )}
+    />
+  );
+}
+
 function getCurrentUser() {
   try {
     const stored = localStorage.getItem(AUTH_USER_KEY);
@@ -291,6 +396,7 @@ const mapped = records.map((u) => ({
   last_name: u.last_name,
   email: u.email,
   phone: u.phone,
+  country_code: u.country_code,
   role_names: roleToDisplayName(u.role),
   role_id: u.role?.id,
 
@@ -401,6 +507,7 @@ function EditUserForm({ open, onClose, user, roles, onSuccess }) {
     control,
     watch,
     reset,
+    setValue,
     formState: { errors, isSubmitting, dirtyFields },
   } = useForm({
     mode: "onTouched",
@@ -408,6 +515,7 @@ function EditUserForm({ open, onClose, user, roles, onSuccess }) {
       first_name: "",
       last_name: "",
       email: "",
+      country_code: "US",
       phone: "",
       roles: null,
     },
@@ -425,6 +533,7 @@ function EditUserForm({ open, onClose, user, roles, onSuccess }) {
       first_name: user.first_name || "",
       last_name: user.last_name || "",
       email: user.email || "",
+      country_code: resolveCountryCode(user.country_code),
       phone: user.phone || "",
       roles: roles.find((r) => r.key === user.role_id) || null,
     });
@@ -444,6 +553,7 @@ function EditUserForm({ open, onClose, user, roles, onSuccess }) {
     if (dirtyFields.first_name) payload.first_name = data.first_name;
     if (dirtyFields.last_name) payload.last_name = data.last_name || null;
     if (dirtyFields.phone) payload.phone = data.phone || null;
+    if (dirtyFields.country_code) payload.country_code = data.country_code || null;
 
     if (data.roles?.key && data.roles.key !== user?.role_id) {
       payload.role_id = data.roles.key;
@@ -545,32 +655,7 @@ function EditUserForm({ open, onClose, user, roles, onSuccess }) {
                     {...register("email")}
                   />
 
-<TextField
-  label={<RequiredLabel text="Mobile" />}
-  type="tel"
-  fullWidth
-  size="small"
-  sx={fieldSx}
-  error={!!errors.phone}
-  helperText={errors.phone?.message || " "}
-  slotProps={{
-    htmlInput: { inputMode: "numeric", pattern: "[0-9]*" },
-    input: {
-      startAdornment: (
-        <InputAdornment position="start">
-          <PhoneIphoneIcon sx={adornmentIconSx} />
-        </InputAdornment>
-      ),
-    },
-  }}
-  {...register("phone", {
-    required: "Mobile number is required",
-    pattern: { value: MOBILE_PATTERN, message: "Numbers only, at least 10 digits" },
-    onChange: (e) => {
-      e.target.value = e.target.value.replace(/\D/g, "");
-    },
-  })}
-/>
+                  <MobileField control={control} setValue={setValue} />
 
                 </Box>
               </Box>
@@ -855,7 +940,11 @@ function UserDetailsModal({ open, onClose, viewData, roles }) {
   <DetailRow
     icon={<PhoneIphoneIcon sx={{ fontSize: 17 }} />}
     label="Mobile"
-    value={viewData?.phone}
+    value={
+      viewData?.phone
+        ? `${dialFor(viewData.country_code, "")} ${viewData.phone}`.trim()
+        : viewData?.phone
+    }
   />
 
   {selectedRole?.permissions?.length > 0 && (
@@ -926,10 +1015,18 @@ const {
   control,
   watch,
   reset,
+  setValue,
   formState: { errors, isSubmitting },
 } = useForm({
     mode: "onTouched",
-    defaultValues: { first_name: "", last_name: "", email: "", phone: "", roles: null },
+    defaultValues: {
+      first_name: "",
+      last_name: "",
+      email: "",
+      country_code: "US",
+      phone: "",
+      roles: null,
+    },
   });
 const selectedRole = watch("roles");
   const handleClose = () => {
@@ -944,6 +1041,7 @@ const selectedRole = watch("roles");
       first_name: data.first_name,
       last_name: data.last_name,
       email: data.email,
+      country_code: data.country_code,
       phone: data.phone,
       role_id: data.roles?.key ?? "",
     };
@@ -1042,32 +1140,7 @@ const selectedRole = watch("roles");
                 })}
               />
 
-            <TextField
-  label={<RequiredLabel text="Mobile" />}
-  type="tel"
-  fullWidth
-  size="small"
-  sx={fieldSx}
-  error={!!errors.phone}
-  helperText={errors.phone?.message || " "}
-  slotProps={{
-    htmlInput: { inputMode: "numeric", pattern: "[0-9]*" },
-    input: {
-      startAdornment: (
-        <InputAdornment position="start">
-          <PhoneIphoneIcon sx={adornmentIconSx} />
-        </InputAdornment>
-      ),
-    },
-  }}
-  {...register("phone", {
-    required: "Mobile number is required",
-    pattern: { value: MOBILE_PATTERN, message: "Numbers only, at least 10 digits" },
-    onChange: (e) => {
-      e.target.value = e.target.value.replace(/\D/g, "");
-    },
-  })}
-/>
+              <MobileField control={control} setValue={setValue} />
             </Box>
           </Box>
 

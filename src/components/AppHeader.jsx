@@ -9,7 +9,6 @@ import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import Avatar from '@mui/material/Avatar';
-import Badge from '@mui/material/Badge';
 import Drawer from '@mui/material/Drawer';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
@@ -18,7 +17,6 @@ import ListItemText from '@mui/material/ListItemText';
 import Divider from '@mui/material/Divider';
 
 import SearchIcon from '@mui/icons-material/Search';
-import NotificationsOutlinedIcon from '@mui/icons-material/NotificationsOutlined';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import AssignmentIndOutlinedIcon from '@mui/icons-material/AssignmentIndOutlined';
 import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
@@ -31,11 +29,11 @@ import CreditCardOutlined from '@mui/icons-material/CreditCardOutlined';
 import MenuIcon from '@mui/icons-material/Menu';
 import CloseIcon from '@mui/icons-material/Close';
 
-import { apiFetch } from '../lib/api';
 import { logout } from '../utils/Auth';
 import logo from '../assets/images/logo.webp';
 
 import SearchOverlay from './SearchOverlay';
+import NotificationsMenu from './NotificationsMenu';
 
 const AUTH_TOKEN_KEY = 'crm_auth_token';
 const AUTH_USER_KEY = 'crm_user';
@@ -106,7 +104,6 @@ export default function AppHeader() {
 
     const [profileMenuAnchor, setProfileMenuAnchor] = useState(null);
     const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
-    const [notificationsCount, setNotificationsCount] = useState(0);
     const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
     const readUserFromStorage = () => {
@@ -253,11 +250,7 @@ export default function AppHeader() {
                         <SearchIcon fontSize="small" />
                     </IconButton>
 
-                    <IconButton id="notification_button" size="small">
-                        <Badge badgeContent={notificationsCount} color="secondary">
-                            <NotificationsOutlinedIcon fontSize="small" />
-                        </Badge>
-                    </IconButton>
+                    <NotificationsMenu />
 
                     <Box sx={{ width: '1px', height: 24, backgroundColor: 'rgba(0,0,0,0.08)', mx: 1 }} />
 
@@ -310,11 +303,7 @@ export default function AppHeader() {
                     <SearchIcon fontSize="small" />
                 </IconButton>
 
-                <IconButton size="small" aria-label="Notifications">
-                    <Badge badgeContent={notificationsCount} color="secondary">
-                        <NotificationsOutlinedIcon fontSize="small" />
-                    </Badge>
-                </IconButton>
+                <NotificationsMenu />
 
                 <IconButton
                     edge="end"

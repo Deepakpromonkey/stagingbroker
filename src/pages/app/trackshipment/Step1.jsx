@@ -6,6 +6,13 @@ import { z } from "zod";
 import { create } from "zustand";
 
 import { apiFetch } from "../../../lib/api";
+import {
+  COUNTRY_CODES,
+  PHONE_VALIDATION,
+  validatePhoneForCountry,
+  sanitizePhoneDigits,
+} from "../../../lib/phone";
+import CountryFlag from "../../../components/CountryFlag";
 import { toast } from "../../../components/ui/Toaster";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import StepSidebar from "./StepSidebar";
@@ -41,13 +48,6 @@ const DRIVER_TYPES = [
   { value: "other_company_driver", label: "Other carrier company driver" },
 ];
 
-export const COUNTRY_CODES = [
-  { code: "IN", dial: "+91", label: "India" },
-  { code: "US", dial: "+1", label: "United States" },
-  { code: "CA", dial: "+1", label: "Canada" },
-  { code: "MX", dial: "+52", label: "Mexico" },
-];
-
 const TRACK_DURATIONS = [
   { value: "track for 1 day", label: "Track for 1 day" },
   { value: "track for 2 days", label: "Track for 2 days" },
@@ -80,49 +80,6 @@ const EMAIL_LIST_PATTERN = /^\s*[^\s@]+@[^\s@]+\.[^\s@]+\s*(,\s*[^\s@]+@[^\s@]+\
 
 // Only letters and spaces (used for dispatcher name)
 const ALPHA_PATTERN = /^[A-Za-z\s]*$/;
-
-export const PHONE_VALIDATION = {
-  US: {
-    length: 10,
-    pattern: /^[2-9]\d{9}$/,
-    message: "Enter a valid 10-digit US phone number",
-  },
-  CA: {
-    length: 10,
-    pattern: /^[2-9]\d{9}$/,
-    message: "Enter a valid 10-digit Canadian phone number",
-  },
-  MX: {
-    length: 10,
-    pattern: /^\d{10}$/,
-    message: "Enter a valid 10-digit Mexican phone number",
-  },
-  IN: {
-    length: 10,
-    pattern: /^[6-9]\d{9}$/,
-    message: "Enter a valid 10-digit Indian mobile number",
-  },
-};
-
-export function validatePhoneForCountry(rawPhone, countryCode) {
-  const digits = (rawPhone || "").replace(/\D/g, "");
-  const rule = PHONE_VALIDATION[countryCode] || PHONE_VALIDATION.US;
-
-  if (digits.length !== rule.length) {
-    return rule.message;
-  }
-
-  if (rule.pattern && !rule.pattern.test(digits)) {
-    return rule.message;
-  }
-
-  return true;
-}
-
-export function sanitizePhoneDigits(rawValue, countryCode) {
-  const maxLength = (PHONE_VALIDATION[countryCode] || PHONE_VALIDATION.US).length;
-  return (rawValue || "").replace(/\D/g, "").slice(0, maxLength);
-}
 
 // Strips digits/symbols from name-type fields — letters and spaces only.
 function sanitizeName(rawValue) {
@@ -353,17 +310,6 @@ function useOutsideClick(ref, onOutside) {
     return () => document.removeEventListener("mousedown", handler);
   }, [ref, onOutside]);
 }
-
-export const CountryFlag = ({ code, className = "" }) => (
-  <img
-    src={`https://flagcdn.com/24x18/${code.toLowerCase()}.png`}
-    srcSet={`https://flagcdn.com/48x36/${code.toLowerCase()}.png 2x`}
-    width={20}
-    height={15}
-    alt=""
-    className={`inline-block shrink-0 rounded-[2px] object-cover ${className}`}
-  />
-);
 
 const CarrierStatusBadge = ({ carrier }) => {
   if (!carrier) return null;

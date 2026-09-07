@@ -19,6 +19,15 @@ import {
     KeyboardArrowDown as KeyboardArrowDownIconMui,
 } from '@mui/icons-material';
 import { apiFetch, getToken } from '../../../lib/api';
+import {
+    COUNTRY_CODES,
+    PHONE_VALIDATION,
+    validatePhoneForCountry,
+    sanitizePhoneDigits,
+    resolveCountryCode,
+    dialFor,
+} from '../../../lib/phone';
+import CountryFlag from '../../../components/CountryFlag';
 import { toast, ToastContainer } from '../../../components/ui/Toaster'
 
 const NAVY = '#0F1B33';
@@ -33,60 +42,6 @@ const PAGE_BG = '#F4F5F1';
 const TOKEN_KEY = 'crm_auth_token';
 const USER_KEY = 'crm_user';
 
-// ---------------------------------------------------------------------
-// Country codes / phone validation — same source list & rules as
-// Step 1 of Track Shipment, so the two forms stay consistent.
-// ---------------------------------------------------------------------
-const COUNTRY_CODES = [
-    { code: "IN", dial: "+91", label: "India" },
-    { code: "US", dial: "+1", label: "United States" },
-    { code: "CA", dial: "+1", label: "Canada" },
-    { code: "MX", dial: "+52", label: "Mexico" },
-];
-
-const PHONE_VALIDATION = {
-    US: {
-        length: 10,
-        pattern: /^[2-9]\d{9}$/,
-        message: "Enter a valid 10-digit US phone number",
-    },
-    CA: {
-        length: 10,
-        pattern: /^[2-9]\d{9}$/,
-        message: "Enter a valid 10-digit Canadian phone number",
-    },
-    MX: {
-        length: 10,
-        pattern: /^\d{10}$/,
-        message: "Enter a valid 10-digit Mexican phone number",
-    },
-    IN: {
-        length: 10,
-        pattern: /^[6-9]\d{9}$/,
-        message: "Enter a valid 10-digit Indian mobile number",
-    },
-};
-
-function validatePhoneForCountry(rawPhone, countryCode) {
-    const digits = (rawPhone || "").replace(/\D/g, "");
-    const rule = PHONE_VALIDATION[countryCode] || PHONE_VALIDATION.US;
-
-    if (digits.length !== rule.length) {
-        return rule.message;
-    }
-
-    if (rule.pattern && !rule.pattern.test(digits)) {
-        return rule.message;
-    }
-
-    return true;
-}
-
-function sanitizePhoneDigits(rawValue, countryCode) {
-    const maxLength = (PHONE_VALIDATION[countryCode] || PHONE_VALIDATION.US).length;
-    return (rawValue || "").replace(/\D/g, "").slice(0, maxLength);
-}
-
 const MAX_NAME_LENGTH = 50;
 
 // Password length bounds — applies to current / new / confirm password.
@@ -99,16 +54,36 @@ function sanitizeName(rawValue) {
     return (rawValue || "").replace(/[^A-Za-z\s]/g, "").slice(0, MAX_NAME_LENGTH);
 }
 
-const CountryFlag = ({ code, className = "" }) => (
-    <img
-        src={`https://flagcdn.com/24x18/${code.toLowerCase()}.png`}
-        srcSet={`https://flagcdn.com/48x36/${code.toLowerCase()}.png 2x`}
-        width={20}
-        height={15}
-        alt=""
-        className={`inline-block flex-shrink-0 rounded-[2px] object-cover ${className}`}
-    />
-);
+/*
+| "Onboarding Date" / "Last Updated".
+|
+| The API sends a pre-formatted string, but the cached `crm_user` written at
+| login predates those fields, so fall back to formatting the raw timestamp
+| here rather than rendering an em dash at a user whose account plainly does
+| have a creation date.
+*/
+function formatAccountDate(...candidates) {
+    for (const candidate of candidates) {
+        if (!candidate) continue;
+
+        // Already formatted by the API — pass it straight through.
+        if (typeof candidate === "string" && !/^\d{4}-\d{2}-\d{2}/.test(candidate)) {
+            return candidate;
+        }
+
+        const date = new Date(candidate);
+
+        if (!Number.isNaN(date.getTime())) {
+            return date.toLocaleDateString(undefined, {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+            });
+        }
+    }
+
+    return "";
+}
 
 const EyeIcon = ({ show }) =>
     show ? <VisibilityIcon sx={{ fontSize: 15 }} /> : <VisibilityOffIcon sx={{ fontSize: 15 }} />;
@@ -454,10 +429,7 @@ const ProfileUpdate = () => {
                         first_name: parsedUser.first_name || '',
                         last_name: parsedUser.last_name || '',
                         contact: parsedUser.phone ?? parsedUser.contact ?? '',
-                        country_code:
-                            COUNTRY_CODES.find(
-                                (c) => c.code === parsedUser.country_code || c.dial === parsedUser.country_code
-                            )?.code || 'US',
+                        country_code: resolveCountryCode(parsedUser.country_code),
                         profile_pic_url: parsedUser.profile_pic_url || ''
                     });
                 } catch (err) {
@@ -484,6 +456,70 @@ const ProfileUpdate = () => {
         return () => window.removeEventListener('storage', loadData);
     }, []);
 
+    /*
+    | Refresh the cached profile from the API.
+    |
+    | `crm_user` is written once at login and then only ever patched locally,
+    | so an account signed in before a field existed never gains it — which is
+    | how "Onboarding Date" and "Last Updated" came to render blank. Pulling
+    | /me on mount closes that gap without forcing a re-login.
+    |
+    | Only the profile fields are merged: `role` was normalised to a slug
+    | string at login and the rest of the app reads it that way, so copying the
+    | API's object over it would change a shape other screens depend on.
+    */
+    useEffect(() => {
+        let cancelled = false;
+
+        const REFRESHED_FIELDS = [
+            'first_name',
+            'last_name',
+            'email',
+            'phone',
+            'country_code',
+            'designation',
+            'permissions',
+            'added_on',
+            'added_on_formatted',
+            'updated_on',
+            'updated_on_formatted',
+        ];
+
+        (async () => {
+            try {
+                const result = await apiFetch('/me');
+
+                const fresh = result?.data ?? result;
+
+                if (cancelled || !fresh || typeof fresh !== 'object') return;
+
+                const patch = {};
+
+                for (const field of REFRESHED_FIELDS) {
+                    if (fresh[field] !== undefined) patch[field] = fresh[field];
+                }
+
+                // The API calls it profile_image; every screen here reads
+                // profile_pic_url. Map it rather than leaving the avatar blank.
+                if (fresh.profile_image) patch.profile_pic_url = fresh.profile_image;
+
+                setUser((previous) => {
+                    const merged = { ...previous, ...patch };
+
+                    localStorage.setItem(USER_KEY, JSON.stringify(merged));
+                    window.dispatchEvent(new CustomEvent('crm-user-updated', { detail: merged }));
+
+                    return merged;
+                });
+            } catch {
+                // A failed refresh is not worth a toast: whatever was cached at
+                // login still renders.
+            }
+        })();
+
+        return () => { cancelled = true; };
+    }, []);
+
     // Keep the edit form in sync when the drawer opens / user changes.
     useEffect(() => {
         if (editOpen && user) {
@@ -491,10 +527,7 @@ const ProfileUpdate = () => {
                 first_name: user.first_name || '',
                 last_name: user.last_name || '',
                 contact: user.phone ?? user.contact ?? '',
-                country_code:
-                    COUNTRY_CODES.find(
-                        (c) => c.code === user.country_code || c.dial === user.country_code
-                    )?.code || 'US',
+                country_code: resolveCountryCode(user.country_code),
                 profile_pic_url: user.profile_pic_url || ''
             });
             setFirstNameError('');
@@ -502,6 +535,18 @@ const ProfileUpdate = () => {
             setContactError('');
         }
     }, [editOpen, user]);
+
+    const onboardingDateLabel = formatAccountDate(
+        user.added_on_formatted,
+        user.added_on,
+        user.created_at,
+    );
+
+    const lastUpdatedLabel = formatAccountDate(
+        user.updated_on_formatted,
+        user.updated_on,
+        user.updated_at,
+    ) || onboardingDateLabel;
 
     const getInitials = () => {
         const f = user.first_name?.[0] || '';
@@ -629,7 +674,7 @@ const ProfileUpdate = () => {
         setIsSubmitting(true);
 
         try {
-            const dialCode = COUNTRY_CODES.find((c) => c.code === formData.country_code)?.dial || '+1';
+            const dialCode = dialFor(formData.country_code);
 
             const payload = new FormData();
             payload.append('first_name', trimmedFirst);
@@ -906,13 +951,13 @@ const ProfileUpdate = () => {
                                 label="Mobile Contact"
                                 value={
                                     user.phone ?? user.contact
-                                        ? `${COUNTRY_CODES.find((c) => c.code === user.country_code)?.dial || ''} ${user.phone ?? user.contact}`.trim()
+                                        ? `${dialFor(user.country_code, '')} ${user.phone ?? user.contact}`.trim()
                                         : ''
                                 }
                                 icon={<PhoneIcon />}
                             />
-                            <DetailRow label="Onboarding Date" value={user.added_on_formatted} icon={<CalendarIcon />} />
-                            <DetailRow label="Last Updated" value={user.updated_on_formatted || user.added_on_formatted} icon={<ClockIcon />} />
+                            <DetailRow label="Onboarding Date" value={onboardingDateLabel} icon={<CalendarIcon />} />
+                            <DetailRow label="Last Updated" value={lastUpdatedLabel} icon={<ClockIcon />} />
                         </div>
                     </div>
 
@@ -974,9 +1019,9 @@ const ProfileUpdate = () => {
                                     <h2 className="text-white text-lg sm:text-xl font-bold mt-1 m-0">
                                         Edit Profile
                                     </h2>
-                                    {user.updated_on_formatted && (
+                                    {lastUpdatedLabel && (
                                         <p className="text-indigo-200/60 text-xs mt-1">
-                                            Last updated {user.updated_on_formatted}
+                                            Last updated {lastUpdatedLabel}
                                         </p>
                                     )}
                                 </div>
