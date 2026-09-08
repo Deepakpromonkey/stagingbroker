@@ -152,6 +152,16 @@ export default function OnboardPage() {
   */
   const isEldDisconnected = eld?.status === "disconnected";
 
+  /*
+  | A live connection this carrier made while onboarding with another broker,
+  | which this one has not been granted yet.
+  |
+  | They linked their provider once already, and we still hold a working token
+  | for it — so all this broker needs is the carrier's permission, not another
+  | trip through the provider's login for a connection that already exists.
+  */
+  const eldShareable = connectRequest?.eld_shareable ?? null;
+
   const isQuestionnaireDone = !!connectRequest?.questionnaire_completed;
   const isDocumentsDone = !!connectRequest?.documents_completed;
 
@@ -547,6 +557,31 @@ export default function OnboardPage() {
     } catch (err) {
       setBusy(false);
       setErrorMessage(err?.message || "Could not open the ELD connection page.");
+    }
+  };
+
+  /**
+   * Give this broker access to the ELD the carrier has already connected.
+   *
+   * Consent is still explicit — the button names the broker — it just does not
+   * need the provider's sign-in page a second time.
+   */
+  const shareEld = async () => {
+    setBusy(true);
+
+    try {
+      const res = await apiFetch("/carrier-connect/eld/share", {
+        method: "POST",
+        skipAuth: true,
+        body: JSON.stringify({ token }),
+      });
+
+      applyRequest(res.data);
+      setSuccessMessage(res.message || "ELD shared.");
+    } catch (err) {
+      setErrorMessage(err?.message || "Could not share your ELD connection.");
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -1494,6 +1529,39 @@ export default function OnboardPage() {
                   Connect your ELD provider
                 </label>
 
+                {/*
+                  Already connected with another broker: ask for permission
+                  rather than sending them back to their provider's login.
+                */}
+                {!isEldConnected && eldShareable && (
+                  <div className="mb-4 flex w-full max-w-xl flex-col items-center rounded-2xl border-2 border-green-200 bg-green-50 p-6 text-center">
+                    <DoneAll className="mb-2 text-green-600" style={{ fontSize: 36 }} />
+
+                    <p className="text-md font-bold text-green-700">
+                      Your {eldShareable.provider || "ELD"} is already connected
+                    </p>
+
+                    <p className="mt-1 text-xs text-[#4B5563]">
+                      You connected it when onboarding with another broker
+                      {eldShareable.vehicles
+                        ? ` — ${eldShareable.vehicles} vehicles, ${eldShareable.drivers} drivers`
+                        : ""}
+                      . Share it with {broker?.company_name || "this broker"} so
+                      they can see your hours of service and vehicle locations.
+                      You will not need to sign in again.
+                    </p>
+
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={shareEld}
+                      className="mt-4 rounded-lg bg-green-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-green-700 disabled:opacity-40"
+                    >
+                      Share with {broker?.company_name || "this broker"}
+                    </button>
+                  </div>
+                )}
+
                 <div
                   className={`group flex min-h-[180px] w-full max-w-xl cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed transition-all ${
                     isEldConnected
@@ -1551,9 +1619,11 @@ export default function OnboardPage() {
                     </div>
                   ) : (
                     <span className="text-md font-bold text-blue-200 uppercase group-hover:text-blue-300">
-                      {isEldSkipped
-                        ? "Skipped — click to connect"
-                        : "Click to start"}
+                      {eldShareable
+                        ? "Or connect a different provider"
+                        : isEldSkipped
+                          ? "Skipped — click to connect"
+                          : "Click to start"}
                     </span>
                   )}
                 </div>
