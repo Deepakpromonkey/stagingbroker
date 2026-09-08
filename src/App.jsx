@@ -37,6 +37,7 @@ import AcceptInvitation from './pages/auth/AcceptInvitation'
 
 import CarrierOnboard from './pages/app/connect'
 import CarrierNoData from './pages/app/connect/CarrierNoData'
+import EldNotSupported from './pages/app/connect/EldNotSupported'
 import EmailApproval from './pages/app/connect/EmailApproval'
 
 /*
@@ -97,6 +98,7 @@ function AppShell() {
               the URL, not by a session. */}
           <Route path="/carrier/connect/:token" element={<CarrierOnboard />} />
           <Route path="/carrier/invalid-access" element={<CarrierNoData />} />
+          <Route path="/carrier/eld-not-supported" element={<EldNotSupported />} />
           <Route path="/carrier/email-approval" element={<EmailApproval />} />
 
           <Route path="/dashboard" element={<Dashboard />} />
