@@ -84,6 +84,11 @@ function formatAccountDate(...candidates) {
 
     return "";
 }
+function withCacheBust(url, version) {
+    if (!url) return url;
+    const sep = url.includes('?') ? '&' : '?';
+    return `${url}${sep}v=${version}`;
+}
 
 const EyeIcon = ({ show }) =>
     show ? <VisibilityIcon sx={{ fontSize: 15 }} /> : <VisibilityOffIcon sx={{ fontSize: 15 }} />;
@@ -104,9 +109,6 @@ const GlobeIcon = () => <PublicIconMui sx={{ fontSize: 14 }} />;
 const SearchIcon = () => <SearchIconMui sx={{ fontSize: 16 }} />;
 const ChevronDownIcon = () => <KeyboardArrowDownIconMui sx={{ fontSize: 18 }} />;
 
-// ---------------------------------------------------------------------
-// A single ledger row — label left, value right, hairline divider.
-// ---------------------------------------------------------------------
 function DetailRow({ label, value, icon }) {
     return (
         <div className="flex items-center justify-between gap-4 py-3.5 border-b border-[#EEF0F3] last:border-0">
@@ -161,10 +163,6 @@ function TextInput({ label, icon, error, ...inputProps }) {
     );
 }
 
-// ---------------------------------------------------------------------
-// Editable, searchable country-code select with flag images. Options
-// come from the same COUNTRY_CODES list used in Step 1.
-// ---------------------------------------------------------------------
 function CountryCodeSelect({ value, onChange, options }) {
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState("");
@@ -378,6 +376,8 @@ const ProfileUpdate = () => {
     const [editOpen, setEditOpen] = useState(false);
     const [passwordOpen, setPasswordOpen] = useState(false);
 
+    const [pictureVersion, setPictureVersion] = useState(0);
+
     const [formData, setFormData] = useState({
         first_name: '',
         last_name: '',
@@ -424,13 +424,22 @@ const ProfileUpdate = () => {
             if (storedUser) {
                 try {
                     const parsedUser = JSON.parse(storedUser);
-                    setUser(parsedUser);
+
+                  
+                    const resolvedPicUrl = parsedUser.profile_pic_url || parsedUser.profile_image || '';
+                    const normalizedUser = { ...parsedUser, profile_pic_url: resolvedPicUrl };
+
+                    if (resolvedPicUrl && !parsedUser.profile_pic_url) {
+                        localStorage.setItem(USER_KEY, JSON.stringify(normalizedUser));
+                    }
+
+                    setUser(normalizedUser);
                     setFormData({
-                        first_name: parsedUser.first_name || '',
-                        last_name: parsedUser.last_name || '',
-                        contact: parsedUser.phone ?? parsedUser.contact ?? '',
-                        country_code: resolveCountryCode(parsedUser.country_code),
-                        profile_pic_url: parsedUser.profile_pic_url || ''
+                        first_name: normalizedUser.first_name || '',
+                        last_name: normalizedUser.last_name || '',
+                        contact: normalizedUser.phone ?? normalizedUser.contact ?? '',
+                        country_code: resolveCountryCode(normalizedUser.country_code),
+                        profile_pic_url: normalizedUser.profile_pic_url || ''
                     });
                 } catch (err) {
                     // eslint-disable-next-line no-console
@@ -555,9 +564,7 @@ const ProfileUpdate = () => {
     };
 
     const getRoleLabel = () => {
-        // Your API returns role as an object: { id, slug, name, level }.
-        // Prefer that real shape first; fall back to role_names / a plain
-        // role state only if it's ever present in some other response shape.
+
         if (user.role && typeof user.role === 'object') {
             return user.role.name || user.role.slug || null;
         }
@@ -614,19 +621,7 @@ const ProfileUpdate = () => {
         }
     };
 
-    // ---------------------------------------------------------------------
-    // Update profile — POST {{base_url}}/update-profile
-    //
-    // Sent as multipart/form-data:
-    //   first_name, last_name, phone, country_code, profile_image (file, optional)
-    //
-    // NOTE: apiFetch must NOT force a "Content-Type: application/json"
-    // header when the body is a FormData instance — the browser needs to
-    // set "multipart/form-data; boundary=..." itself. If your apiFetch
-    // helper always sets Content-Type: application/json, either add a
-    // FormData check there (skip the header when body instanceof FormData)
-    // or swap the call below for a raw fetch with the Bearer token.
-    // ---------------------------------------------------------------------
+
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -696,12 +691,7 @@ const ProfileUpdate = () => {
             if (result?.status) {
                 const updatedUser = result?.data || result?.user || result?.row;
 
-                // Backend returns the uploaded image URL as "profile_image",
-                // but the rest of this component (avatar <img>, getInitials
-                // fallback, etc.) reads "profile_pic_url". Map it across so
-                // a fresh upload actually shows up without a page reload.
-                // Keep checking a couple of other likely key names too, in
-                // case the API response shape changes later.
+           
                 const serverPicUrl =
                     updatedUser?.profile_image ||
                     updatedUser?.profile_pic_url ||
@@ -717,11 +707,7 @@ const ProfileUpdate = () => {
                     };
                     localStorage.setItem(USER_KEY, JSON.stringify(mergedUser));
                     setUser(mergedUser);
-                    // The native "storage" event only fires in *other* tabs,
-                    // not this one, so components like AppHeader that read
-                    // the user from localStorage won't see this update until
-                    // a full page reload. Broadcast a custom event so any
-                    // mounted component in this tab can refresh immediately.
+               
                     window.dispatchEvent(new CustomEvent('crm-user-updated', { detail: mergedUser }));
                 } else {
                     const syncedUser = {
@@ -736,6 +722,8 @@ const ProfileUpdate = () => {
                     setUser(syncedUser);
                     window.dispatchEvent(new CustomEvent('crm-user-updated', { detail: syncedUser }));
                 }
+
+                setPictureVersion((v) => v + 1);
 
                 toast.success(result?.message || 'Profile updated successfully.');
                 setEditOpen(false);
@@ -766,11 +754,6 @@ const ProfileUpdate = () => {
         setShowConfirm(false);
     };
 
-    // ---------------------------------------------------------------------
-    // Change password — matches the Postman request:
-    //   POST {{base_url}}/change-password
-    //   { "current_password": "...", "password": "...", "password_confirmation": "..." }
-    // ---------------------------------------------------------------------
     const handlePasswordSubmit = async (e) => {
         e.preventDefault();
 
@@ -811,14 +794,7 @@ const ProfileUpdate = () => {
         setPasswordSubmitting(true);
 
         try {
-            // apiFetch -> `${API_BASE}/change-password`, i.e. matches the
-            // Postman request's {{base_url}}/change-password, with JSON
-            // Content-Type + Bearer token added automatically.
-            //
-            // On a 4xx response, apiFetch throws an Error whose .message is
-            // already the server's top-level "message" field — e.g. "Your
-            // current password is incorrect." — so we don't need to dig into
-            // result.errors ourselves; the catch block below handles it.
+       
             const rawResult = await apiFetch('/change-password', {
                 method: 'POST',
                 body: JSON.stringify({
@@ -839,8 +815,7 @@ const ProfileUpdate = () => {
                 toast.error(result?.message || 'Failed to update password.');
             }
         } catch (error) {
-            // Surfaces messages like "Your current password is incorrect."
-            // straight from the API via a toast instead of an inline banner.
+         
             toast.error(error?.message || 'An error occurred while updating password.');
         } finally {
             setPasswordSubmitting(false);
@@ -850,10 +825,6 @@ const ProfileUpdate = () => {
     return (
         <div className="min-h-screen px-4 py-5 sm:px-6 md:px-8 lg:px-14" style={{ background: PAGE_BG }}>
 
-            {/* Remove this if <ToastContainer /> is already mounted once
-                globally (e.g. in your root layout) — mounting it twice just
-                means two listeners on the same store, which is harmless,
-                but one is enough. */}
             <ToastContainer />
 
             <div className="mb-6 sm:mb-8">
@@ -865,10 +836,6 @@ const ProfileUpdate = () => {
 
             <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-[300px_1fr] gap-5 sm:gap-6 items-start">
 
-                {/* ---------------------------------------------------------
-                    Sticky identity card — gradient avatar ring, soft
-                    shadow, stacked full-width actions.
-                --------------------------------------------------------- */}
                 <div
                     className="md:sticky md:top-6 relative bg-white rounded-[24px] border border-[#edf2f7] pt-8 pb-6 px-6 flex flex-col items-center text-center"
                     style={{ boxShadow: '0 8px 30px rgba(15,27,51,0.06)' }}
@@ -877,7 +844,7 @@ const ProfileUpdate = () => {
                         <div className="p-[3px] rounded-full" style={{ background: `linear-gradient(135deg, ${INDIGO}, #38BDF8)` }}>
                             {user.profile_pic_url && !avatarError ? (
                                 <img
-                                    src={user.profile_pic_url}
+                                    src={withCacheBust(user.profile_pic_url, pictureVersion)}
                                     alt="Profile"
                                     onError={() => setAvatarError(true)}
                                     className="w-24 h-24 rounded-full object-cover border-[3px] border-white"
@@ -936,7 +903,6 @@ const ProfileUpdate = () => {
                     </div>
                 </div>
 
-                {/* ---- Main column ---- */}
                 <div className="flex flex-col gap-5 sm:gap-6">
 
                     <div className="bg-white rounded-[24px] border border-[#edf2f7] px-5 py-5 sm:px-7 sm:py-6" style={{ boxShadow: '0 8px 30px rgba(15,27,51,0.04)' }}>
@@ -961,7 +927,7 @@ const ProfileUpdate = () => {
                         </div>
                     </div>
 
-                    <div
+                    {/* <div
                         className="relative overflow-hidden rounded-[24px] px-5 py-5 sm:px-7 sm:py-6 flex items-center justify-between gap-4 flex-wrap"
                         style={{ background: `linear-gradient(120deg, ${NAVY} 0%, ${NAVY_LIGHT} 60%, ${INDIGO} 150%)` }}
                     >
@@ -981,7 +947,7 @@ const ProfileUpdate = () => {
                             <LockIcon />
                             Change Password
                         </button>
-                    </div>
+                    </div> */}
 
                 </div>
 
@@ -1095,7 +1061,7 @@ const ProfileUpdate = () => {
                                             />
                                         </div>
                                         <div className="flex items-start gap-4 mb-5">
-                                            {/* Country Code - smaller width */}
+
                                             <div className="w-[200px] flex-shrink-0">
                                                 <CountryCodeSelect
                                                     value={formData.country_code}
@@ -1104,7 +1070,6 @@ const ProfileUpdate = () => {
                                                 />
                                             </div>
 
-                                            {/* Mobile - takes remaining width */}
                                             <div className="flex-1 min-w-0">
                                                 <TextInput
                                                     label="Mobile"
