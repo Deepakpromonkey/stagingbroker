@@ -36,8 +36,15 @@ import Skeleton from "@mui/material/Skeleton";
 import ReportCarrierModal from "./ReportCarrierModal";
 import ConnectCarrierModal from "./ConnectCarrierModal";
 
-// import Api from '../../api/Api';
+import smartwayInactive from "@/assets/certifications/smartway-inactive.png";
+import cert2Inactive from "@/assets/certifications/cert2-inactive.png";
+import cert3Inactive from "@/assets/certifications/cert3-inactive.png";
+
+import smartwayActive from "@/assets/certifications/smartway-active.png";
+import cert2Active from "@/assets/certifications/cert2-active.png";
+
 import { apiFetch } from "../../../lib/api";
+
 
 import {
   Add,
@@ -79,6 +86,7 @@ function CarrierProfile() {
   const [blocking, setBlocking] = useState(false);
   const [unblocking, setUnblocking] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [compliance, setCompliance] = useState(null);
 
   // Bumped after a filing so the panel re-fetches: the broker who just wrote a
   // report expects to see it, and a stale list reads as the save having failed.
@@ -246,6 +254,21 @@ function CarrierProfile() {
     },
     [row_id],
   );
+
+ useEffect(() => {
+  if (!carrier?.dot_number) return;
+
+  apiFetch("/carrier-compliance/check", {
+    method: "POST",
+    body: JSON.stringify({ dot_number: carrier.dot_number }),
+  })
+    .then((res) => {
+      setCompliance(res?.data || null);
+    })
+    .catch((err) => {
+      console.error("Compliance check failed", err);
+    });
+}, [carrier?.dot_number]);
 
   function blockCarrier() {
     if (!carrier?.row_id) return;
@@ -622,6 +645,119 @@ function CarrierProfile() {
     );
   }
 
+
+function CertificationBadge({ activeSrc, inactiveSrc, label, active }) {
+  return (
+    <img
+      src={active ? activeSrc : inactiveSrc}
+      alt={label}
+      title={label}
+      className="h-[34px] w-auto max-w-[120px] object-contain transition-opacity duration-300"
+    />
+  );
+}
+
+function CarrierOperationBadge({ desc }) {
+  if (!desc) return null;
+
+  const lower = desc.toLowerCase();
+  const badges = [];
+
+  // Interstate / Intrastate oval
+  if (lower.includes("intrastate")) {
+    badges.push({
+      label: "INTRASTATE",
+      text: "#1E3FB8",
+      tint: "#EEF2FF",
+      border: "rgba(41,83,228,0.32)",
+    });
+  } else if (lower.includes("interstate")) {
+    badges.push({
+      label: "INTERSTATE",
+      text: "#1E3FB8",
+      tint: "#EEF2FF",
+      border: "rgba(41,83,228,0.32)",
+    });
+  }
+
+  // Hazmat / Non-Hazmat oval — check "non-hazmat" first since it also
+  // contains the substring "hazmat".
+  if (lower.includes("non-hazmat") || lower.includes("non hazmat")) {
+    badges.push({
+      label: "NON-HAZMAT",
+      text: "#B42318",
+      tint: "#FEECEB",
+      border: "rgba(220,38,38,0.36)",
+    });
+  } else if (lower.includes("hazmat")) {
+    badges.push({
+      label: "HAZMAT",
+      text: "#15803D",
+      tint: "#E7FBEF",
+      border: "rgba(21,146,76,0.38)",
+    });
+  }
+
+  return badges.map((badge, index) => (
+    <span
+      key={index}
+      className="inline-flex items-center px-[11px] py-[4px] rounded-full text-[10.5px] font-[800] tracking-[0.04em] uppercase leading-[1.5] whitespace-nowrap"
+      style={{
+        color: badge.text,
+        background: badge.tint,
+        border: `1px solid ${badge.border}`,
+      }}
+    >
+      {badge.label}
+    </span>
+  ));
+}
+
+
+function AuthorityTypeBadge({ commonStat, contractStat, brokerStat }) {
+  const isActive = (val) =>
+    !!val && val.toString().trim().toUpperCase() === "A";
+
+  const isCarrier = isActive(commonStat) || isActive(contractStat);
+  const isBroker = isActive(brokerStat);
+
+  if (!isCarrier && !isBroker) return null;
+
+  const badges = [];
+
+  if (isCarrier) {
+    badges.push({
+      label: "CARRIER",
+      text: "#1E3FB8",
+      tint: "#EEF2FF",
+      border: "rgba(41,83,228,0.32)",
+    });
+  }
+
+  if (isBroker) {
+    badges.push({
+      label: "BROKER",
+      text: "#15803D",
+      tint: "#E7FBEF",
+      border: "rgba(21,146,76,0.38)",
+    });
+  }
+
+  return badges.map((badge, index) => (
+    <span
+      key={index}
+      className="inline-flex items-center px-[11px] py-[4px] rounded-full text-[10.5px] font-[800] tracking-[0.04em] uppercase leading-[1.5] whitespace-nowrap"
+      style={{
+        color: badge.text,
+        background: badge.tint,
+        border: `1px solid ${badge.border}`,
+      }}
+    >
+      {badge.label}
+    </span>
+  ));
+}
+
   const scrollToSection = function (label) {
     if (label === "INFORMATION") {
       if (informationTabs.includes(activeTab)) {
@@ -885,6 +1021,13 @@ function CarrierProfile() {
         <div className="mx-auto max-w-[1600px]">
           <CarrierProfileSection
             variant="hero"
+             status={
+        isBlocked
+            ? 'blocked'
+            : isConnected
+                ? 'connected'
+                : 'default'
+    }
             title={carrier.company_name || "NA"}
             subtitle={carrier.dba_name || "NA"}
             leftItems={[
@@ -918,6 +1061,7 @@ function CarrierProfile() {
                   />
                 ),
               },
+
             ]}
             rightItems={[
               {
@@ -942,7 +1086,7 @@ function CarrierProfile() {
             actions={[
               !isShortlisted
                 ? {
-                    label: "Add to Preferred",
+                    label: "Monitoring",
                     icon: <Add />,
                     variant: "secondary",
                     onClick: addToPreferred,
@@ -950,7 +1094,7 @@ function CarrierProfile() {
                     loading: shortlisting,
                   }
                 : {
-                    label: "Remove from Shortlisted",
+                    label: "Unmonitor",
                     icon: <DeleteOutline />,
                     variant: "danger",
                     onClick: removeFromShortlist,
@@ -959,7 +1103,7 @@ function CarrierProfile() {
                   },
               !isBlocked
                 ? {
-                    label: "Block Carrier",
+                    label: "Block",
                     icon: <BlockOutlined className="!text-[18px]" />,
                     variant: "danger",
                     onClick: blockCarrier,
@@ -967,7 +1111,7 @@ function CarrierProfile() {
                     loading: blocking,
                   }
                 : {
-                    label: "Unblock Carrier",
+                    label: "Unblock",
                     icon: <CheckCircleOutlined className="!text-[18px]" />,
                     variant: "secondary",
                     onClick: unblockCarrier,
@@ -975,7 +1119,7 @@ function CarrierProfile() {
                     loading: unblocking,
                   },
               {
-                label: "Report Carrier",
+                label: "Report ",
                 icon: <ReportProblemOutlined className="!text-[18px]" />,
                 variant: "danger",
                 onClick: () => setReportModalOpen(true),
@@ -1015,6 +1159,63 @@ function CarrierProfile() {
               <OnboardingStatus request={connectRequest} />
             </div>
           )}
+
+        {/* --- Certifications --- */}
+<div className="mt-[24px] flex flex-wrap items-center gap-[20px] rounded-[16px] border border-[#d9e1ee] bg-white p-[16px_20px] shadow-sm">
+  <span className="text-[12px] font-[700] uppercase tracking-tight text-[#64748b]">
+    Certification:
+  </span>
+
+  <div className="flex items-center gap-[24px]">
+    <CertificationBadge
+      activeSrc={smartwayActive}
+      inactiveSrc={smartwayInactive}
+      label="SmartWay Certified"
+      active={!!compliance?.smartway}
+    />
+    <CertificationBadge
+      activeSrc={cert2Active}
+      inactiveSrc={cert2Inactive}
+      label="CARB Compliant"
+      active={!!compliance?.carb}
+    />
+    <CertificationBadge
+      activeSrc="COLORED_CERT3_URL_HERE"
+      inactiveSrc={cert3Inactive}
+      label="PHMSA Compliant"
+      active={!!compliance?.phmsa}
+    />
+  </div>
+
+  {carrier?.fmcsa_data?.carrierOperation?.carrierOperationDesc && (
+    <>
+      <div className="hidden sm:block h-[34px] w-px bg-[#e5eaf2]" />
+
+      <div className="flex flex-wrap items-center gap-[10px]">
+        <CarrierOperationBadge
+          desc={carrier.fmcsa_data.carrierOperation.carrierOperationDesc}
+        />
+      </div>
+    </>
+  )}
+
+  {(carrier?.authority?.common_stat?.toString().trim().toUpperCase() === "A" ||
+    carrier?.authority?.contract_stat?.toString().trim().toUpperCase() === "A" ||
+    carrier?.authority?.broker_stat?.toString().trim().toUpperCase() === "A") && (
+    <>
+      <div className="hidden sm:block h-[34px] w-px bg-[#e5eaf2]" />
+
+      <div className="flex flex-wrap items-center gap-[10px]">
+        <AuthorityTypeBadge
+          commonStat={carrier?.authority?.common_stat}
+          contractStat={carrier?.authority?.contract_stat}
+          brokerStat={carrier?.authority?.broker_stat}
+        />
+      </div>
+    </>
+  )}
+</div>
+          
 
           <div className="mt-[24px]">
             <CarrierProfileSection
