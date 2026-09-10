@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Login from './pages/auth/Login'
 import Signup from './pages/auth/Signup'
@@ -61,6 +62,9 @@ DTPay Guest Pay
 import DtPayGuestPay from './pages/app/DtPayGuestPay';
 
 
+import NewPartnerCard from './pages/app/new-partner/Card';
+
+
 // Paths that should render full-page, without the app header/nav chrome.
 // /subscribe is one of these: it's shown as a forced, standalone step
 // (right after signup, or when RouteGuard redirects here for not having
@@ -73,6 +77,10 @@ const NO_HEADER_PATHS = ['/subscribe', '/accept-invitation'];
 function AppShell() {
   const location = useLocation();
   const hideHeader = NO_HEADER_PATHS.includes(location.pathname);
+
+  useEffect(() => {
+  window.scrollTo(0, 0);
+}, [location.pathname]);
 
   return (
     <RouteGuard>
@@ -127,6 +135,8 @@ function AppShell() {
           <Route path="/shipment/:row_id" element={<ControlTowerShipment />} />
           <Route path="/profile/carriers/shortlisted" element={<ShortlistedCarriers />} />
           <Route path="/profile/carriers/blocked" element={<BlockedCarriers />} />
+
+          <Route path="/carriers/new-partner" element={<NewPartnerCard />} />
 
           {/* The header's Carriers link points here; before this it fell
               through to the catch-all and bounced back to login. */}

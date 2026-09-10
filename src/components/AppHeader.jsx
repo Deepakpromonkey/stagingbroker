@@ -30,12 +30,14 @@ import Group from '@mui/icons-material/Group';
 import CreditCardOutlined from '@mui/icons-material/CreditCardOutlined';
 import MenuIcon from '@mui/icons-material/Menu';
 import CloseIcon from '@mui/icons-material/Close';
+import PersonSearchOutlinedIcon from '@mui/icons-material/PersonSearchOutlined';
 
 import { apiFetch } from '../lib/api';
 import { logout } from '../utils/Auth';
 import logo from '../assets/images/logo.webp';
 
 import SearchOverlay from './SearchOverlay';
+import FindPartnerOverlay from './FindPartnerOverlay';
 
 const AUTH_TOKEN_KEY = 'crm_auth_token';
 const AUTH_USER_KEY = 'crm_user';
@@ -98,6 +100,25 @@ function navLinkClass({ isActive }) {
     ].join(' ');
 }
 
+// ---------------------------------------------------------------------
+// Same normalization ProfileUpdate does: right after a fresh login, the
+// stored "crm_user" object may only have "profile_image" (the field the
+// API actually returns) and not "profile_pic_url" (the field this header
+// reads for the Avatar src). Without this fallback the avatar stays blank
+// until the user happens to open /profile, since that page was previously
+// the only place that normalized and rewrote it back to localStorage.
+//
+// Kept as a standalone helper (rather than inlined) so every place that
+// can produce/consume a "crm_user"-shaped object in this component —
+// initial read, the "storage" event, and the "crm-user-updated" event —
+// goes through the same fallback logic.
+// ---------------------------------------------------------------------
+function normalizeUser(rawUser) {
+    if (!rawUser) return rawUser;
+    const resolvedPicUrl = rawUser.profile_pic_url || rawUser.profile_image || '';
+    return { ...rawUser, profile_pic_url: resolvedPicUrl };
+}
+
 export default function AppHeader() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -106,6 +127,7 @@ export default function AppHeader() {
 
     const [profileMenuAnchor, setProfileMenuAnchor] = useState(null);
     const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
+    const [findPartnerOpen, setFindPartnerOpen] = useState(false);
     const [notificationsCount, setNotificationsCount] = useState(0);
     const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
@@ -113,7 +135,18 @@ export default function AppHeader() {
         const storedUser = localStorage.getItem(AUTH_USER_KEY);
         if (storedUser) {
             try {
-                setUser(JSON.parse(storedUser));
+                const parsedUser = JSON.parse(storedUser);
+                const normalizedUser = normalizeUser(parsedUser);
+
+                // If we had to fall back to profile_image, persist the fix so
+                // every other reader of crm_user (this header, other tabs,
+                // ProfileUpdate, etc.) sees the corrected shape too, not just
+                // this component instance.
+                if (normalizedUser.profile_pic_url && !parsedUser.profile_pic_url) {
+                    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(normalizedUser));
+                }
+
+                setUser(normalizedUser);
             } catch (e) {
                 setUser(null);
             }
@@ -137,10 +170,11 @@ export default function AppHeader() {
         return () => window.removeEventListener('storage', onStorage);
     }, []);
 
+
     useEffect(() => {
         const onUserUpdated = (e) => {
             if (e?.detail) {
-                setUser(e.detail);
+                setUser(normalizeUser(e.detail));
             } else {
                 readUserFromStorage();
             }
@@ -244,6 +278,47 @@ export default function AppHeader() {
                 }}
             >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <Button
+                        id="find_partner_button"
+                        variant="outlined"
+                        size="small"
+                        disableRipple
+                        startIcon={<PersonSearchOutlinedIcon sx={{ fontSize: 16 }} />}
+                        onClick={() => setFindPartnerOpen(true)}
+                        sx={{
+                            textTransform: 'none',
+                            fontWeight: 700,
+                            fontSize: 12.5,
+                            borderRadius: '8px',
+                            borderColor: 'rgba(226,232,240,1)',
+                            color: '#334155',
+                            px: 1.5,
+                            mr: 1,
+                            whiteSpace: 'nowrap',
+                            userSelect: 'none',
+                            WebkitUserSelect: 'none',
+                            WebkitTapHighlightColor: 'transparent', // kills the gray tap flash on click/keyboard activation
+                            outline: 'none',
+                            '& *': {
+                                userSelect: 'none',
+                                WebkitUserSelect: 'none',
+                            },
+                            '&:focus': {
+                                outline: 'none',
+                            },
+                            '&.Mui-focusVisible': {
+                                outline: 'none',
+                                backgroundColor: 'transparent',
+                            },
+                            '&:hover': {
+                                borderColor: 'rgba(203,213,225,1)',
+                                backgroundColor: 'rgba(248,250,252,1)',
+                            },
+                        }}
+                    >
+                        Find New Partner
+                    </Button>
+
                     <IconButton
                         id="search_button"
                         size="small"
@@ -302,6 +377,14 @@ export default function AppHeader() {
                     flexShrink: 0,
                 }}
             >
+                <IconButton
+                    size="small"
+                    aria-label="Find New Partner"
+                    onClick={() => setFindPartnerOpen(true)}
+                >
+                    <PersonSearchOutlinedIcon fontSize="small" />
+                </IconButton>
+
                 <IconButton
                     size="small"
                     aria-label="Search"
@@ -437,6 +520,24 @@ export default function AppHeader() {
                         Navigation
                     </Box>
                     <List disablePadding>
+                        <ListItem disablePadding>
+                            <ListItemButton
+                                onClick={() => {
+                                    setMobileDrawerOpen(false);
+                                    setFindPartnerOpen(true);
+                                }}
+                                sx={{ borderRadius: '8px', my: 0.25, gap: 1.5 }}
+                            >
+                                <ListItemIcon sx={{ minWidth: 'auto', color: '#64748b' }}>
+                                    <PersonSearchOutlinedIcon sx={{ fontSize: 18 }} />
+                                </ListItemIcon>
+                                <ListItemText
+                                    primary="Find New Partner"
+                                    primaryTypographyProps={{ fontSize: 13, fontWeight: 700 }}
+                                />
+                            </ListItemButton>
+                        </ListItem>
+
                         {filteredNavLinks.map((item) => (
                             <ListItem key={item.to} disablePadding>
                                 <ListItemButton
@@ -519,6 +620,15 @@ export default function AppHeader() {
                 onSearch={(query, type) => {
                     setSearchOverlayOpen(false);
                     navigate(`/carriers/search?q=${encodeURIComponent(query)}&searched_by=${encodeURIComponent(type)}`);
+                }}
+            />
+
+            <FindPartnerOverlay
+                open={findPartnerOpen}
+                onClose={() => setFindPartnerOpen(false)}
+                onSearch={({ type, location }) => {
+                    setFindPartnerOpen(false);
+                    navigate(`/carriers/new-partner?type=${encodeURIComponent(type)}&location=${encodeURIComponent(location)}`);
                 }}
             />
         </Box>

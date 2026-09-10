@@ -143,25 +143,36 @@ if (res.status === 401) {
         clearTimeout(timeoutId);
     }
 }
-export async function apiDownload(path, fallbackName = "download") {
+export async function apiDownload(path, optionsOrFallbackName = {}, fallbackName = "download") {
+    let options = optionsOrFallbackName;
+
+    if (typeof optionsOrFallbackName === "string") {
+        fallbackName = optionsOrFallbackName;
+        options = {};
+    }
+
+    const { method = "GET", body, headers: extraHeaders, ...restOptions } = options;
+    const isFormData = body instanceof FormData;
+
     const res = await fetch(`${API_BASE}${path}`, {
-        headers: authHeaders(),
+        ...restOptions,
+        method,
+        body,
+        headers: {
+            ...authHeaders(isFormData),
+            ...extraHeaders,
+        },
     });
 
     if (!res.ok) {
-        // Errors still come back as JSON, so the message survives.
         let message = `Download failed (${res.status})`;
-
         try {
             const json = await res.json();
             if (json?.message) message = json.message;
         } catch { /* not JSON — keep the status message */ }
-
         throw new Error(message);
     }
 
-    // The server names the file in Content-Disposition; fall back to the
-    // caller's name when the header is absent or unparseable.
     const disposition = res.headers.get("Content-Disposition") || "";
     const match = disposition.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
     const filename = match ? decodeURIComponent(match[1]) : fallbackName;
