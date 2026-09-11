@@ -256,6 +256,174 @@ function StatePath({ steps }) {
 }
 
 /*
+ * What each signal the model raises means to a broker.
+ *
+ * Kept as prose rather than the raw token: `certificate_disowned` is the most
+ * serious thing a reply can say and it should not need decoding.
+ */
+const REPLY_SIGNALS = {
+    policy_not_in_force: { label: 'Policy not in force', tone: 'bad' },
+    cancellation_rescinded: { label: 'Cancellation withdrawn', tone: 'good' },
+    awaiting_authorization: { label: 'Needs insured\u2019s approval', tone: 'wait' },
+    renewal_pending: { label: 'Renewal not yet bound', tone: 'wait' },
+    wrong_agency: { label: 'No longer this agency', tone: 'wait' },
+    direct_writer: { label: 'Direct policy \u2014 agency cannot issue', tone: 'wait' },
+    out_of_office: { label: 'Out of office', tone: 'wait' },
+    asks_requirements: { label: 'Asking what we need', tone: 'wait' },
+    certificate_disowned: { label: 'Agency did not issue this certificate', tone: 'bad' },
+    limit_discrepancy: { label: 'Limit differs from the certificate', tone: 'bad' },
+    insurer_changed: { label: 'Insurer changed', tone: 'wait' },
+    filing_lag: { label: 'FMCSA filing behind', tone: 'wait' }
+};
+
+const SIGNAL_TONE = {
+    bad: 'bg-[#fee2e2] text-[#991b1b]',
+    wait: 'bg-[#fef3c7] text-[#92400e]',
+    good: 'bg-[#dcfce7] text-[#166534]'
+};
+
+function money(value) {
+
+    if (typeof value !== 'number' || Number.isNaN(value)) {
+        return null;
+    }
+
+    return '$' + value.toLocaleString('en-US');
+}
+
+/*
+ * The model's reading of one reply, beside the reply itself.
+ *
+ * A broker books loads on limits and exclusions as much as on the expiry date,
+ * and those arrive as prose buried in the same mail - so what was read out of
+ * it is shown next to it rather than left in the JSON.
+ */
+function ReplyReading({ reading }) {
+
+    if (!reading) {
+        return null;
+    }
+
+    const coverages = Array.isArray(reading.coverages) ? reading.coverages : [];
+    const exclusions = Array.isArray(reading.exclusions) ? reading.exclusions : [];
+    const subLimits = Array.isArray(reading.sub_limits) ? reading.sub_limits : [];
+    const signals = Array.isArray(reading.signals) ? reading.signals : [];
+
+    const hasBody = coverages.length || exclusions.length || subLimits.length
+        || signals.length || reading.policy_number || reading.insurer || reading.holder_name;
+
+    if (!hasBody) {
+        return null;
+    }
+
+    return (
+        <div className='mt-[8px] rounded-[8px] bg-[#f8fafc] p-[10px] ring-1 ring-[#e5e7eb]'>
+
+            {signals.length ? (
+                <div className='mb-[8px] flex flex-wrap gap-[5px]'>
+                    {signals.map(function (signal) {
+                        const known = REPLY_SIGNALS[signal];
+
+                        return (
+                            <span
+                                key={signal}
+                                className={`rounded-[999px] px-[8px] py-[2px] text-[10px] font-[700] ${
+                                    SIGNAL_TONE[known?.tone] || 'bg-[#e2e8f0] text-[#475569]'
+                                }`}
+                            >
+                                {known ? known.label : signal.replace(/_/g, ' ')}
+                            </span>
+                        );
+                    })}
+                </div>
+            ) : null}
+
+            {reading.summary ? (
+                <p className='mb-[8px] text-[12px] font-[500] italic text-[#475569]'>
+                    {reading.summary}
+                </p>
+            ) : null}
+
+            {coverages.length ? (
+                <table className='mb-[8px] w-full border-collapse text-[11.5px]'>
+                    <tbody>
+                        {coverages.map(function (coverage, index) {
+                            return (
+                                <tr key={`${coverage?.type || 'coverage'}-${index}`}>
+                                    <td className='py-[2px] pr-[8px] font-[600] capitalize text-[#334155]'>
+                                        {coverage?.type || 'Coverage'}
+                                    </td>
+                                    <td className='py-[2px] pr-[8px] text-right font-[700] tabular-nums text-[#111827]'>
+                                        {money(coverage?.limit) || '\u2014'}
+                                    </td>
+                                    <td className='py-[2px] text-right text-[#64748b]'>
+                                        {coverage?.expiry_date ? formatDate(coverage.expiry_date) : ''}
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            ) : null}
+
+            {/*
+              * Sub-limits sit above exclusions and carry the warning colour:
+              * a $100,000 seafood sub-limit under a $250,000 cargo line is how
+              * a load gets tendered under-insured on a certificate that reads
+              * as perfectly good.
+              */}
+            {subLimits.length ? (
+                <div className='mb-[8px] rounded-[6px] bg-[#fef3c7] px-[9px] py-[7px]'>
+
+                    <p className='text-[10px] font-[700] uppercase tracking-[0.06em] text-[#92400e]'>
+                        Commodity sub-limits
+                    </p>
+
+                    <ul className='mt-[3px] flex flex-col gap-[2px]'>
+                        {subLimits.map(function (limit, index) {
+                            return (
+                                <li key={`${limit?.commodity || 'sub'}-${index}`} className='text-[11.5px] font-[600] text-[#7c2d12]'>
+                                    {limit?.commodity}: {money(limit?.limit) || '\u2014'}
+                                </li>
+                            );
+                        })}
+                    </ul>
+
+                </div>
+            ) : null}
+
+            {exclusions.length ? (
+                <div className='mb-[8px]'>
+
+                    <p className='text-[10px] font-[700] uppercase tracking-[0.06em] text-[#94a3b8]'>
+                        Not covered
+                    </p>
+
+                    <ul className='mt-[3px] flex flex-col gap-[2px]'>
+                        {exclusions.map(function (exclusion, index) {
+                            return (
+                                <li key={`exclusion-${index}`} className='text-[11.5px] font-[500] text-[#475569]'>
+                                    &middot; {exclusion}
+                                </li>
+                            );
+                        })}
+                    </ul>
+
+                </div>
+            ) : null}
+
+            <div className='flex flex-wrap gap-x-[14px] gap-y-[3px] text-[11px] text-[#64748b]'>
+                {reading.policy_number ? <span>Policy <b className='font-[600] text-[#334155]'>{reading.policy_number}</b></span> : null}
+                {reading.insurer ? <span>Insurer <b className='font-[600] text-[#334155]'>{reading.insurer}</b></span> : null}
+                {reading.holder_name ? <span>Holder <b className='font-[600] text-[#334155]'>{reading.holder_name}</b></span> : null}
+                {reading.alternate_email ? <span>Write instead to <b className='font-[600] text-[#334155]'>{reading.alternate_email}</b></span> : null}
+            </div>
+
+        </div>
+    );
+}
+
+/*
  * One message in the thread.
  *
  * Outbound and inbound are told apart by which side of the card the accent
@@ -331,6 +499,8 @@ function ThreadMessage({ message }) {
 
                 </div>
             ) : null}
+
+            <ReplyReading reading={message.extracted} />
 
             {/*
               * The machine's reading of the reply, folded away. A broker
