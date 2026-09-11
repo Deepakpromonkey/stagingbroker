@@ -525,6 +525,79 @@ function ThreadMessage({ message }) {
     );
 }
 
+/*
+ * How the certificate compared to the FMCSA filing.
+ *
+ * Shown above the thread rather than inside it: it is a fact about the
+ * request, not about any one reply, and it is the thing that decides whether
+ * a broker can act on the date underneath it.
+ */
+const VERIFICATION = {
+    matches: {
+        label: 'Matches FMCSA',
+        className: 'border-[#86efac] bg-[#f0fdf4] text-[#166534]'
+    },
+    filing_lag: {
+        label: 'FMCSA filing behind',
+        className: 'border-[#fcd34d] bg-[#fffbeb] text-[#92400e]'
+    },
+    insurer_mismatch: {
+        label: 'Insurer does not match FMCSA',
+        className: 'border-[#fca5a5] bg-[#fef2f2] text-[#991b1b]'
+    },
+    pending_cancellation: {
+        label: 'Cancellation pending at FMCSA',
+        className: 'border-[#fca5a5] bg-[#fef2f2] text-[#991b1b]'
+    },
+    not_checked: {
+        label: 'Not checked against FMCSA',
+        className: 'border-[#e2e8f0] bg-[#f8fafc] text-[#475569]'
+    }
+};
+
+function VerificationBanner({ verification }) {
+
+    if (!verification || !verification.verdict) {
+        return null;
+    }
+
+    const shown = VERIFICATION[verification.verdict] || VERIFICATION.not_checked;
+
+    return (
+        <div className={`mb-[14px] rounded-[10px] border px-[14px] py-[11px] ${shown.className}`}>
+
+            <p className='text-[12px] font-[800]'>
+                {shown.label}
+            </p>
+
+            {verification.reason ? (
+                <p className='mt-[3px] text-[12px] font-[500] opacity-90'>
+                    {verification.reason}
+                </p>
+            ) : null}
+
+            {/*
+              * The two names side by side. A broker deciding whether to hold a
+              * carrier wants to see the disagreement itself, not a verdict
+              * about it.
+              */}
+            {verification.insurer_on_certificate || verification.insurer_on_file ? (
+                <div className='mt-[8px] flex flex-wrap gap-x-[18px] gap-y-[3px] text-[11px] opacity-90'>
+                    <span>Certificate: <b className='font-[700]'>{verification.insurer_on_certificate || 'NA'}</b></span>
+                    <span>FMCSA: <b className='font-[700]'>{verification.insurer_on_file || 'NA'}</b></span>
+                </div>
+            ) : null}
+
+            {verification.recheck_after ? (
+                <p className='mt-[6px] text-[11px] font-[600]'>
+                    Check again after {formatDate(verification.recheck_after)}
+                </p>
+            ) : null}
+
+        </div>
+    );
+}
+
 function InsuranceThreadModal({ detail, isLoading, error, onClose }) {
     const messages = Array.isArray(detail?.messages) ? detail.messages : [];
 
@@ -568,6 +641,8 @@ function InsuranceThreadModal({ detail, isLoading, error, onClose }) {
                         <p className='text-[13px] font-[500] text-[#991b1b]'>{error}</p>
                     ) : detail ? (
                         <>
+                            <VerificationBanner verification={detail.request?.verification} />
+
                             <StatePath steps={detail.state_path} />
 
                             <p className='mb-[6px] text-[10px] font-[700] uppercase tracking-[0.08em] text-[#94a3b8]'>
