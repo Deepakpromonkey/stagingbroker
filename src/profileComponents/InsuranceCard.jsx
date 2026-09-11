@@ -105,6 +105,10 @@ const REQUEST_STATUS = {
         label: 'Received',
         className: 'bg-[#dcfce7] text-[#166534]'
     },
+    awaiting: {
+        label: 'Awaiting cert',
+        className: 'bg-[#fef3c7] text-[#92400e]'
+    },
     failed: {
         label: 'Failed',
         className: 'bg-[#fee2e2] text-[#991b1b]'
@@ -117,7 +121,9 @@ const REQUEST_STATUS = {
 
 // Statuses where the agency has been mailed and has not finished answering,
 // so the raise button stays disabled rather than sending a duplicate.
-const OPEN_STATUSES = ['pending', 'responded'];
+// `awaiting` counts: the agency replied without a date and the certificate is
+// still expected, so a second request would chase a conversation already open.
+const OPEN_STATUSES = ['pending', 'responded', 'awaiting'];
 
 function formatDate(value) {
 
