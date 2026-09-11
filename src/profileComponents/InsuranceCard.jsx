@@ -644,6 +644,131 @@ function VerificationBanner({ verification }) {
     );
 }
 
+/*
+ * What the broker is asking the agency for.
+ *
+ * A fixed list rather than free text for the questions themselves: each one
+ * maps to something the reply is read for, and a question nothing can read
+ * the answer to is not worth putting to a stranger. The note at the bottom is
+ * where anything else goes.
+ */
+const ASK_OPTIONS = [
+    { key: 'expiry', label: 'Policy expiry date' },
+    { key: 'limits', label: 'Auto liability and cargo limits' },
+    { key: 'schedule', label: 'Any Auto or Scheduled Autos \u2014 and the VINs if scheduled' },
+    { key: 'exclusions', label: 'Exclusions, deductibles and commodity sub-limits' },
+    { key: 'insurer', label: 'Insurer and policy number' },
+    { key: 'holder', label: 'Certificate made out to our company, with MC and USDOT' }
+];
+
+function RaiseRequestModal({ isRaising, error, onRaise, onClose }) {
+    const [asks, setAsks] = useState(ASK_OPTIONS.map((option) => option.key));
+    const [note, setNote] = useState('');
+
+    function toggle(key) {
+
+        setAsks(function (current) {
+            return current.includes(key)
+                ? current.filter((item) => item !== key)
+                : current.concat(key);
+        });
+    }
+
+    return (
+        <div
+            className='fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-[16px]'
+            onClick={onClose}
+        >
+            <div
+                onClick={(event) => event.stopPropagation()}
+                className='flex max-h-[80vh] w-full max-w-[520px] flex-col overflow-hidden rounded-[16px] bg-white shadow-xl'
+            >
+                <div className='flex items-center justify-between border-b border-[#e5e7eb] px-[16px] py-[12px]'>
+
+                    <div>
+                        <h3 className='text-[15px] font-[700] text-[#111827]'>
+                            Ask the agency
+                        </h3>
+                        <p className='mt-[1px] text-[11px] font-[500] text-[#94a3b8]'>
+                            Everything is asked by default
+                        </p>
+                    </div>
+
+                    <button
+                        type='button'
+                        onClick={onClose}
+                        className='flex items-center justify-center rounded-[8px] p-[6px] text-[#6b7280] transition-colors hover:bg-[#f1f5f9] hover:text-[#111827]'
+                    >
+                        <CloseOutlined sx={{ fontSize: 18 }} />
+                    </button>
+                </div>
+
+                <div className='flex-1 overflow-y-auto px-[16px] py-[14px]'>
+
+                    <ul className='flex flex-col gap-[2px]'>
+                        {ASK_OPTIONS.map(function (option) {
+                            return (
+                                <li key={option.key}>
+                                    <label className='flex cursor-pointer items-start gap-[9px] rounded-[8px] px-[8px] py-[7px] transition-colors hover:bg-[#f8fafc]'>
+
+                                        <input
+                                            type='checkbox'
+                                            id={`ask-${option.key}`}
+                                            checked={asks.includes(option.key)}
+                                            onChange={() => toggle(option.key)}
+                                            className='mt-[2px] h-[15px] w-[15px] flex-shrink-0 accent-[#0f57c8]'
+                                        />
+
+                                        <span className='text-[13px] font-[500] text-[#334155]'>
+                                            {option.label}
+                                        </span>
+
+                                    </label>
+                                </li>
+                            );
+                        })}
+                    </ul>
+
+                    <label
+                        htmlFor='ask-note'
+                        className='mt-[12px] block text-[10px] font-[700] uppercase tracking-[0.08em] text-[#94a3b8]'
+                    >
+                        Anything else
+                    </label>
+
+                    <textarea
+                        id='ask-note'
+                        value={note}
+                        onChange={(event) => setNote(event.target.value)}
+                        rows={2}
+                        maxLength={500}
+                        placeholder='Does the cargo form cover frozen seafood?'
+                        className='mt-[4px] w-full rounded-[8px] border border-[#e5e7eb] p-[9px] text-[13px] text-[#334155] outline-none transition focus:border-[#0f57c8] focus:ring-2 focus:ring-[#dbeafe]'
+                    />
+
+                    {error ? (
+                        <p className='mt-[10px] text-[12px] font-[500] text-[#991b1b]'>{error}</p>
+                    ) : null}
+
+                </div>
+
+                <div className='border-t border-[#e5e7eb] px-[16px] py-[12px]'>
+                    <button
+                        type='button'
+                        disabled={isRaising || (asks.length === 0 && !note.trim())}
+                        onClick={() => onRaise(asks, note.trim())}
+                        className='flex w-full items-center justify-center gap-[6px] rounded-[10px] bg-[#0f57c8] py-[12px] text-[13px] font-[700] text-white transition-all hover:bg-[#0c47a3] disabled:cursor-not-allowed disabled:opacity-50'
+                    >
+                        <MailOutlineOutlined sx={{ fontSize: 16 }} />
+                        {isRaising ? 'Sending\u2026' : 'Send request'}
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    );
+}
+
 function InsuranceThreadModal({ detail, isLoading, error, onClose }) {
     const messages = Array.isArray(detail?.messages) ? detail.messages : [];
 
@@ -736,6 +861,7 @@ function InsuranceCard(props) {
 
     const [insuranceRequest, setInsuranceRequest] = useState(null);
     const [isRaising, setIsRaising] = useState(false);
+    const [isAskOpen, setIsAskOpen] = useState(false);
     const [requestError, setRequestError] = useState(null);
 
     const [isResponseOpen, setIsResponseOpen] = useState(false);
@@ -875,7 +1001,7 @@ const coiUrl = coiDocument?.document_url
 
     }, [ocrCoverages]);
 
-    function handleRaise() {
+    function handleRaise(asks, note) {
 
         if (!dotNumber || isRaising || isRequestOpen) {
             return;
@@ -889,11 +1015,14 @@ const coiUrl = coiDocument?.document_url
             body: JSON.stringify({
                 dot_number: dotNumber,
                 carrier_name: carrierName,
-                carrier_mc: carrierMc
+                carrier_mc: carrierMc,
+                asks: asks,
+                ask_note: note || null
             })
         })
             .then(function (result) {
                 setInsuranceRequest(result?.data || null);
+                setIsAskOpen(false);
             })
             .catch(function (err) {
 
@@ -1082,7 +1211,7 @@ const coiUrl = coiDocument?.document_url
             <button
                 type='button'
                 disabled={!dotNumber || isRaising || isRequestOpen}
-                onClick={handleRaise}
+                onClick={() => setIsAskOpen(true)}
                 title={
                     isRequestOpen
                         ? 'A request is already with this carrier\u2019s agency.'
@@ -1132,6 +1261,15 @@ const coiUrl = coiDocument?.document_url
             <CoiDocumentModal
                 url={coiUrl}
                 onClose={() => setIsCoiModalOpen(false)}
+            />
+        )}
+
+        {isAskOpen && (
+            <RaiseRequestModal
+                isRaising={isRaising}
+                error={requestError}
+                onRaise={handleRaise}
+                onClose={() => setIsAskOpen(false)}
             />
         )}
 
