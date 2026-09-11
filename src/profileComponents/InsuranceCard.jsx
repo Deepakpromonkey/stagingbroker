@@ -136,7 +136,221 @@ function formatDate(value) {
         });
 }
 
-function InsuranceResponseModal({ detail, isLoading, error, onClose }) {
+function formatDateTime(value) {
+
+    if (!value) {
+        return 'NA';
+    }
+
+    const parsed = new Date(value);
+
+    return Number.isNaN(parsed.getTime())
+        ? value
+        : parsed.toLocaleString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit'
+        });
+}
+
+/*
+ * The request's path, as a rail down the left of the thread.
+ *
+ * A status chip says where a request stopped; this says how it got there and
+ * what it is still waiting for, which is the difference between "chase the
+ * agency again" and "leave it alone, the reply is being read".
+ */
+function StatePath({ steps }) {
+
+    if (!Array.isArray(steps) || steps.length === 0) {
+        return null;
+    }
+
+    // The request's current position: the last step actually reached.
+    let currentIndex = -1;
+
+    steps.forEach(function (step, index) {
+
+        if (step.reached) {
+            currentIndex = index;
+        }
+    });
+
+    return (
+        <ol className='mb-[16px] rounded-[10px] bg-[#f8fafc] px-[14px] py-[12px]'>
+
+            {steps.map(function (step, index) {
+                const isCurrent = index === currentIndex;
+                const isLast = index === steps.length - 1;
+
+                return (
+                    <li key={step.state} className='flex gap-[10px]'>
+
+                        {/*
+                          * The rail. The dot marks the step and the line joins
+                          * it to the next one, so an unreached tail reads as
+                          * "not yet" rather than as a gap.
+                          */}
+                        <div className='flex flex-col items-center'>
+
+                            <span
+                                className={`mt-[4px] h-[9px] w-[9px] flex-shrink-0 rounded-full ${
+                                    step.reached ? 'bg-[#0f57c8]' : 'bg-[#cbd5e1]'
+                                }`}
+                            />
+
+                            {!isLast ? (
+                                <span
+                                    className={`w-[2px] flex-1 ${
+                                        step.reached ? 'bg-[#bfdbfe]' : 'bg-[#e2e8f0]'
+                                    }`}
+                                />
+                            ) : null}
+
+                        </div>
+
+                        <div className={isLast ? 'pb-[2px]' : 'pb-[12px]'}>
+
+                            <p
+                                className={`text-[12px] font-[700] ${
+                                    step.reached ? 'text-[#111827]' : 'text-[#94a3b8]'
+                                }`}
+                            >
+                                {step.label}
+
+                                {isCurrent ? (
+                                    <span className='ml-[6px] rounded-[999px] bg-[#dbeafe] px-[7px] py-[1px] text-[9px] font-[700] uppercase tracking-[0.06em] text-[#1e40af]'>
+                                        Now
+                                    </span>
+                                ) : null}
+                            </p>
+
+                            {step.detail ? (
+                                <p className='mt-[2px] break-words text-[11px] font-[500] text-[#475569]'>
+                                    {step.detail}
+                                </p>
+                            ) : null}
+
+                            {step.at ? (
+                                <p className='mt-[2px] text-[11px] font-[500] text-[#94a3b8]'>
+                                    {formatDateTime(step.at)}
+                                </p>
+                            ) : null}
+
+                        </div>
+
+                    </li>
+                );
+            })}
+
+        </ol>
+    );
+}
+
+/*
+ * One message in the thread.
+ *
+ * Outbound and inbound are told apart by which side of the card the accent
+ * sits on rather than by a label, so a broker can count the replies at a
+ * glance without reading any of them.
+ */
+function ThreadMessage({ message }) {
+    const isOutbound = message.direction === 'outbound';
+
+    return (
+        <li
+            className={`rounded-[10px] p-[12px] ring-1 ${
+                isOutbound
+                    ? 'bg-[#f8fafc] ring-[#e5e7eb]'
+                    : 'bg-white ring-[#bfdbfe]'
+            }`}
+        >
+            <div className='flex flex-wrap items-baseline justify-between gap-[6px]'>
+
+                <p className='text-[12px] font-[700] text-[#111827]'>
+                    {isOutbound ? 'Sent to agency' : 'Reply from agency'}
+                </p>
+
+                <p className='text-[11px] font-[500] text-[#94a3b8]'>
+                    {formatDateTime(message.at)}
+                </p>
+
+            </div>
+
+            <p className='mt-[3px] break-words text-[11px] font-[500] text-[#475569]'>
+                {isOutbound
+                    ? `To ${message.to_email || 'NA'}`
+                    : `From ${message.from_name
+                        ? `${message.from_name} <${message.from_email}>`
+                        : message.from_email || 'NA'}`}
+            </p>
+
+            {message.subject ? (
+                <p className='mt-[6px] break-words text-[12px] font-[600] text-[#334155]'>
+                    {message.subject}
+                </p>
+            ) : null}
+
+            {message.body_text ? (
+                <pre className='mt-[8px] whitespace-pre-wrap break-words rounded-[8px] bg-white p-[10px] text-[12px] leading-[1.6] text-[#334155] ring-1 ring-[#e5e7eb]'>
+                    {message.body_text}
+                </pre>
+            ) : isOutbound ? (
+                /*
+                 * The outbound body is built from a template at send time and
+                 * never stored, so there is nothing to show. Saying so beats
+                 * an empty box that reads like a failure.
+                 */
+                <p className='mt-[8px] text-[11px] font-[500] text-[#94a3b8]'>
+                    Standard request for current insurance details.
+                </p>
+            ) : (
+                <p className='mt-[8px] text-[11px] font-[500] text-[#94a3b8]'>
+                    The reply had no readable text.
+                </p>
+            )}
+
+            {message.extracted_expiry_date ? (
+                <div className='mt-[8px] rounded-[8px] bg-[#f0fdf4] px-[10px] py-[7px]'>
+
+                    <p className='text-[10px] font-[700] uppercase tracking-[0.08em] text-[#15803d]'>
+                        Expiry date read from this reply
+                    </p>
+
+                    <p className='mt-[2px] text-[14px] font-[800] text-[#166534]'>
+                        {formatDate(message.extracted_expiry_date)}
+                    </p>
+
+                </div>
+            ) : null}
+
+            {/*
+              * The machine's reading of the reply, folded away. A broker
+              * acting on an extracted date should be able to check it against
+              * the source, but it is not what they open the thread to see.
+              */}
+            {message.llm_response ? (
+                <details className='mt-[8px]'>
+
+                    <summary className='cursor-pointer text-[11px] font-[600] text-[#0f57c8]'>
+                        How this was read
+                    </summary>
+
+                    <pre className='mt-[6px] whitespace-pre-wrap break-words rounded-[8px] bg-[#f8fafc] p-[10px] text-[11px] leading-[1.6] text-[#475569] ring-1 ring-[#e5e7eb]'>
+                        {message.llm_response}
+                    </pre>
+
+                </details>
+            ) : null}
+
+        </li>
+    );
+}
+
+function InsuranceThreadModal({ detail, isLoading, error, onClose }) {
+    const messages = Array.isArray(detail?.messages) ? detail.messages : [];
 
     return (
         <div
@@ -148,9 +362,18 @@ function InsuranceResponseModal({ detail, isLoading, error, onClose }) {
                 className='flex max-h-[80vh] w-full max-w-[720px] flex-col overflow-hidden rounded-[16px] bg-white shadow-xl'
             >
                 <div className='flex items-center justify-between border-b border-[#e5e7eb] px-[16px] py-[12px]'>
-                    <h3 className='text-[15px] font-[700] text-[#111827]'>
-                        Insurance response
-                    </h3>
+
+                    <div>
+                        <h3 className='text-[15px] font-[700] text-[#111827]'>
+                            Insurance request
+                        </h3>
+
+                        {detail?.request?.recipient_email ? (
+                            <p className='mt-[1px] break-words text-[11px] font-[500] text-[#94a3b8]'>
+                                {detail.request.recipient_email}
+                            </p>
+                        ) : null}
+                    </div>
 
                     <button
                         type='button'
@@ -164,61 +387,27 @@ function InsuranceResponseModal({ detail, isLoading, error, onClose }) {
                 <div className='flex-1 overflow-y-auto px-[16px] py-[14px]'>
 
                     {isLoading ? (
-                        <Skeleton variant='rounded' height={180} sx={{ borderRadius: '10px' }} />
+                        <Skeleton variant='rounded' height={220} sx={{ borderRadius: '10px' }} />
                     ) : error ? (
                         <p className='text-[13px] font-[500] text-[#991b1b]'>{error}</p>
                     ) : detail ? (
                         <>
-                            <div className='mb-[14px] rounded-[10px] bg-[#f8fafc] px-[14px] py-[12px]'>
+                            <StatePath steps={detail.state_path} />
 
-                                <p className='text-[10px] font-[700] uppercase tracking-[0.08em] text-[#94a3b8]'>
-                                    From
-                                </p>
-
-                                <p className='mt-[3px] text-[13px] font-[600] text-[#111827]'>
-                                    {detail.from_name
-                                        ? `${detail.from_name} <${detail.from_email}>`
-                                        : detail.from_email || 'NA'}
-                                </p>
-
-                                <p className='mt-[8px] text-[10px] font-[700] uppercase tracking-[0.08em] text-[#94a3b8]'>
-                                    Received
-                                </p>
-
-                                <p className='mt-[3px] text-[13px] font-[500] text-[#334155]'>
-                                    {formatDate(detail.received_at)}
-                                </p>
-
-                                {detail.extracted_expiry_date ? (
-                                    <>
-                                        <p className='mt-[8px] text-[10px] font-[700] uppercase tracking-[0.08em] text-[#94a3b8]'>
-                                            Insurance expiry date
-                                        </p>
-
-                                        <p className='mt-[3px] text-[15px] font-[800] text-[#166534]'>
-                                            {formatDate(detail.extracted_expiry_date)}
-                                        </p>
-                                    </>
-                                ) : null}
-
-                            </div>
-
-                            {/*
-                              * The reply as it arrived, kept in front of the
-                              * extracted date rather than behind it - the date
-                              * is a machine reading of this text, and a broker
-                              * about to book a load on it should be able to
-                              * check it against the source in one glance.
-                              */}
                             <p className='mb-[6px] text-[10px] font-[700] uppercase tracking-[0.08em] text-[#94a3b8]'>
-                                Reply
+                                Correspondence
                             </p>
 
-                            <pre className='whitespace-pre-wrap break-words rounded-[10px] bg-white p-[12px] text-[12px] leading-[1.6] text-[#334155] ring-1 ring-[#e5e7eb]'>
-                                {detail.body_text
-                                    || (detail.body_html ? detail.body_html.replace(/<[^>]+>/g, ' ') : '')
-                                    || 'The reply had no readable text.'}
-                            </pre>
+                            <ul className='flex flex-col gap-[10px]'>
+                                {messages.map(function (message, index) {
+                                    return (
+                                        <ThreadMessage
+                                            key={message.uuid || `message-${index}`}
+                                            message={message}
+                                        />
+                                    );
+                                })}
+                            </ul>
                         </>
                     ) : (
                         <p className='text-[13px] font-[500] text-[#94a3b8]'>
@@ -425,31 +614,30 @@ const coiUrl = coiDocument?.document_url
             return;
         }
 
-        // Without a reply there is nothing to open, so Track just refreshes -
-        // the status may have moved since the page was loaded.
-        if (!insuranceRequest.response_uuid) {
-
-            apiFetch(`/carriers/${dotNumber}/insurance-request`)
-                .then(function (result) {
-                    setInsuranceRequest(result?.data || null);
-                })
-                .catch(function (err) {
-                    console.error('InsuranceCard request refresh error:', err);
-                });
-
-            return;
-        }
-
+        /*
+         * Opened for every request, not only the answered ones. A request with
+         * no reply yet is exactly the one a broker is most likely to be asking
+         * about, and the thread answers "who was mailed, when, and how long
+         * has it been" without them having to raise a second request to find
+         * out.
+         */
         setIsResponseOpen(true);
         setIsLoadingResponse(true);
         setResponseError(null);
 
-        apiFetch(`/carrier-insurance-requests/responses/${insuranceRequest.response_uuid}`)
+        apiFetch(`/carrier-insurance-requests/${insuranceRequest.uuid}/thread`)
             .then(function (result) {
                 setResponseDetail(result?.data || null);
+
+                // The thread carries the request with it, so an status that
+                // moved since the page loaded is picked up here rather than
+                // waiting for the next poll.
+                if (result?.data?.request) {
+                    setInsuranceRequest(result.data.request);
+                }
             })
             .catch(function (err) {
-                setResponseError(err.message || 'Could not load the response.');
+                setResponseError(err.message || 'Could not load the thread.');
             })
             .finally(function () {
                 setIsLoadingResponse(false);
@@ -649,7 +837,7 @@ const coiUrl = coiDocument?.document_url
         )}
 
         {isResponseOpen && (
-            <InsuranceResponseModal
+            <InsuranceThreadModal
                 detail={responseDetail}
                 isLoading={isLoadingResponse}
                 error={responseError}
