@@ -473,13 +473,47 @@ function ThreadMessage({ message }) {
                 </pre>
             ) : isOutbound ? (
                 /*
-                 * The outbound body is built from a template at send time and
-                 * never stored, so there is nothing to show. Saying so beats
-                 * an empty box that reads like a failure.
+                 * The body is built from a template at send time and never
+                 * stored, and the broker chooses the questions - so there is
+                 * no single "standard request" to describe. The questions
+                 * themselves are what to show.
                  */
-                <p className='mt-[8px] text-[11px] font-[500] text-[#94a3b8]'>
-                    Standard request for current insurance details.
-                </p>
+                <div className='mt-[8px]'>
+
+                    {Array.isArray(message.asks) && message.asks.length ? (
+                        <ul className='flex flex-col gap-[3px]'>
+                            {message.asks.map(function (ask, index) {
+                                return (
+                                    <li key={`ask-${index}`} className='text-[11.5px] font-[500] text-[#475569]'>
+                                        &middot; {ask}
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    ) : (
+                        <p className='text-[11px] font-[500] text-[#94a3b8]'>
+                            Request for current insurance details.
+                        </p>
+                    )}
+
+                    {message.holder_name ? (
+                        <p className='mt-[5px] text-[11.5px] font-[500] text-[#475569]'>
+                            Holder given as <b className='font-[700] text-[#334155]'>{message.holder_name}</b>
+                        </p>
+                    ) : null}
+
+                    {/*
+                      * The broker's own question, set apart from the standard
+                      * list: it is the one line an agency is most likely to
+                      * answer specifically, so it should be findable later.
+                      */}
+                    {message.ask_note ? (
+                        <p className='mt-[7px] rounded-[6px] bg-[#eff6ff] px-[9px] py-[6px] text-[11.5px] font-[600] text-[#1e40af]'>
+                            {message.ask_note}
+                        </p>
+                    ) : null}
+
+                </div>
             ) : (
                 <p className='mt-[8px] text-[11px] font-[500] text-[#94a3b8]'>
                     The reply had no readable text.
@@ -729,12 +763,22 @@ function RaiseRequestModal({ isRaising, error, onRaise, onClose }) {
                         })}
                     </ul>
 
+                    {/*
+                      * The six boxes are the questions the reply is read for.
+                      * Anything outside them - a load-specific question, a
+                      * named unit, a reference the agency wants quoted - goes
+                      * here and is sent verbatim.
+                      */}
                     <label
                         htmlFor='ask-note'
-                        className='mt-[12px] block text-[10px] font-[700] uppercase tracking-[0.08em] text-[#94a3b8]'
+                        className='mt-[14px] block text-[12px] font-[700] text-[#334155]'
                     >
-                        Anything else
+                        Ask something specific
                     </label>
+
+                    <p className='mt-[2px] text-[11px] font-[500] text-[#94a3b8]'>
+                        Sent word for word, under the list above.
+                    </p>
 
                     <textarea
                         id='ask-note'
@@ -742,7 +786,7 @@ function RaiseRequestModal({ isRaising, error, onRaise, onClose }) {
                         onChange={(event) => setNote(event.target.value)}
                         rows={2}
                         maxLength={500}
-                        placeholder='Does the cargo form cover frozen seafood?'
+                        placeholder='Is VIN 1XKYDP9X7GJ483011 on the policy? We are tendering a $148,000 seafood load on Monday.'
                         className='mt-[4px] w-full rounded-[8px] border border-[#e5e7eb] p-[9px] text-[13px] text-[#334155] outline-none transition focus:border-[#0f57c8] focus:ring-2 focus:ring-[#dbeafe]'
                     />
 
