@@ -555,6 +555,52 @@ const VERIFICATION = {
     }
 };
 
+/*
+ * Whether the certificate can be believed at all.
+ *
+ * Sits above the FMCSA comparison because it is the prior question: a
+ * certificate the agency says it never issued does not need checking against
+ * a filing. Deliberately the loudest thing in the modal - both sequences it
+ * comes from are ones where every other check passes.
+ */
+function TrustBanner({ trust }) {
+
+    if (!trust || !trust.verdict || trust.verdict === 'no_concerns') {
+        return null;
+    }
+
+    const isStop = trust.verdict === 'do_not_rely';
+    const flags = Array.isArray(trust.flags) ? trust.flags : [];
+
+    return (
+        <div
+            className={`mb-[14px] rounded-[10px] border-l-[4px] px-[14px] py-[12px] ${
+                isStop
+                    ? 'border-[#dc2626] bg-[#fef2f2]'
+                    : 'border-[#f59e0b] bg-[#fffbeb]'
+            }`}
+        >
+            <p className={`text-[13px] font-[800] ${isStop ? 'text-[#991b1b]' : 'text-[#92400e]'}`}>
+                {isStop ? 'Do not rely on this certificate' : 'Check this certificate before relying on it'}
+            </p>
+
+            <ul className='mt-[6px] flex flex-col gap-[3px]'>
+                {flags.map(function (flag, index) {
+                    return (
+                        <li
+                            key={flag?.code || `flag-${index}`}
+                            className={`text-[12px] font-[500] ${isStop ? 'text-[#7f1d1d]' : 'text-[#7c2d12]'}`}
+                        >
+                            &middot; {flag?.message}
+                        </li>
+                    );
+                })}
+            </ul>
+
+        </div>
+    );
+}
+
 function VerificationBanner({ verification }) {
 
     if (!verification || !verification.verdict) {
@@ -641,6 +687,8 @@ function InsuranceThreadModal({ detail, isLoading, error, onClose }) {
                         <p className='text-[13px] font-[500] text-[#991b1b]'>{error}</p>
                     ) : detail ? (
                         <>
+                            <TrustBanner trust={detail.request?.trust} />
+
                             <VerificationBanner verification={detail.request?.verification} />
 
                             <StatePath steps={detail.state_path} />
