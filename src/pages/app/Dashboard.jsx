@@ -1,4 +1,4 @@
-import React, { Component } from 'react';
+import React, { Component, useState, useRef, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { apiFetch } from '../../lib/api';
 import SettingsOutlined from '@mui/icons-material/SettingsOutlined';
@@ -8,8 +8,14 @@ import OpenInNew from '@mui/icons-material/OpenInNew';
 import AutoAwesomeOutlined from '@mui/icons-material/AutoAwesomeOutlined';
 import Close from '@mui/icons-material/Close';
 import LocalShippingOutlined from '@mui/icons-material/LocalShippingOutlined';
+import ShieldOutlined from '@mui/icons-material/ShieldOutlined';
+import ScheduleOutlined from '@mui/icons-material/ScheduleOutlined';
+import WarningAmberOutlined from '@mui/icons-material/WarningAmberOutlined';
+import SendRounded from '@mui/icons-material/SendRounded';
 import Chip from '@mui/material/Chip';
 import { format } from 'date-fns';
+
+const BASE_URL = 'https://ai.dollartraq.com';
 
 const TRACKING_METHOD_LABELS = {
     driver_phone: "Driver's Cell Phone",
@@ -45,6 +51,341 @@ function statusLabel(status) {
         .join(' ');
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Concierge chat
+//
+// Slides in from the right on desktop, and takes the full screen on mobile.
+// Integrates directly with Fleetra Chat API using crm_company from localStorage.
+//
+// NOTE: this component intentionally does NOT fall back to a hardcoded
+// company/session UUID when localStorage is missing the real one. If we
+// can't identify the company, we don't init a session and we don't send
+// chat requests — surfacing that as an inline message instead of silently
+// talking to the API as some other tenant.
+// ─────────────────────────────────────────────────────────────────────────
+
+const SUGGESTIONS = [
+    { icon: ShieldOutlined, label: 'Vet a carrier', value: 'Vet MC 1234567' },
+    { icon: LocalShippingOutlined, label: 'Track a shipment', value: 'Track SH000025' },
+    { icon: ScheduleOutlined, label: 'Expiring COIs', value: "What's expiring this week?" },
+    { icon: WarningAmberOutlined, label: 'At-risk loads', value: 'Show me at-risk loads' },
+];
+
+function getStoredCompanyUuid() {
+    try {
+        const storedCompany = localStorage.getItem('crm_company');
+        if (!storedCompany) return null;
+
+        const parsed = JSON.parse(storedCompany);
+        return parsed?.uuid || null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function ConciergeChat({ isOpen, onClose, seedQuery, onSeedConsumed }) {
+    const [messages, setMessages] = useState([
+        {
+            id: 'greeting',
+            role: 'bot',
+            text: "Hi, I'm your logistics concierge. Ask me to vet a carrier, track a shipment, or check what's expiring this week.",
+        },
+    ]);
+    const [input, setInput] = useState('');
+    const [isTyping, setIsTyping] = useState(false);
+    const [sessionId, setSessionId] = useState(null);
+    const [sessionError, setSessionError] = useState(false);
+    const [conversationId, setConversationId] = useState(null);
+
+    const scrollRef = useRef(null);
+    const inputRef = useRef(null);
+    const seededRef = useRef(false);
+
+    // Initialize a Fleetra session using the real company_id from localStorage.
+    // No fallback UUID: if we don't know the company, we don't create a
+    // session, and `send` below refuses to fire without one.
+    useEffect(() => {
+        const initSession = async () => {
+            const companyUuid = getStoredCompanyUuid();
+
+            if (!companyUuid) {
+                setSessionError(true);
+                return;
+            }
+
+            try {
+                const res = await fetch(`${BASE_URL}/api/session`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        company_id: companyUuid,
+                    }),
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.session_id) {
+                        setSessionId(data.session_id);
+                        setSessionError(false);
+                        return;
+                    }
+                }
+
+                setSessionError(true);
+            } catch (err) {
+                console.error('Failed to initialize session:', err);
+                setSessionError(true);
+            }
+        };
+
+        if (isOpen && !sessionId && !sessionError) {
+            initSession();
+        }
+    }, [isOpen, sessionId, sessionError]);
+
+    const send = async (text) => {
+        const value = (text ?? input).trim();
+        if (!value || isTyping) return;
+
+        // Refuse to talk to the API without a real session — no fallback ID.
+        if (!sessionId) {
+            setMessages((prev) => [
+                ...prev,
+                { id: `u-${Date.now()}`, role: 'user', text: value },
+                {
+                    id: `b-${Date.now()}`,
+                    role: 'bot',
+                    text: "I couldn't verify your account, so I can't look anything up right now. Please refresh or sign in again.",
+                },
+            ]);
+            setInput('');
+            return;
+        }
+
+        setMessages((prev) => [...prev, { id: `u-${Date.now()}`, role: 'user', text: value }]);
+        setInput('');
+        setIsTyping(true);
+
+        try {
+            const payload = {
+                message: value,
+                session_id: sessionId,
+            };
+
+            if (conversationId) {
+                payload.conversation_id = conversationId;
+            }
+
+            const response = await fetch(`${BASE_URL}/api/chat`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.conversation_id) {
+                    setConversationId(data.conversation_id);
+                }
+                setMessages((prev) => [
+                    ...prev,
+                    { id: `b-${Date.now()}`, role: 'bot', text: data.reply || 'No response from assistant.' },
+                ]);
+            } else {
+                setMessages((prev) => [
+                    ...prev,
+                    { id: `b-${Date.now()}`, role: 'bot', text: 'Sorry, I encountered an issue processing your request.' },
+                ]);
+            }
+        } catch (error) {
+            setMessages((prev) => [
+                ...prev,
+                { id: `b-${Date.now()}`, role: 'bot', text: 'Network error. Please try again later.' },
+            ]);
+        } finally {
+            setIsTyping(false);
+        }
+    };
+
+    // Seed the thread once with whatever was typed into the top bar, then
+    // let the parent clear it so re-opening the panel doesn't replay it.
+    useEffect(() => {
+        if (isOpen && seedQuery && !seededRef.current) {
+            seededRef.current = true;
+            send(seedQuery);
+            onSeedConsumed?.();
+        }
+        if (!isOpen) {
+            seededRef.current = false;
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen, seedQuery]);
+
+    useEffect(() => {
+        if (isOpen) {
+            window.setTimeout(() => inputRef.current?.focus(), 300);
+        }
+    }, [isOpen]);
+
+    useEffect(() => {
+        scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+    }, [messages, isTyping]);
+
+    return (
+        <>
+            {/* Backdrop — dims the dashboard, closes the panel on click */}
+            <div
+                onClick={onClose}
+                aria-hidden={!isOpen}
+                className={`fixed inset-0 z-[90] bg-[#0B2A45] transition-opacity duration-300 ${
+                    isOpen ? 'opacity-40 pointer-events-auto' : 'opacity-0 pointer-events-none'
+                }`}
+            />
+
+            {/* Panel */}
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-label="Concierge chat"
+                className={`fixed inset-y-0 right-0 z-[100] w-full sm:w-[420px] bg-[#F7F9FB] shadow-2xl flex flex-col transition-transform duration-300 ease-out ${
+                    isOpen ? 'translate-x-0' : 'translate-x-full'
+                }`}
+            >
+                {/* Header */}
+                <div
+                    className="flex items-start justify-between px-5 py-4 sm:px-6 sm:py-5 text-white shrink-0"
+                    style={{ background: 'linear-gradient(135deg, #0B3E6F 0%, #185FA5 100%)' }}
+                >
+                    <div className="flex items-center gap-3 min-w-0">
+                        <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/15">
+                            <AutoAwesomeOutlined style={{ fontSize: 20 }} />
+                        </span>
+                        <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                                <h3 className="m-0 text-[15px] font-bold tracking-tight truncate">Concierge</h3>
+                                <span className="text-[9px] font-bold tracking-wide bg-white/15 rounded-full px-2 py-0.5 shrink-0">
+                                    BETA
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className="relative flex h-1.5 w-1.5 shrink-0">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#4ADE80] opacity-75" />
+                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#4ADE80]" />
+                                </span>
+                                <span className="text-[11px] text-white/75">Vetting &amp; tracking assistant</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        aria-label="Close concierge"
+                        onClick={onClose}
+                        className="rounded-full border-none bg-white/10 hover:bg-white/20 p-1.5 text-white cursor-pointer shrink-0 transition-colors"
+                    >
+                        <Close style={{ fontSize: 18 }} />
+                    </button>
+                </div>
+
+                {/* Message thread */}
+                <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 sm:px-5 py-5 flex flex-col gap-3.5">
+                    {sessionError && (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[12px] text-amber-800">
+                            We couldn't verify your account for this session, so lookups are disabled until you refresh or sign in again.
+                        </div>
+                    )}
+
+                    {messages.map((m) => (
+                        <div
+                            key={m.id}
+                            className={`flex items-end gap-2 ${m.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
+                        >
+                            {m.role === 'bot' && (
+                                <span className="mb-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#185FA5]/10 text-[#185FA5]">
+                                    <AutoAwesomeOutlined style={{ fontSize: 13 }} />
+                                </span>
+                            )}
+                            <div
+                                className={`max-w-[78%] px-3.5 py-2.5 text-[13px] leading-relaxed ${
+                                    m.role === 'user'
+                                        ? 'bg-[#1d4ed8] text-white rounded-2xl rounded-br-md'
+                                        : 'bg-white text-[#1a1a1a] border border-[#e8edf2] rounded-2xl rounded-bl-md'
+                                }`}
+                            >
+                                {m.text}
+                            </div>
+                        </div>
+                    ))}
+
+                    {isTyping && (
+                        <div className="flex items-end gap-2">
+                            <span className="mb-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#185FA5]/10 text-[#185FA5]">
+                                <AutoAwesomeOutlined style={{ fontSize: 13 }} />
+                            </span>
+                            <div className="flex items-center gap-1 bg-white border border-[#e8edf2] rounded-2xl rounded-bl-md px-4 py-3.5">
+                                {[0, 1, 2].map((i) => (
+                                    <span
+                                        key={i}
+                                        className="h-1.5 w-1.5 rounded-full bg-[#9CA9B8] animate-bounce"
+                                        style={{ animationDelay: `${i * 120}ms` }}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Suggestions — shown until the person sends their first message */}
+                    {messages.length === 1 && !isTyping && (
+                        <div className="grid grid-cols-2 gap-2 pt-1">
+                            {SUGGESTIONS.map(({ icon: Icon, label, value }) => (
+                                <button
+                                    key={label}
+                                    type="button"
+                                    onClick={() => send(value)}
+                                    className="flex items-center gap-2 rounded-xl border border-[#dbe4ee] bg-white px-3 py-2.5 text-left text-[12px] font-semibold text-[#374151] cursor-pointer transition-colors hover:border-[#185FA5] hover:bg-[#EFF6FF]"
+                                >
+                                    <Icon style={{ fontSize: 15 }} className="text-[#185FA5] shrink-0" />
+                                    <span className="truncate">{label}</span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Composer */}
+                <div className="shrink-0 border-t border-[#e8edf2] bg-white px-4 sm:px-5 py-3.5">
+                    <div className="flex items-center gap-2 rounded-full border border-[#dbe4ee] bg-[#F7F9FB] pl-4 pr-1.5 py-1.5 focus-within:border-[#185FA5] transition-colors">
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') send();
+                            }}
+                            placeholder="Message the concierge…"
+                            className="flex-1 min-w-0 bg-transparent border-none outline-none text-[13px] text-[#1a1a1a] placeholder-[#94a3b8]"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => send()}
+                            disabled={!input.trim() || isTyping}
+                            aria-label="Send message"
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-none text-white cursor-pointer transition-colors disabled:cursor-not-allowed disabled:bg-[#CBD5E1] bg-[#1d4ed8] hover:enabled:bg-blue-700"
+                        >
+                            <SendRounded style={{ fontSize: 15 }} />
+                        </button>
+                    </div>
+                    <p className="m-0 mt-2 text-center text-[10px] text-[#9ca3af]">
+                        Concierge is in beta — answers here are illustrative for now.
+                    </p>
+                </div>
+            </div>
+        </>
+    );
+}
 
 class Dashboard extends Component {
 
@@ -68,9 +409,11 @@ class Dashboard extends Component {
             success_message: '',
             aiQuery: '',
 
-            // The concierge is not built yet, so the bar explains that on use
-            // rather than looking broken when nothing happens.
+            // Controls the Concierge slide-over. `ai_seed_query` carries
+            // whatever was typed into the top bar into the panel's first
+            // message, then gets cleared so it isn't replayed next time.
             ai_modal_open: false,
+            ai_seed_query: '',
 
             // shipment totals — derived from /shipments pagination
             // metadata (see loadShipmentTotals) rather than a separate
@@ -214,6 +557,11 @@ class Dashboard extends Component {
             .finally(() => {
                 this.setState({ shipments_loading: false });
             });
+    };
+
+    openConcierge = () => {
+        this.setState({ ai_modal_open: true, ai_seed_query: this.state.aiQuery });
+        this.setState({ aiQuery: '' });
     };
 
     render() {
@@ -420,13 +768,13 @@ class Dashboard extends Component {
                             value={this.state.aiQuery}
                             onChange={(e) => this.setState({ aiQuery: e.target.value })}
                             onKeyDown={(e) => {
-                                if (e.key === 'Enter') this.setState({ ai_modal_open: true });
+                                if (e.key === 'Enter') this.openConcierge();
                             }}
                         />
                     </div>
                     <button
                         type="button"
-                        onClick={() => this.setState({ ai_modal_open: true })}
+                        onClick={this.openConcierge}
                         className="w-full sm:w-auto bg-[#1d4ed8] hover:bg-blue-700 text-white font-semibold text-sm rounded-xl py-2.5 px-5 flex items-center justify-center gap-2 transition-all shadow-sm border-none cursor-pointer"
                     >
                         <AutoAwesomeOutlined style={{ fontSize: 16 }} />
@@ -692,11 +1040,6 @@ class Dashboard extends Component {
                     </div>
                 </div>
 
-                {/* ── Recent Activity — mobile / small-tablet card view ──
-                     Shown only below the md breakpoint. Same data, same
-                     row click-through, laid out as stacked cards instead
-                     of a wide table so nothing overflows/gets clipped on
-                     narrow screens. Desktop table above is untouched. */}
                 <div className="md:hidden flex flex-col gap-3">
                     {shipments_loading && (
                         <div className="bg-white border border-[#e5e7eb] rounded-2xl py-10 text-center text-sm text-[#9ca3af]">
@@ -719,7 +1062,7 @@ class Dashboard extends Component {
                             <div
                                 key={row.uuid || i}
                                 onClick={() => this.setState({ redirect: `/shipment/${row.uuid}` })}
-                                className="bg-white border border-[#e5e7eb] rounded-2xl p-4 cursor-pointer active:bg-[#f8fafc]"
+                                className="bg-[#fff] border border-[#e5e7eb] rounded-2xl p-4 cursor-pointer active:bg-[#f8fafc]"
                                 style={{ borderLeft: '3px solid #185FA5' }}
                             >
                                 <div className="flex items-start justify-between gap-3 mb-3">
@@ -775,62 +1118,13 @@ class Dashboard extends Component {
                     })}
                 </div>
 
-                {/* ── Concierge: not built yet ── */}
-                {this.state.ai_modal_open && (
-                    <div
-                        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4"
-                        onClick={() => this.setState({ ai_modal_open: false })}
-                    >
-                        {/* Stops a click inside the card from closing it. */}
-                        <div
-                            className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-xl"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <div className="flex items-start justify-between border-b border-[#F1F5F9] px-6 py-5">
-                                <div className="flex items-center gap-3">
-                                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#EFF6FF] text-[#1d4ed8]">
-                                        <AutoAwesomeOutlined style={{ fontSize: 20 }} />
-                                    </span>
-
-                                    <h3 className="m-0 text-lg font-bold tracking-tight text-[#111827]">
-                                        AI Services Launching Soon
-                                    </h3>
-                                </div>
-
-                                <button
-                                    type="button"
-                                    aria-label="Close"
-                                    onClick={() => this.setState({ ai_modal_open: false })}
-                                    className="rounded-full border-none bg-transparent p-1 text-[#9ca3af] cursor-pointer hover:text-[#111827]"
-                                >
-                                    <Close style={{ fontSize: 20 }} />
-                                </button>
-                            </div>
-
-                            <div className="px-6 py-6">
-                                <p className="m-0 text-sm leading-relaxed text-[#4B5563]">
-                                    The Concierge is still being built. Soon you will be able to
-                                    vet a carrier, track a shipment or ask what is expiring this
-                                    week, straight from that bar.
-                                </p>
-
-                                <p className="mt-3 mb-0 text-xs text-[#9CA3AF]">
-                                    We will let you know the moment it is live.
-                                </p>
-                            </div>
-
-                            <div className="flex justify-end border-t border-[#F1F5F9] px-6 py-4">
-                                <button
-                                    type="button"
-                                    onClick={() => this.setState({ ai_modal_open: false })}
-                                    className="rounded-xl border-none bg-[#1d4ed8] px-6 py-2.5 text-sm font-semibold text-white cursor-pointer hover:bg-blue-700"
-                                >
-                                    Got it
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                {/* ── Concierge chat panel ── */}
+                <ConciergeChat
+                    isOpen={this.state.ai_modal_open}
+                    onClose={() => this.setState({ ai_modal_open: false })}
+                    seedQuery={this.state.ai_seed_query}
+                    onSeedConsumed={() => this.setState({ ai_seed_query: '' })}
+                />
 
             </div>
         );
