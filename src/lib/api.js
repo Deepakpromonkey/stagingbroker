@@ -9,8 +9,7 @@ export const STRIPE_PUBLIC_KEY = 'pk_live_51TP2bME8lGA6s4DI1Qrd3hBPKD6jZEZFP43NN
 | halves together -- previously this meant editing the line below and
 | remembering not to commit it.
 */
-export const API_BASE =
-    import.meta.env.VITE_API_BASE || "https://brokerapi.dollartraq.com/api/v1";
+export const API_BASE = import.meta.env.VITE_API_BASE;
  
 export const SOCKET_BASE = API_BASE.replace(/^http/, "ws");
  
