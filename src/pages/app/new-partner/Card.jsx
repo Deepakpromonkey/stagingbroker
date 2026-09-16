@@ -855,7 +855,7 @@ export default function NewPartnerPage() {
                     </button>
                 </div>
 
-                    {isPending && !loading && (
+                    {(isPending || loading) && (
                         <div
                             className="w-full py-[14px] px-[18px] mb-[16px] flex items-center gap-[10px] text-[12.5px] font-[600] rounded-[12px]"
                             style={{ color: BRAND_PRIMARY_DARK, background: BRAND_PRIMARY_TINT, border: `1px solid ${BRAND_PRIMARY_BORDER}` }}
