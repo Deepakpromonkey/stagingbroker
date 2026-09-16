@@ -16,6 +16,8 @@ import {
     BuildOutlined,
     Inventory2Outlined,
     TuneOutlined,
+    ChevronLeft,
+    ChevronRight,
 } from '@mui/icons-material';
 
 import CarrierCard from '../../../components/CarrierCards';
@@ -29,6 +31,8 @@ const ENTITY_TYPE_MAP = {
     Carriers: 'Carriers',
     Shippers: 'Both',
 };
+
+const PER_PAGE = 10;
 
 function parseRadiusMiles(radiusLabel) {
     const match = /^(\d+)/.exec(radiusLabel || '');
@@ -49,8 +53,6 @@ function buildFilterBody(filters) {
     if (filters.authorityAgeMin) body.min_months = Number(filters.authorityAgeMin);
     if (filters.authorityAgeMax) body.max_months = Number(filters.authorityAgeMax);
 
-    // operations combines the radio (Interstate/Intrastate) and the Hazmat
-    // toggle, per the sample body's "operations": ["Interstate", "Hazmat"]
     const operations = [];
     if (filters.operation) operations.push(filters.operation);
     if (filters.hazmat) operations.push('Hazmat');
@@ -63,16 +65,14 @@ function buildFilterBody(filters) {
 
     if (filters.safety) body.safety_rating = [filters.safety];
 
-    // The sample body only has a single "cargo" array — this UI splits it
-    // into separate Equipment and Cargo sections, so both are merged here.
     const cargo = [...(filters.equipment || []), ...(filters.cargo || [])];
     if (cargo.length) body.cargo = cargo;
 
     return body;
 }
 
-async function searchCarriers(filters, { signal } = {}) {
-    const body = { ...buildFilterBody(filters), per_page: 10 };
+async function searchCarriers(filters, page = 1, { signal } = {}) {
+    const body = { ...buildFilterBody(filters), page, per_page: PER_PAGE };
 
     const response = await apiFetch('/carrier/advanced-filter', {
         method: 'POST',
@@ -80,12 +80,12 @@ async function searchCarriers(filters, { signal } = {}) {
         signal,
     });
 
-    return response?.data ?? response?.results ?? response ?? [];
+    return response || {};
 }
 
 async function exportCarriersCsv(filters) {
     const body = { ...buildFilterBody(filters), export_csv: true };
-    const timestamp = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const timestamp = new Date().toISOString().slice(0, 10);
 
     await apiDownload(
         '/carrier/advanced-filter',
@@ -111,16 +111,18 @@ const RED_TEXT = '#B42318';
 const RED_TINT = '#FEECEB';
 const RED_BORDER = 'rgba(220,38,38,0.36)';
 
+const SINGLE_THEME = { tint: '#EEF4FF', border: 'rgba(37,99,235,0.16)', icon: '#2563EB' };
+
 const SECTION_THEMES = {
-    radius: { tint: '#EEF4FF', border: 'rgba(37,99,235,0.16)', icon: '#2563EB' },
-    authority: { tint: '#EFFCF3', border: 'rgba(21,146,76,0.18)', icon: '#15924C' },
-    authorityAge: { tint: '#FFF8EC', border: 'rgba(217,119,6,0.18)', icon: '#B45309' },
-    operation: { tint: '#F3F1FF', border: 'rgba(109,40,217,0.16)', icon: '#6D28D9' },
-    fleet: { tint: '#EEFBFC', border: 'rgba(8,145,178,0.18)', icon: '#0E7490' },
-    insurance: { tint: '#FDF0FA', border: 'rgba(190,24,150,0.16)', icon: '#BE1896' },
-    safety: { tint: '#FEF2F2', border: 'rgba(220,38,38,0.16)', icon: '#DC2626' },
-    equipment: { tint: '#F1F6FE', border: 'rgba(30,64,175,0.16)', icon: '#1E40AF' },
-    cargo: { tint: '#F5FBEF', border: 'rgba(77,124,15,0.18)', icon: '#4D7C0F' },
+    radius: SINGLE_THEME,
+    authority: SINGLE_THEME,
+    authorityAge: SINGLE_THEME,
+    operation: SINGLE_THEME,
+    fleet: SINGLE_THEME,
+    insurance: SINGLE_THEME,
+    safety: SINGLE_THEME,
+    equipment: SINGLE_THEME,
+    cargo: SINGLE_THEME,
 };
 
 
@@ -322,6 +324,87 @@ function FilterPanel({ id, label, icon, open, onToggle, children }) {
     );
 }
 
+function PaginationBar({ currentPage, lastPage, onPrev, onNext }) {
+    if (lastPage <= 1) return null;
+
+    const iconButtonClass =
+        'flex items-center justify-center w-[34px] h-[34px] rounded-full transition-colors duration-150 disabled:opacity-30 disabled:cursor-not-allowed';
+
+    return (
+        <div className="w-full flex items-center justify-center gap-[16px] py-[22px]">
+            <button
+                type="button"
+                onClick={onPrev}
+                disabled={currentPage === 1}
+                aria-label="Previous page"
+                className={iconButtonClass}
+                style={{ background: SURFACE, border: `1px solid ${BORDER}`, color: SLATE }}
+            >
+                <ChevronLeft sx={{ fontSize: 19 }} />
+            </button>
+
+            <span className="text-[12.5px] font-[600]" style={{ color: MUTED }}>
+                Page <span className="font-[800]" style={{ color: INK }}>{currentPage}</span> of {lastPage.toLocaleString()}
+            </span>
+
+            <button
+                type="button"
+                onClick={onNext}
+                disabled={currentPage === lastPage}
+                aria-label="Next page"
+                className={iconButtonClass}
+                style={{ background: SURFACE, border: `1px solid ${BORDER}`, color: SLATE }}
+            >
+                <ChevronRight sx={{ fontSize: 19 }} />
+            </button>
+        </div>
+    );
+}
+
+function CarrierCardSkeleton() {
+    return (
+        <div
+            className="w-full rounded-[16px] bg-white mb-[16px] overflow-hidden animate-pulse"
+            style={{ border: `1px solid ${BORDER}` }}
+        >
+            <div className="h-[4px] w-full" style={{ background: '#E4E7EC' }} />
+            <div className="p-[20px]">
+                <div className="flex items-start justify-between gap-[16px]">
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-[10px] mb-[16px]">
+                            <div className="h-[18px] w-[180px] rounded-[6px]" style={{ background: '#EAECF0' }} />
+                            <div className="h-[20px] w-[80px] rounded-full" style={{ background: '#EAECF0' }} />
+                            <div className="h-[20px] w-[110px] rounded-full" style={{ background: '#EAECF0' }} />
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-[10px] mb-[16px]">
+                            {Array.from({ length: 5 }).map((_, i) => (
+                                <div key={i} className="rounded-[12px] p-[12px]" style={{ background: SURFACE }}>
+                                    <div className="w-[26px] h-[26px] rounded-[8px] mb-[10px]" style={{ background: '#EAECF0' }} />
+                                    <div className="h-[8px] w-[50px] rounded-[4px] mb-[8px]" style={{ background: '#EAECF0' }} />
+                                    <div className="h-[12px] w-[70px] rounded-[4px]" style={{ background: '#EAECF0' }} />
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex flex-wrap gap-[10px]">
+                            <div className="h-[34px] w-[200px] rounded-full" style={{ background: SURFACE, border: `1px solid ${BORDER}` }} />
+                            <div className="h-[34px] w-[130px] rounded-full" style={{ background: SURFACE, border: `1px solid ${BORDER}` }} />
+                            <div className="h-[34px] w-[90px] rounded-full" style={{ background: SURFACE, border: `1px solid ${BORDER}` }} />
+                        </div>
+                    </div>
+                    <div className="hidden sm:flex flex-col items-center gap-[10px] shrink-0 w-[220px]">
+                        <div className="h-[10px] w-[70px] rounded-[4px]" style={{ background: '#EAECF0' }} />
+                        <div className="w-[64px] h-[64px] rounded-full" style={{ background: '#EAECF0' }} />
+                        <div className="h-[10px] w-[90px] rounded-[4px]" style={{ background: '#EAECF0' }} />
+                        <div className="h-[26px] w-full rounded-full" style={{ background: '#EAECF0' }} />
+                        <div className="h-[26px] w-full rounded-full" style={{ background: '#EAECF0' }} />
+                        <div className="h-[26px] w-full rounded-full" style={{ background: '#EAECF0' }} />
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function NewPartnerPage() {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
@@ -332,6 +415,10 @@ export default function NewPartnerPage() {
     const [hasSearched, setHasSearched] = useState(false);
     const [shortlisted, setShortlisted] = useState([]);
     const [exporting, setExporting] = useState(false);
+
+    const [total, setTotal] = useState(0);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [lastPage, setLastPage] = useState(1);
 
     const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
@@ -359,16 +446,24 @@ export default function NewPartnerPage() {
         e.toLowerCase().includes(equipmentSearch.toLowerCase())
     );
 
-    const runSearch = useCallback(async (activeFilters, { signal } = {}) => {
+    const runSearch = useCallback(async (activeFilters, page = 1, { signal } = {}) => {
         setLoading(true);
         setError(null);
         try {
-            const results = await searchCarriers(activeFilters, { signal });
-            setCarriers(results || []);
+            const response = await searchCarriers(activeFilters, page, { signal });
+            const data = response?.data ?? response?.results ?? (Array.isArray(response) ? response : []);
+
+            setCarriers(data || []);
+            setTotal(response?.total ?? (data ? data.length : 0));
+            setCurrentPage(response?.current_page ?? page);
+            setLastPage(response?.last_page ?? 1);
         } catch (err) {
             if (err.name !== 'AbortError') {
                 setError(err.message || 'Something went wrong while searching.');
                 setCarriers([]);
+                setTotal(0);
+                setCurrentPage(1);
+                setLastPage(1);
             }
         } finally {
             setLoading(false);
@@ -380,7 +475,7 @@ export default function NewPartnerPage() {
         setOverlayOpen(false);
         const nextFilters = { ...filters, type, location };
         setFilters(nextFilters);
-        runSearch(nextFilters);
+        runSearch(nextFilters, 1);
     };
 
     useEffect(() => {
@@ -394,7 +489,7 @@ export default function NewPartnerPage() {
         const nextFilters = { ...DEFAULT_FILTERS, type, location };
         setFilters(nextFilters);
         setOpenSections(DEFAULT_OPEN_SECTIONS);
-        runSearch(nextFilters, { signal: controller.signal });
+        runSearch(nextFilters, 1, { signal: controller.signal });
 
         return () => controller.abort();
     }, [searchParams.toString()]);
@@ -402,13 +497,26 @@ export default function NewPartnerPage() {
     useEffect(() => {
         if (!hasSearched) return;
         const controller = new AbortController();
-        runSearch(filters, { signal: controller.signal });
+        runSearch(filters, 1, { signal: controller.signal });
         return () => controller.abort();
     }, [
         filters.radius, filters.authority, filters.authorityAgeMin, filters.authorityAgeMax,
         filters.operation, filters.hazmat, filters.fleetMin, filters.fleetMax,
         filters.minBIPD, filters.safety, filters.equipment, filters.cargo
     ]);
+
+    useEffect(() => {
+        if (!hasSearched) return;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, [currentPage]);
+
+    const handlePrevPage = () => {
+        if (currentPage > 1) runSearch(filters, currentPage - 1);
+    };
+
+    const handleNextPage = () => {
+        if (currentPage < lastPage) runSearch(filters, currentPage + 1);
+    };
 
     const handleRemove = (carrierId) => {
         setShortlisted((prev) => prev.filter((id) => id !== carrierId));
@@ -426,6 +534,12 @@ export default function NewPartnerPage() {
         } finally {
             setExporting(false);
         }
+    };
+
+    const goToCarrierProfile = (carrier) => {
+        const id = carrier.row_id || carrier.carrier_id;
+        if (!id) return;
+        navigate('/carriers/' + id);
     };
 
     const activeFilterCount =
@@ -482,13 +596,13 @@ export default function NewPartnerPage() {
                             className="text-[11px] font-[800] px-[9px] py-[4px] rounded-full shrink-0"
                             style={{ color: BRAND_PRIMARY_DARK, background: BRAND_PRIMARY_TINT, border: `1px solid ${BRAND_PRIMARY_BORDER}` }}
                         >
-                            {carriers.length} found
+                            {total.toLocaleString()} found
                         </span>
                     )}
                 </div>
 
                 <div
-                    className={`${mobileFiltersOpen ? 'flex' : 'hidden'} sm:flex w-full sm:w-[280px] shrink-0 rounded-[18px] flex-col`}
+                    className={`${mobileFiltersOpen ? 'flex' : 'hidden'} sm:flex w-full sm:w-[280px] shrink-0 rounded-[18px] flex-col sm:sticky sm:top-[24px] sm:self-start sm:max-h-[calc(100vh-48px)]`}
                     style={{
                         background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFF 100%)',
                         border: `1px solid ${BORDER}`,
@@ -529,7 +643,7 @@ export default function NewPartnerPage() {
                                     className="text-[11px] font-[800] px-[9px] py-[2px] rounded-full"
                                     style={{ color: BRAND_PRIMARY_DARK, background: BRAND_PRIMARY_TINT, border: `1px solid ${BRAND_PRIMARY_BORDER}` }}
                                 >
-                                    {carriers.length} found
+                                    {total.toLocaleString()} found
                                 </span>
                             )}
                         </div>
@@ -558,7 +672,7 @@ export default function NewPartnerPage() {
                         )}
                     </div>
 
-                    <div className="px-[14px] pt-[14px] pb-[18px] max-h-[70vh] sm:max-h-none overflow-y-auto sm:overflow-visible">
+                    <div className="px-[14px] pt-[14px] pb-[18px] max-h-[70vh] sm:max-h-[calc(100vh-160px)] overflow-y-auto">
 
                         <FilterPanel id="radius" label="Radius" icon={<MyLocationOutlined sx={{ fontSize: 15 }} />} open={openSections.radius} onToggle={() => toggleSection('radius')}>
                             {RADIUS_OPTIONS.map((opt) => (
@@ -683,34 +797,35 @@ export default function NewPartnerPage() {
                             className="w-full rounded-full text-[12.5px] font-[700] py-[10px] transition-colors duration-150"
                             style={{ background: BRAND_PRIMARY, color: '#fff' }}
                         >
-                            Show {hasSearched ? `${carriers.length} results` : 'results'}
+                            Show {hasSearched ? `${total.toLocaleString()} results` : 'results'}
                         </button>
                     </div>
                 </div>
 
-                {/* ---- Results ---- */}
                 <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-[16px]">
+                 <div className="flex items-center justify-between mb-[16px]">
+                    {loading ? (
+                        <div className="h-[22px] sm:h-[26px] w-[220px] rounded-[6px] animate-pulse" style={{ background: '#EAECF0' }} />
+                    ) : (
                         <h1 className="text-[16px] sm:text-[20px] font-[800] m-0" style={{ color: INK }}>
-                            {hasSearched ? `${carriers.length} partners found` : 'Find a new partner'}
+                            {hasSearched ? `${total.toLocaleString()} partners found` : 'Find a new partner'}
                         </h1>
-                        <button
-                            type="button"
-                            onClick={() => setOverlayOpen(true)}
-                            className="text-[12px] sm:text-[12.5px] font-[700] rounded-full px-[14px] sm:px-[16px] py-[8px] sm:py-[9px] transition-colors duration-150 shrink-0"
-                            style={{ background: BRAND_PRIMARY, color: '#fff' }}
-                        >
-                            New search
-                        </button>
-                    </div>
-
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => setOverlayOpen(true)}
+                        className="text-[12px] sm:text-[12.5px] font-[700] rounded-full px-[14px] sm:px-[16px] py-[8px] sm:py-[9px] transition-colors duration-150 shrink-0"
+                        style={{ background: BRAND_PRIMARY, color: '#fff' }}
+                    >
+                        New search
+                    </button>
+                </div>
                     {loading && (
-                        <div
-                            className="w-full py-[60px] flex items-center justify-center text-[13px] font-[600] rounded-[16px] bg-white text-center px-[16px]"
-                            style={{ color: MUTED, border: `1px solid ${BORDER}` }}
-                        >
-                            Searching…
-                        </div>
+                        <>
+                            {Array.from({ length: 5 }).map((_, i) => (
+                                <CarrierCardSkeleton key={i} />
+                            ))}
+                        </>
                     )}
 
                     {!loading && error && (
@@ -744,12 +859,21 @@ export default function NewPartnerPage() {
                         <CarrierCard
                             key={carrier.row_id || carrier.carrier_id}
                             carrier={carrier}
-                            onClick={(c) => navigate('/carriers/' + c.row_id)}
+                            onClick={() => goToCarrierProfile(carrier)}
                             showRemove={shortlisted.includes(carrier.carrier_id)}
                             onRemove={handleRemove}
                             removeLabel="Remove from shortlist"
                         />
                     ))}
+
+                    {!loading && !error && carriers.length > 0 && (
+                        <PaginationBar
+                            currentPage={currentPage}
+                            lastPage={lastPage}
+                            onPrev={handlePrevPage}
+                            onNext={handleNextPage}
+                        />
+                    )}
                 </div>
 
             </div>
