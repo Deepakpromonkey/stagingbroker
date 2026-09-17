@@ -47,7 +47,7 @@ const NAV_LINKS = [
         permission: 'book-assign-loads',
     },
     { label: 'Carrier Q/A', to: '/carrier-questions' },
-    { label: 'Risk & Alerts', to: '/risk-alerts' },
+    // { label: 'Risk & Alerts', to: '/risk-alerts' },
     { label: 'DT-Pay', to: '/dt-pay' },
 ];
 
