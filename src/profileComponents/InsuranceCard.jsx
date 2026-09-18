@@ -301,6 +301,28 @@ function money(value) {
  * and those arrive as prose buried in the same mail - so what was read out of
  * it is shown next to it rather than left in the JSON.
  */
+/*
+ * How the reading describes its own source.
+ *
+ * Deliberately worded from the broker's side rather than the model's: what
+ * matters is whether a document backs these numbers, not which content block
+ * they were parsed out of.
+ */
+const READ_FROM = {
+    certificate: {
+        label: 'Read from the attached certificate',
+        className: 'bg-[#dcfce7] text-[#166534]'
+    },
+    both: {
+        label: 'Read from the certificate and the reply',
+        className: 'bg-[#dbeafe] text-[#1e40af]'
+    },
+    email: {
+        label: 'Read from the reply text only',
+        className: 'bg-[#f1f5f9] text-[#475569]'
+    }
+};
+
 function ReplyReading({ reading }) {
 
     if (!reading) {
@@ -319,8 +341,22 @@ function ReplyReading({ reading }) {
         return null;
     }
 
+    /*
+     * Where the numbers below actually came from. A limit read off the
+     * certificate and a limit repeated from memory in a covering note are not
+     * worth the same to a broker about to book a load, and until the document
+     * was being read there was only ever one answer to give here.
+     */
+    const readFrom = READ_FROM[reading.read_from] || null;
+
     return (
         <div className='mt-[8px] rounded-[8px] bg-[#f8fafc] p-[10px] ring-1 ring-[#e5e7eb]'>
+
+            {readFrom ? (
+                <p className={`mb-[8px] inline-flex items-center rounded-[999px] px-[8px] py-[2px] text-[10px] font-[700] ${readFrom.className}`}>
+                    {readFrom.label}
+                </p>
+            ) : null}
 
             {signals.length ? (
                 <div className='mb-[8px] flex flex-wrap gap-[5px]'>
