@@ -149,6 +149,35 @@ if (res.status === 401) {
         clearTimeout(timeoutId);
     }
 }
+/*
+| A file behind the bearer token, as something the browser can render.
+|
+| An <img> or <iframe> src cannot carry an Authorization header, so a private
+| file has to be fetched here and handed on as an object URL. The caller owns
+| what comes back and must revoke it -- the blob is held in memory until it
+| does, and a PDF re-fetched on every render would otherwise pile up.
+*/
+export async function apiBlobUrl(path) {
+    const res = await fetch(`${API_BASE}${path}`, {
+        headers: authHeaders(),
+    });
+
+    if (!res.ok) {
+        let message = `Could not load the file (${res.status})`;
+
+        try {
+            const json = await res.json();
+            if (json?.message) message = json.message;
+        } catch { /* not JSON -- keep the status message */ }
+
+        const err = new Error(message);
+        err.status = res.status;
+        throw err;
+    }
+
+    return URL.createObjectURL(await res.blob());
+}
+
 export async function apiDownload(path, fallbackName = "download") {
     const res = await fetch(`${API_BASE}${path}`, {
         headers: authHeaders(),
