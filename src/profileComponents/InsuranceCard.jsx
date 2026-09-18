@@ -4,12 +4,15 @@ import {
     ShieldOutlined,
     CloseOutlined,
     MailOutlineOutlined,
-    HourglassEmptyOutlined
+    HourglassEmptyOutlined,
+    PictureAsPdfOutlined,
+    InsertDriveFileOutlined,
+    DownloadOutlined
 } from '@mui/icons-material';
 
 import Skeleton from '@mui/material/Skeleton';
 
-import { apiFetch } from '../lib/api';
+import { apiFetch, apiBlobUrl, apiDownload } from '../lib/api';
 
 const PREFERRED_LIMIT_KEYS = [
     'COMBINED SINGLE LIMIT (Ea accident)',
@@ -423,6 +426,193 @@ function ReplyReading({ reading }) {
     );
 }
 
+function formatBytes(bytes) {
+
+    if (!bytes || bytes < 1024) {
+        return `${bytes || 0} B`;
+    }
+
+    const units = ['KB', 'MB', 'GB'];
+    let value = bytes / 1024;
+    let unit = 0;
+
+    while (value >= 1024 && unit < units.length - 1) {
+        value /= 1024;
+        unit += 1;
+    }
+
+    return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
+}
+
+/*
+ * The files that came attached to one reply.
+ *
+ * The reading above this is the machine's account of a document; this is the
+ * document. A broker about to book a load on an extracted date should be able
+ * to open the certificate rather than take the reading's word for it, so it
+ * opens in place instead of behind a download.
+ *
+ * The file sits behind the bearer token, which an <iframe src> cannot carry,
+ * so it is fetched as a blob and handed over as an object URL - revoked when
+ * the selection changes or the thread closes. The preview state carries the
+ * path it belongs to, so a slow fetch for a file the broker has already
+ * clicked past cannot render over the one they are looking at.
+ */
+function MessageAttachments({ attachments }) {
+
+    const previewable = attachments.filter((file) => file.previewable);
+
+    const [activeUuid, setActiveUuid] = useState(previewable[0]?.uuid || null);
+    const [preview, setPreview] = useState(null);
+    const [downloadError, setDownloadError] = useState(null);
+
+    const active = attachments.find((file) => file.uuid === activeUuid) || null;
+    const activePath = active?.path || null;
+
+    useEffect(function () {
+
+        if (!activePath) {
+            return undefined;
+        }
+
+        let cancelled = false;
+        let objectUrl = null;
+
+        apiBlobUrl(activePath)
+            .then(function (url) {
+
+                objectUrl = url;
+
+                if (cancelled) {
+                    URL.revokeObjectURL(url);
+                    return;
+                }
+
+                setPreview({ path: activePath, url, error: null });
+            })
+            .catch(function (err) {
+                if (cancelled) return;
+                setPreview({ path: activePath, url: null, error: err.message || 'Could not load the file.' });
+            });
+
+        return function () {
+            cancelled = true;
+
+            if (objectUrl) {
+                URL.revokeObjectURL(objectUrl);
+            }
+        };
+
+    }, [activePath]);
+
+    if (!attachments.length) {
+        return null;
+    }
+
+    const isPdf = (active?.content_type || '').toLowerCase() === 'application/pdf';
+
+    // A result from a previous selection is not this file's, so it does not get
+    // to render as though it were.
+    const shown = preview && preview.path === activePath ? preview : null;
+
+    return (
+        <div className='mt-[8px]'>
+
+            <p className='mb-[6px] text-[10px] font-[700] uppercase tracking-[0.08em] text-[#94a3b8]'>
+                {attachments.length === 1 ? 'Attached certificate' : `Attached (${attachments.length})`}
+            </p>
+
+            <div className='mb-[8px] flex flex-col gap-[5px]'>
+
+                {attachments.map(function (file) {
+
+                    const isActive = file.uuid === activeUuid;
+
+                    return (
+                        <div
+                            key={file.uuid}
+                            className={`flex items-center gap-[8px] rounded-[8px] border px-[9px] py-[7px] transition-colors ${
+                                isActive ? 'border-[#93c5fd] bg-[#eff6ff]' : 'border-[#e5e7eb] bg-white'
+                            }`}
+                        >
+
+                            {(file.content_type || '').toLowerCase() === 'application/pdf' ? (
+                                <PictureAsPdfOutlined className='text-[#b91c1c]' sx={{ fontSize: 18 }} />
+                            ) : (
+                                <InsertDriveFileOutlined className='text-[#64748b]' sx={{ fontSize: 18 }} />
+                            )}
+
+                            <button
+                                type='button'
+                                disabled={!file.previewable}
+                                onClick={() => setActiveUuid(file.uuid)}
+                                className='min-w-0 flex-1 text-left disabled:cursor-default'
+                            >
+                                <span className='block truncate text-[12px] font-[600] text-[#111827]'>
+                                    {file.filename}
+                                </span>
+
+                                <span className='block text-[10.5px] font-[500] text-[#94a3b8]'>
+                                    {formatBytes(file.size_bytes)}
+                                    {file.previewable ? (isActive ? ' \u00b7 showing below' : ' \u00b7 click to view') : ''}
+                                </span>
+                            </button>
+
+                            <button
+                                type='button'
+                                title='Download'
+                                onClick={() => {
+                                    setDownloadError(null);
+
+                                    // Unhandled otherwise: apiDownload rejects on
+                                    // a file that has since been cleared off the
+                                    // disk, and a click that silently does
+                                    // nothing reads as a bug.
+                                    apiDownload(file.path, file.filename).catch(
+                                        (err) => setDownloadError(err.message || 'Could not download the file.')
+                                    );
+                                }}
+                                className='flex items-center justify-center rounded-[6px] p-[5px] text-[#64748b] transition-colors hover:bg-[#f1f5f9] hover:text-[#111827]'
+                            >
+                                <DownloadOutlined sx={{ fontSize: 16 }} />
+                            </button>
+
+                        </div>
+                    );
+                })}
+
+            </div>
+
+            {downloadError ? (
+                <p className='mb-[6px] text-[11px] font-[500] text-[#991b1b]'>{downloadError}</p>
+            ) : null}
+
+            {active ? (
+                !shown ? (
+                    <Skeleton variant='rounded' height={320} sx={{ borderRadius: '8px' }} />
+                ) : shown.error ? (
+                    <p className='text-[11px] font-[500] text-[#991b1b]'>{shown.error}</p>
+                ) : shown.url ? (
+                    isPdf ? (
+                        <iframe
+                            src={shown.url}
+                            title={active.filename}
+                            className='h-[380px] w-full rounded-[8px] ring-1 ring-[#e5e7eb]'
+                        />
+                    ) : (
+                        <img
+                            src={shown.url}
+                            alt={active.filename}
+                            className='max-h-[380px] w-full rounded-[8px] object-contain ring-1 ring-[#e5e7eb]'
+                        />
+                    )
+                ) : null
+            ) : null}
+
+        </div>
+    );
+}
+
 /*
  * One message in the thread.
  *
@@ -533,6 +723,8 @@ function ThreadMessage({ message }) {
 
                 </div>
             ) : null}
+
+            <MessageAttachments attachments={message.attachments || []} />
 
             <ReplyReading reading={message.extracted} />
 
