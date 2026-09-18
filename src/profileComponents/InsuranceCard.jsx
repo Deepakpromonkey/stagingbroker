@@ -4,12 +4,15 @@ import {
     ShieldOutlined,
     CloseOutlined,
     MailOutlineOutlined,
-    HourglassEmptyOutlined
+    HourglassEmptyOutlined,
+    PictureAsPdfOutlined,
+    InsertDriveFileOutlined,
+    DownloadOutlined
 } from '@mui/icons-material';
 
 import Skeleton from '@mui/material/Skeleton';
 
-import { apiFetch } from '../lib/api';
+import { apiFetch, apiBlobUrl, apiDownload } from '../lib/api';
 
 const PREFERRED_LIMIT_KEYS = [
     'COMBINED SINGLE LIMIT (Ea accident)',
@@ -136,6 +139,208 @@ function formatDate(value) {
         });
 }
 
+function formatBytes(bytes) {
+
+    if (!bytes || bytes < 1024) {
+        return `${bytes || 0} B`;
+    }
+
+    const units = ['KB', 'MB', 'GB'];
+    let value = bytes / 1024;
+    let unit = 0;
+
+    while (value >= 1024 && unit < units.length - 1) {
+        value /= 1024;
+        unit += 1;
+    }
+
+    return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
+}
+
+/*
+ * The files the agency actually sent.
+ *
+ * The extracted date is a machine reading of one of these, and a broker about
+ * to book a load on it is entitled to look at the document rather than at a
+ * summary of it - so the certificate opens in place, selected by default,
+ * instead of behind a download that lands in a folder.
+ *
+ * The file sits behind the bearer token, which an <iframe src> cannot carry.
+ * It is fetched as a blob instead, and the object URL is revoked when the
+ * selection changes or the modal closes - without that, every certificate a
+ * broker opened would stay in memory until the tab was.
+ */
+function ResponseAttachments({ attachments }) {
+
+    const previewable = attachments.filter((file) => file.previewable);
+
+    const [activeUuid, setActiveUuid] = useState(previewable[0]?.uuid || null);
+
+    /*
+     * One piece of state rather than three, and it records which file it is
+     * about. The alternative - a url, an error and a loading flag - has to be
+     * reset from inside the effect before each fetch, which is a render
+     * triggering a render; carrying the path instead lets the render below
+     * simply ignore a result that belongs to a file no longer selected.
+     */
+    const [preview, setPreview] = useState(null);
+
+    const [downloadError, setDownloadError] = useState(null);
+
+    const active = attachments.find((file) => file.uuid === activeUuid) || null;
+
+    // The effect depends on the path alone, not on the object around it - a
+    // re-render that rebuilds the same list must not re-fetch the same PDF.
+    const activePath = active?.path || null;
+
+    useEffect(function () {
+
+        if (!activePath) {
+            return undefined;
+        }
+
+        let cancelled = false;
+        let objectUrl = null;
+
+        apiBlobUrl(activePath)
+            .then(function (url) {
+
+                objectUrl = url;
+
+                // Nothing is holding this URL if the selection already moved
+                // on, so it is released here rather than leaked.
+                if (cancelled) {
+                    URL.revokeObjectURL(url);
+                    return;
+                }
+
+                setPreview({ path: activePath, url, error: null });
+            })
+            .catch(function (err) {
+                if (cancelled) return;
+                setPreview({ path: activePath, url: null, error: err.message || 'Could not load the file.' });
+            });
+
+        return function () {
+            cancelled = true;
+
+            if (objectUrl) {
+                URL.revokeObjectURL(objectUrl);
+            }
+        };
+
+    }, [activePath]);
+
+    if (!attachments.length) {
+        return null;
+    }
+
+    const isPdf = (active?.content_type || '').toLowerCase() === 'application/pdf';
+
+    // A result from a previous selection is not this file's, so it does not
+    // get to render as though it were.
+    const shown = preview && preview.path === activePath ? preview : null;
+
+    return (
+        <div className='mb-[14px]'>
+
+            <p className='mb-[6px] text-[10px] font-[700] uppercase tracking-[0.08em] text-[#94a3b8]'>
+                {attachments.length === 1 ? 'Attachment' : `Attachments (${attachments.length})`}
+            </p>
+
+            <div className='mb-[10px] flex flex-col gap-[6px]'>
+
+                {attachments.map(function (file) {
+
+                    const isActive = file.uuid === activeUuid;
+
+                    return (
+                        <div
+                            key={file.uuid}
+                            className={`flex items-center gap-[10px] rounded-[10px] border px-[10px] py-[8px] transition-colors ${
+                                isActive
+                                    ? 'border-[#93c5fd] bg-[#eff6ff]'
+                                    : 'border-[#e5e7eb] bg-white'
+                            }`}
+                        >
+
+                            {(file.content_type || '').toLowerCase() === 'application/pdf' ? (
+                                <PictureAsPdfOutlined className='text-[#b91c1c]' sx={{ fontSize: 20 }} />
+                            ) : (
+                                <InsertDriveFileOutlined className='text-[#64748b]' sx={{ fontSize: 20 }} />
+                            )}
+
+                            <button
+                                type='button'
+                                disabled={!file.previewable}
+                                onClick={() => setActiveUuid(file.uuid)}
+                                className='min-w-0 flex-1 text-left disabled:cursor-default'
+                            >
+                                <span className='block truncate text-[13px] font-[600] text-[#111827]'>
+                                    {file.filename}
+                                </span>
+
+                                <span className='block text-[11px] font-[500] text-[#94a3b8]'>
+                                    {formatBytes(file.size_bytes)}
+                                    {file.previewable ? (isActive ? ' \u00b7 showing below' : ' \u00b7 click to view') : ''}
+                                </span>
+                            </button>
+
+                            <button
+                                type='button'
+                                title='Download'
+                                onClick={() => {
+                                    setDownloadError(null);
+
+                                    // Unhandled otherwise: apiDownload rejects
+                                    // on a 404 from a file that has since been
+                                    // cleared off the disk, and a click that
+                                    // silently does nothing reads as a bug.
+                                    apiDownload(file.path, file.filename).catch(
+                                        (err) => setDownloadError(err.message || 'Could not download the file.')
+                                    );
+                                }}
+                                className='flex items-center justify-center rounded-[8px] p-[6px] text-[#64748b] transition-colors hover:bg-[#f1f5f9] hover:text-[#111827]'
+                            >
+                                <DownloadOutlined sx={{ fontSize: 18 }} />
+                            </button>
+
+                        </div>
+                    );
+                })}
+
+            </div>
+
+            {downloadError ? (
+                <p className='mb-[8px] text-[12px] font-[500] text-[#991b1b]'>{downloadError}</p>
+            ) : null}
+
+            {active ? (
+                !shown ? (
+                    <Skeleton variant='rounded' height={360} sx={{ borderRadius: '10px' }} />
+                ) : shown.error ? (
+                    <p className='text-[12px] font-[500] text-[#991b1b]'>{shown.error}</p>
+                ) : shown.url ? (
+                    isPdf ? (
+                        <iframe
+                            src={shown.url}
+                            title={active.filename}
+                            className='h-[420px] w-full rounded-[10px] ring-1 ring-[#e5e7eb]'
+                        />
+                    ) : (
+                        <img
+                            src={shown.url}
+                            alt={active.filename}
+                            className='max-h-[420px] w-full rounded-[10px] object-contain ring-1 ring-[#e5e7eb]'
+                        />
+                    )
+                ) : null
+            ) : null}
+
+        </div>
+    );
+}
+
 function InsuranceResponseModal({ detail, isLoading, error, onClose }) {
 
     return (
@@ -202,6 +407,13 @@ function InsuranceResponseModal({ detail, isLoading, error, onClose }) {
                                 ) : null}
 
                             </div>
+
+                            {/*
+                              * Above the prose on purpose: the certificate is
+                              * the answer, and the sentence around it is the
+                              * covering note.
+                              */}
+                            <ResponseAttachments attachments={detail.attachments || []} />
 
                             {/*
                               * The reply as it arrived, kept in front of the
