@@ -10,6 +10,7 @@ import LoadSearch from './pages/app/loadsearch/LoadSearch'
 import CarrierSearch from './pages/app/carriers/CarrierSearch'
 import CarrierProfile from './pages/app/carriers/CarrierProfile'
 import ConnectedCarriers from './pages/app/carriers/ConnectedCarriers'
+import NewPartnerCard from './pages/app/new-partner/Card'
 
 import UsersList from './pages/app/users/UsersList'
 
@@ -37,6 +38,7 @@ import AcceptInvitation from './pages/auth/AcceptInvitation'
 
 import CarrierOnboard from './pages/app/connect'
 import CarrierNoData from './pages/app/connect/CarrierNoData'
+import EldNotSupported from './pages/app/connect/EldNotSupported'
 import EmailApproval from './pages/app/connect/EmailApproval'
 
 /*
@@ -97,6 +99,7 @@ function AppShell() {
               the URL, not by a session. */}
           <Route path="/carrier/connect/:token" element={<CarrierOnboard />} />
           <Route path="/carrier/invalid-access" element={<CarrierNoData />} />
+          <Route path="/carrier/eld-not-supported" element={<EldNotSupported />} />
           <Route path="/carrier/email-approval" element={<EmailApproval />} />
 
           <Route path="/dashboard" element={<Dashboard />} />
@@ -132,6 +135,7 @@ function AppShell() {
               through to the catch-all and bounced back to login. */}
           <Route path="/carriers" element={<ConnectedCarriers />} />
           <Route path="/carriers/search" element={<CarrierSearch />} />
+          <Route path="/carriers/new-partner" element={<NewPartnerCard />} />
           <Route path="/carriers/:row_id" element={<CarrierProfile />} />
 
           <Route path="/profile/scoring-weights" element={<ScoringWeights />} />

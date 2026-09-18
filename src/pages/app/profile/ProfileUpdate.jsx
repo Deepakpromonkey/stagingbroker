@@ -42,6 +42,20 @@ const PAGE_BG = '#F4F5F1';
 const TOKEN_KEY = 'crm_auth_token';
 const USER_KEY = 'crm_user';
 
+/*
+| A new avatar is uploaded to the same URL as the old one, so the browser keeps
+| showing the cached copy and the change looks like it silently failed. The
+| version counter below is bumped on a successful save; appending it makes the
+| URL new enough for the cache to miss while still pointing at the same file.
+*/
+function withCacheBust(url, version) {
+    if (!url) return url;
+
+    const sep = url.includes('?') ? '&' : '?';
+
+    return `${url}${sep}v=${version}`;
+}
+
 const MAX_NAME_LENGTH = 50;
 
 // Password length bounds — applies to current / new / confirm password.
@@ -387,6 +401,7 @@ const ProfileUpdate = () => {
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [avatarError, setAvatarError] = useState(false);
+    const [pictureVersion, setPictureVersion] = useState(0);
 
     const [firstNameError, setFirstNameError] = useState('');
     const [lastNameError, setLastNameError] = useState('');
@@ -723,6 +738,7 @@ const ProfileUpdate = () => {
                     // a full page reload. Broadcast a custom event so any
                     // mounted component in this tab can refresh immediately.
                     window.dispatchEvent(new CustomEvent('crm-user-updated', { detail: mergedUser }));
+                    setPictureVersion((v) => v + 1);
                 } else {
                     const syncedUser = {
                         ...user,
@@ -735,6 +751,7 @@ const ProfileUpdate = () => {
                     localStorage.setItem(USER_KEY, JSON.stringify(syncedUser));
                     setUser(syncedUser);
                     window.dispatchEvent(new CustomEvent('crm-user-updated', { detail: syncedUser }));
+                    setPictureVersion((v) => v + 1);
                 }
 
                 toast.success(result?.message || 'Profile updated successfully.');
@@ -877,7 +894,7 @@ const ProfileUpdate = () => {
                         <div className="p-[3px] rounded-full" style={{ background: `linear-gradient(135deg, ${INDIGO}, #38BDF8)` }}>
                             {user.profile_pic_url && !avatarError ? (
                                 <img
-                                    src={user.profile_pic_url}
+                                    src={withCacheBust(user.profile_pic_url, pictureVersion)}
                                     alt="Profile"
                                     onError={() => setAvatarError(true)}
                                     className="w-24 h-24 rounded-full object-cover border-[3px] border-white"

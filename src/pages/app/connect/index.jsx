@@ -141,6 +141,27 @@ export default function OnboardPage() {
   // the connection loaded. Absent while the carrier has not linked anything.
   const eld = connectRequest?.eld ?? null;
 
+  /*
+  | A connection the carrier made, and their provider has since dropped.
+  |
+  | This has to be its own state rather than folding into "not connected": the
+  | carrier did everything asked of them, and telling them to connect an ELD
+  | they believe they already connected reads as the step having lost their
+  | work. Re-auth also cannot start a fresh flow — it repairs the connection
+  | that exists, against the same provider account.
+  */
+  const isEldDisconnected = eld?.status === "disconnected";
+
+  /*
+  | A live connection this carrier made while onboarding with another broker,
+  | which this one has not been granted yet.
+  |
+  | They linked their provider once already, and we still hold a working token
+  | for it — so all this broker needs is the carrier's permission, not another
+  | trip through the provider's login for a connection that already exists.
+  */
+  const eldShareable = connectRequest?.eld_shareable ?? null;
+
   const isQuestionnaireDone = !!connectRequest?.questionnaire_completed;
   const isDocumentsDone = !!connectRequest?.documents_completed;
 
@@ -536,6 +557,31 @@ export default function OnboardPage() {
     } catch (err) {
       setBusy(false);
       setErrorMessage(err?.message || "Could not open the ELD connection page.");
+    }
+  };
+
+  /**
+   * Give this broker access to the ELD the carrier has already connected.
+   *
+   * Consent is still explicit — the button names the broker — it just does not
+   * need the provider's sign-in page a second time.
+   */
+  const shareEld = async () => {
+    setBusy(true);
+
+    try {
+      const res = await apiFetch("/carrier-connect/eld/share", {
+        method: "POST",
+        skipAuth: true,
+        body: JSON.stringify({ token }),
+      });
+
+      applyRequest(res.data);
+      setSuccessMessage(res.message || "ELD shared.");
+    } catch (err) {
+      setErrorMessage(err?.message || "Could not share your ELD connection.");
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -1483,22 +1529,59 @@ export default function OnboardPage() {
                   Connect your ELD provider
                 </label>
 
+                {/*
+                  Already connected with another broker: ask for permission
+                  rather than sending them back to their provider's login.
+                */}
+                {!isEldConnected && eldShareable && (
+                  <div className="mb-4 flex w-full max-w-xl flex-col items-center rounded-2xl border-2 border-green-200 bg-green-50 p-6 text-center">
+                    <DoneAll className="mb-2 text-green-600" style={{ fontSize: 36 }} />
+
+                    <p className="text-md font-bold text-green-700">
+                      Your {eldShareable.provider || "ELD"} is already connected
+                    </p>
+
+                    <p className="mt-1 text-xs text-[#4B5563]">
+                      You connected it when onboarding with another broker
+                      {eldShareable.vehicles
+                        ? ` — ${eldShareable.vehicles} vehicles, ${eldShareable.drivers} drivers`
+                        : ""}
+                      . Share it with {broker?.company_name || "this broker"} so
+                      they can see your hours of service and vehicle locations.
+                      You will not need to sign in again.
+                    </p>
+
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={shareEld}
+                      className="mt-4 rounded-lg bg-green-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-green-700 disabled:opacity-40"
+                    >
+                      Share with {broker?.company_name || "this broker"}
+                    </button>
+                  </div>
+                )}
+
                 <div
                   className={`group flex min-h-[180px] w-full max-w-xl cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed transition-all ${
                     isEldConnected
                       ? "border-green-300 bg-green-50"
-                      : isEldSkipped
-                        ? "border-gray-300 bg-gray-50"
-                        : "border-gray-300 bg-[#FAFBFD] hover:border-blue-500"
+                      : isEldDisconnected
+                        ? "border-amber-300 bg-amber-50"
+                        : isEldSkipped
+                          ? "border-gray-300 bg-gray-50"
+                          : "border-gray-300 bg-[#FAFBFD] hover:border-blue-500"
                   }`}
-                  onClick={() => !isEldConnected && connectEld()}
+                  onClick={() => !isEldConnected && !busy && connectEld()}
                 >
                   <SensorsOutlined
                     style={{ fontSize: 80 }}
                     className={
                       isEldConnected
                         ? "text-green-700 opacity-20"
-                        : "text-blue-100 group-hover:text-blue-200"
+                        : isEldDisconnected
+                          ? "text-amber-200"
+                          : "text-blue-100 group-hover:text-blue-200"
                     }
                   />
 
@@ -1522,11 +1605,25 @@ export default function OnboardPage() {
                           : "Importing your fleet — this continues in the background."}
                       </span>
                     </div>
+                  ) : isEldDisconnected ? (
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="text-md font-bold text-amber-600 uppercase">
+                        {eld?.provider
+                          ? `${eld.provider} needs reconnecting`
+                          : "Reconnect your ELD"}
+                      </span>
+
+                      <span className="text-xs text-[#6B7280]">
+                        Your provider signed us out. Click to sign in again.
+                      </span>
+                    </div>
                   ) : (
                     <span className="text-md font-bold text-blue-200 uppercase group-hover:text-blue-300">
-                      {isEldSkipped
-                        ? "Skipped — click to connect"
-                        : "Click to start"}
+                      {eldShareable
+                        ? "Or connect a different provider"
+                        : isEldSkipped
+                          ? "Skipped — click to connect"
+                          : "Click to start"}
                     </span>
                   )}
                 </div>

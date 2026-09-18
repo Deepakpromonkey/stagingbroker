@@ -15,11 +15,24 @@ function CarrierProfileSection(props) {
 
     function renderHeroSection() {
 
+        function getHeroGradient() {
+
+            if (props.status === 'blocked') {
+                return 'bg-gradient-to-r from-[#B91C1C] via-[#C0261F] to-[#991B1B]';
+            }
+
+            if (props.status === 'connected') {
+                return 'bg-gradient-to-r from-[#15803D] via-[#1a9147] to-[#166534]';
+            }
+
+            return 'bg-gradient-to-r from-[#0E57C0] via-[#1a55cf] to-[#1E40AF]';
+        }
+
         return (
 
             <div className='overflow-hidden rounded-[16px] border border-[#d9e1ee] bg-white shadow-[0_2px_8px_rgba(16,24,40,0.06)]'>
 
-               <div className='flex flex-col gap-[24px] bg-gradient-to-r from-[#0E57C0] via-[#1a55cf] to-[#1E40AF] px-[20px] py-[24px] md:px-[28px] md:py-[26px] xl:flex-row xl:items-center xl:justify-between xl:px-[36px] xl:py-[28px]'>
+               <div className={`flex flex-col gap-[24px] ${getHeroGradient()} px-[20px] py-[24px] md:px-[28px] md:py-[26px] xl:flex-row xl:items-center xl:justify-between xl:px-[36px] xl:py-[28px]`}>
 
                     <div className='min-w-0 flex flex-col justify-center'>
 
@@ -65,7 +78,7 @@ return (
         }}
         className={
             getButtonBaseClasses() +
-            ' sm:min-w-[190px] sm:w-auto sm:text-[15px] xl:h-[52px] xl:px-[22px] xl:text-[16px]' +
+            ' sm:min-w-[100px] sm:w-auto sm:text-[15px] xl:h-[52px] xl:px-[22px] xl:text-[16px]' +
             (action?.disabled
                 ? ' cursor-not-allowed opacity-60 grayscale'
                 : ' cursor-pointer hover:opacity-90 transition-all')
