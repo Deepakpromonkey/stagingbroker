@@ -6,33 +6,19 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined";
 import SatelliteAltOutlinedIcon from "@mui/icons-material/SatelliteAltOutlined";
+import SatelliteAltIcon from "@mui/icons-material/SatelliteAlt";
 
 import { apiFetch } from "../../../lib/api";
 import { toast } from "../../../components/ui/Toaster";
 
+/*
+| Broker-facing ELD shipment detail page. Styled to match the rest of this
+| app — see control_tower/ControlTowerShipment.jsx, the equivalent page for a
+| phone-tracked load — rather than the dark mockup this was first built from.
+*/
+
 const trackUrl = (uuid) => `/shipments/${uuid}/eld/track`;
-
 const containerStyle = { width: "100%", height: "100%", minHeight: "340px" };
-
-const DARK_MAP_STYLE = [
-  { elementType: "geometry", stylers: [{ color: "#0f1a2e" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#0f1a2e" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#64748b" }] },
-  { featureType: "road", elementType: "geometry", stylers: [{ color: "#1a2740" }] },
-  { featureType: "water", elementType: "geometry", stylers: [{ color: "#0a1120" }] },
-  { featureType: "poi", stylers: [{ visibility: "off" }] },
-  { featureType: "transit", stylers: [{ visibility: "off" }] },
-  { featureType: "administrative", elementType: "geometry", stylers: [{ color: "#233247" }] },
-];
-
-const trailOptions = {
-  strokeColor: "#3B5BFB",
-  strokeOpacity: 0.5,
-  strokeWeight: 3,
-  clickable: false,
-  zIndex: 2,
-  icons: [{ icon: { path: "M 0,-1 0,1", strokeOpacity: 0.7, scale: 3 }, offset: "0", repeat: "14px" }],
-};
 
 // See ControlTowerShipment.jsx for why this waits on the global script
 // instead of using @react-google-maps/api's own loader — index.html already
@@ -53,6 +39,14 @@ function useGoogleMapsReady() {
   return ready;
 }
 
+const trailOptions = {
+  strokeColor: "#2563EB",
+  strokeOpacity: 0.9,
+  strokeWeight: 4,
+  clickable: false,
+  zIndex: 3,
+};
+
 function timeAgo(iso) {
   if (!iso) return "—";
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
@@ -62,25 +56,32 @@ function timeAgo(iso) {
   return `${Math.floor(seconds / 86400)} d ago`;
 }
 
-const STATUS_LABEL = {
-  draft: "Not started",
-  active: "In transit",
-  completed: "Delivered",
-  cancelled: "Cancelled",
-};
+function formatWindow(date, time, timezone) {
+  if (!date) return "Not scheduled";
+  const [y, m, d] = date.split("-");
+  let label = `${m}/${d}/${y}`;
+  if (time) {
+    const [h, min] = time.split(":").map(Number);
+    const period = h >= 12 ? "PM" : "AM";
+    const hour12 = h % 12 === 0 ? 12 : h % 12;
+    label += ` · ${hour12}:${String(min).padStart(2, "0")} ${period}`;
+  }
+  if (timezone) label += ` ${timezone}`;
+  return label;
+}
 
-const STATUS_DOT = {
-  draft: "bg-slate-400",
-  active: "bg-[#3B5BFB]",
-  completed: "bg-emerald-400",
-  cancelled: "bg-red-400",
+const STATUS_STYLES = {
+  draft: { label: "Not Started", className: "bg-slate-100 text-slate-600" },
+  active: { label: "In Transit", className: "bg-blue-50 text-blue-600" },
+  completed: { label: "Delivered", className: "bg-green-50 text-green-600" },
+  cancelled: { label: "Cancelled", className: "bg-red-50 text-red-600" },
 };
 
 function DetailRow({ label, value }) {
   return (
-    <div className="flex items-center justify-between border-b border-white/[0.06] py-3 last:border-b-0">
-      <span className="text-sm text-slate-400">{label}</span>
-      <span className="text-right text-sm font-semibold text-slate-100">{value ?? "—"}</span>
+    <div className="flex items-center justify-between border-b border-slate-100 py-3 last:border-b-0">
+      <span className="text-sm text-slate-500">{label}</span>
+      <span className="text-right text-sm font-semibold text-slate-800">{value ?? "—"}</span>
     </div>
   );
 }
@@ -102,7 +103,6 @@ export default function EldShipmentDetail() {
       const res = await apiFetch(trackUrl(uuid));
       if (res?.status) {
         setData(res.data);
-
         if (res.data.status === "active" && pollRef.current === null) {
           pollRef.current = setInterval(() => load(false), 10000);
         } else if (res.data.status !== "active" && pollRef.current) {
@@ -159,25 +159,27 @@ export default function EldShipmentDetail() {
 
   if (loading || !data) {
     return (
-      <div className="min-h-screen bg-[#0A0F1E] px-4 py-8 sm:px-6 lg:px-10">
+      <div className="min-h-screen bg-[#F4F5F1] px-4 py-5 sm:px-6 md:px-8 lg:px-14">
         <div className="mx-auto max-w-6xl animate-pulse space-y-5">
-          <div className="h-8 w-64 rounded bg-white/5" />
+          <div className="h-8 w-64 rounded bg-slate-200" />
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-            <div className="h-96 rounded-2xl bg-white/5 lg:col-span-2" />
-            <div className="h-96 rounded-2xl bg-white/5" />
+            <div className="h-96 rounded-2xl bg-slate-200 lg:col-span-2" />
+            <div className="h-96 rounded-2xl bg-slate-200" />
           </div>
         </div>
       </div>
     );
   }
 
+  const statusInfo = STATUS_STYLES[data.status] || { label: data.status, className: "bg-slate-100 text-slate-600" };
+
   return (
-    <div className="min-h-screen bg-[#0A0F1E] px-4 py-8 sm:px-6 lg:px-10">
+    <div className="min-h-screen bg-[#F4F5F1] px-4 py-5 sm:px-6 md:px-8 lg:px-14 antialiased text-[#1E293B]">
       <div className="mx-auto max-w-6xl">
         <button
           type="button"
           onClick={() => navigate("/load-search")}
-          className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-slate-400 transition hover:text-slate-200"
+          className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition hover:text-slate-800"
         >
           <ArrowBackIcon sx={{ fontSize: 16 }} /> Back to Load Search
         </button>
@@ -185,13 +187,12 @@ export default function EldShipmentDetail() {
         <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-2xl font-bold text-white sm:text-[28px]">{data.shipment_no}</h1>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1 text-xs font-bold text-slate-300">
-                <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[data.status] || "bg-slate-400"}`} />
-                {STATUS_LABEL[data.status] || data.status}
+              <h1 className="text-2xl font-bold text-slate-900 sm:text-[28px]">{data.shipment_no}</h1>
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${statusInfo.className}`}>
+                {statusInfo.label}
               </span>
             </div>
-            <p className="mt-1.5 text-sm text-slate-400">
+            <p className="mt-1.5 text-sm text-slate-500">
               {data.origin || "Origin not entered"} → {data.destination || "Destination not entered"}
               {data.pro_number ? ` · PRO ${data.pro_number}` : ""}
             </p>
@@ -203,7 +204,7 @@ export default function EldShipmentDetail() {
                 href={`${data.public_tracking_url}?preview=1`}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-xs font-bold text-slate-200 transition hover:bg-white/[0.08]"
+                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
               >
                 <OpenInNewIcon sx={{ fontSize: 15 }} /> Preview customer link
               </a>
@@ -212,7 +213,7 @@ export default function EldShipmentDetail() {
               type="button"
               onClick={copyLink}
               disabled={!data.public_tracking_url}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#3B5BFB] px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-[#3B5BFB]/20 transition hover:bg-[#2F4CE0] disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-2xl bg-[#001A48] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-[#1E293B] disabled:opacity-50"
             >
               <ContentCopyIcon sx={{ fontSize: 15 }} /> Share tracking link
             </button>
@@ -221,19 +222,17 @@ export default function EldShipmentDetail() {
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
           <div className="space-y-5 lg:col-span-2">
-            <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0D1526]">
+            <div className="overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white shadow-sm">
               <div className="flex items-center justify-between px-5 py-4">
-                <h2 className="text-sm font-bold text-white">Route & live position</h2>
+                <h2 className="text-sm font-bold text-slate-900">Route & live position</h2>
               </div>
 
-              <div className="mx-5 mb-5 overflow-hidden rounded-xl border border-white/5" style={{ minHeight: 340 }}>
+              <div className="mx-5 mb-5 overflow-hidden rounded-xl border border-slate-100" style={{ minHeight: 340 }}>
                 {!current ? (
-                  <div className="flex h-[340px] flex-col items-center justify-center gap-2 bg-[#0f1a2e] text-slate-500">
+                  <div className="flex h-[340px] flex-col items-center justify-center gap-2 bg-slate-50 text-slate-400">
                     <SatelliteAltOutlinedIcon sx={{ fontSize: 28 }} />
                     <p className="text-sm font-medium">
-                      {data.status === "draft"
-                        ? "Tracking hasn't started yet."
-                        : "No position reported by the ELD yet."}
+                      {data.status === "draft" ? "Tracking hasn't started yet." : "No position reported by the ELD yet."}
                     </p>
                   </div>
                 ) : isLoaded ? (
@@ -242,12 +241,7 @@ export default function EldShipmentDetail() {
                     center={{ lat: Number(current.latitude), lng: Number(current.longitude) }}
                     zoom={9}
                     onLoad={(map) => { mapRef.current = map; }}
-                    options={{
-                      styles: DARK_MAP_STYLE,
-                      streetViewControl: false,
-                      mapTypeControl: false,
-                      fullscreenControl: false,
-                    }}
+                    options={{ streetViewControl: false, mapTypeControl: false, fullscreenControl: false }}
                   >
                     {trail.length > 1 && <Polyline path={trail} options={trailOptions} />}
                     <Marker
@@ -255,7 +249,7 @@ export default function EldShipmentDetail() {
                       icon={{
                         path: window.google.maps.SymbolPath.CIRCLE,
                         scale: 8,
-                        fillColor: "#3B5BFB",
+                        fillColor: "#2563EB",
                         fillOpacity: 1,
                         strokeColor: "#ffffff",
                         strokeWeight: 2,
@@ -263,21 +257,22 @@ export default function EldShipmentDetail() {
                     />
                   </GoogleMap>
                 ) : (
-                  <div className="h-[340px] animate-pulse bg-[#0f1a2e]" />
+                  <div className="h-[340px] animate-pulse bg-slate-100" />
                 )}
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/[0.06] px-5 py-3.5 text-xs text-slate-500">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-5 py-3.5 text-xs text-slate-500">
                 <span>
-                  Position pings every {Math.round((data.tracking_interval_seconds || 300) / 60)} min via
-                  Terminal / ELD
+                  Position pings every {Math.round((data.tracking_interval_seconds || 300) / 60)} min via Terminal / ELD
                 </span>
                 <span>Last ping: {timeAgo(current?.located_at)}</span>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-[#0D1526] p-5">
-              <h2 className="mb-1 text-sm font-bold text-white">🛰️ ELD telemetry</h2>
+            <div className="rounded-2xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
+              <h2 className="mb-1 flex items-center gap-2 text-sm font-bold text-slate-900">
+                <SatelliteAltIcon sx={{ fontSize: 17 }} className="text-[#1D4ED8]" /> ELD telemetry
+              </h2>
               <div className="mt-3">
                 <DetailRow label="Source" value={`Terminal · ${data.eld_provider || "—"}`} />
                 <DetailRow label="Speed" value={current ? `${Math.round(current.speed_mph)} mph` : "—"} />
@@ -294,9 +289,9 @@ export default function EldShipmentDetail() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-[#0D1526] p-5">
-            <h2 className="mb-1 flex items-center gap-2 text-sm font-bold text-white">
-              <LocalShippingOutlinedIcon sx={{ fontSize: 17 }} /> Shipment details
+          <div className="rounded-2xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
+            <h2 className="mb-1 flex items-center gap-2 text-sm font-bold text-slate-900">
+              <LocalShippingOutlinedIcon sx={{ fontSize: 17 }} className="text-[#1D4ED8]" /> Shipment details
             </h2>
             <div className="mt-3">
               <DetailRow
@@ -311,6 +306,8 @@ export default function EldShipmentDetail() {
               <DetailRow label="Driver" value={data.driver_name} />
               <DetailRow label="Origin" value={data.origin || "Origin not entered"} />
               <DetailRow label="Destination" value={data.destination || "Destination not entered"} />
+              <DetailRow label="Pickup window" value={formatWindow(data.pickup_date, data.pickup_time, data.pickup_timezone)} />
+              <DetailRow label="Delivery window" value={formatWindow(data.delivery_date, data.delivery_time, data.delivery_timezone)} />
               <DetailRow label="Dispatched" value={timeAgo(data.tracking_started_at)} />
             </div>
           </div>
