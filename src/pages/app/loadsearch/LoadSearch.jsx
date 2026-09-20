@@ -9,7 +9,13 @@ import FormatListBulletedIcon from "@mui/icons-material/FormatListBulleted";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import IconButton from "@mui/material/IconButton";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
+import ListItemIcon from "@mui/material/ListItemIcon";
+import ListItemText from "@mui/material/ListItemText";
 import { Add } from "@mui/icons-material";
+import EditNoteOutlinedIcon from "@mui/icons-material/EditNoteOutlined";
+import SatelliteAltOutlinedIcon from "@mui/icons-material/SatelliteAltOutlined";
 
 import { useNavigate } from "react-router-dom";
 
@@ -123,6 +129,8 @@ export default function LoadSearch() {
 
   const navigate = useNavigate();
 
+  const [newTrackingAnchor, setNewTrackingAnchor] = useState(null);
+
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(10);
 
@@ -207,12 +215,70 @@ export default function LoadSearch() {
 
   {/* Right Side */}
 <button
-  onClick={() => navigate("/trackshipment/step1")}
+  onClick={(e) => setNewTrackingAnchor(e.currentTarget)}
   className="sm:mt-6 inline-flex self-start sm:self-auto items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 sm:px-6 py-3 sm:py-4 text-sm sm:text-[15px] font-semibold text-slate-900 shadow-sm hover:bg-slate-50 w-auto shrink-0"
 >
   <Add sx={{ fontSize: 20 }} />
   New Tracking
 </button>
+
+<Menu
+  anchorEl={newTrackingAnchor}
+  open={Boolean(newTrackingAnchor)}
+  onClose={() => setNewTrackingAnchor(null)}
+  transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+  anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+  slotProps={{
+    paper: {
+      elevation: 0,
+      sx: {
+        mt: 1,
+        borderRadius: '14px',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.08)',
+        minWidth: 260,
+      },
+    },
+  }}
+>
+  <MenuItem
+    onClick={() => {
+      setNewTrackingAnchor(null);
+      navigate("/trackshipment/step1");
+    }}
+    sx={{ py: 1.5, px: 2 }}
+  >
+    <ListItemIcon>
+      <EditNoteOutlinedIcon sx={{ fontSize: 20, color: '#475569' }} />
+    </ListItemIcon>
+    <ListItemText
+      primary="Manual Entry"
+      secondary="Enter carrier and driver details yourself"
+      slotProps={{
+        primary: { sx: { fontSize: 14, fontWeight: 600, color: '#0f172a' } },
+        secondary: { sx: { fontSize: 12, color: '#64748b' } },
+      }}
+    />
+  </MenuItem>
+  <MenuItem
+    onClick={() => {
+      setNewTrackingAnchor(null);
+      navigate("/trackshipment/eld");
+    }}
+    sx={{ py: 1.5, px: 2 }}
+  >
+    <ListItemIcon>
+      <SatelliteAltOutlinedIcon sx={{ fontSize: 20, color: '#475569' }} />
+    </ListItemIcon>
+    <ListItemText
+      primary="ELD Live Tracking"
+      secondary="Pull vehicle & driver from a connected carrier's ELD"
+      slotProps={{
+        primary: { sx: { fontSize: 14, fontWeight: 600, color: '#0f172a' } },
+        secondary: { sx: { fontSize: 12, color: '#64748b' } },
+      }}
+    />
+  </MenuItem>
+</Menu>
 </div>
 
       <div className="mb-6 flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-end gap-4">
@@ -301,9 +367,12 @@ export default function LoadSearch() {
                     key={row.original.uuid || row.id}
                     className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/60 cursor-pointer"
                     onClick={() => {
-                      if (row.original.uuid) {
-                        window.location.href = `/shipment/${row.original.uuid}`;
-                      }
+                      if (!row.original.uuid) return;
+                      navigate(
+                        row.original.tracking_method === "eld"
+                          ? `/shipment/eld/${row.original.uuid}`
+                          : `/shipment/${row.original.uuid}`
+                      );
                     }}
                   >
                     {row.getVisibleCells().map((cell) => (

@@ -5,6 +5,9 @@ import Signup from './pages/auth/Signup'
 import Dashboard from './pages/app/Dashboard'
 import TrackShipmentStep1 from './pages/app/trackshipment/Step1'
 import TrackShipmentStep2 from './pages/app/trackshipment/Step2'
+import TrackShipmentEld from './pages/app/trackshipment-eld/EldShipmentForm'
+import EldShipmentDetail from './pages/app/trackshipment-eld/EldShipmentDetail'
+import PublicTracking from './pages/app/PublicTracking/PublicTracking'
 import SearchVet from './pages/app/SearchVet/SearchVet'
 import RiskAlerts from './pages/app/riskalert/RiskAlerts'
 import LoadSearch from './pages/app/loadsearch/LoadSearch'
@@ -70,14 +73,19 @@ import NewPartnerCard from './pages/app/new-partner/Card';
 // /subscribe is one of these: it's shown as a forced, standalone step
 // (right after signup, or when RouteGuard redirects here for not having
 // a plan yet) and shouldn't look like a page nested inside the app shell.
+// /track/:token is the customer-facing public tracking page — whoever opens
+// it has no broker session and shouldn't see this app's internal nav at all.
 const NO_HEADER_PATHS = ['/subscribe', '/accept-invitation'];
+const NO_HEADER_PREFIXES = ['/track/'];
 
 // Needs to live inside <BrowserRouter> so it can call useLocation() —
 // App() itself renders BrowserRouter, so it isn't inside the router
 // context yet and can't read the current path directly.
 function AppShell() {
   const location = useLocation();
-  const hideHeader = NO_HEADER_PATHS.includes(location.pathname);
+  const hideHeader =
+    NO_HEADER_PATHS.includes(location.pathname) ||
+    NO_HEADER_PREFIXES.some((prefix) => location.pathname.startsWith(prefix));
 
   useEffect(() => {
   window.scrollTo(0, 0);
@@ -112,6 +120,7 @@ function AppShell() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/trackshipment/step1" element={<TrackShipmentStep1 />} />
           <Route path="/trackshipment/step2" element={<TrackShipmentStep2 />} />
+          <Route path="/trackshipment/eld" element={<TrackShipmentEld />} />
           <Route path="/load-search" element={<LoadSearch />} />
           <Route path="/search-vet" element={<SearchVet />} />
           <Route path="/risk-alerts" element={<RiskAlerts />} />
@@ -135,6 +144,11 @@ function AppShell() {
 
           <Route path="/control-tower" element={<ControlTowerList />} />
           <Route path="/shipment/:row_id" element={<ControlTowerShipment />} />
+          <Route path="/shipment/eld/:uuid" element={<EldShipmentDetail />} />
+
+          {/* Public — the customer opens this with nothing but a link, no
+              account here at all. Authorised by the token in the URL. */}
+          <Route path="/track/:token" element={<PublicTracking />} />
           <Route path="/profile/carriers/shortlisted" element={<ShortlistedCarriers />} />
           <Route path="/profile/carriers/blocked" element={<BlockedCarriers />} />
 
