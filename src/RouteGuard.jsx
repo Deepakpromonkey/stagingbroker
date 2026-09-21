@@ -72,7 +72,11 @@ const PUBLIC_PATH_PREFIXES = [
   "/carrier/connect/",
   "/carrier/invalid-access",
   "/carrier/email-approval",
-  '/guest-pay'
+  '/guest-pay',
+
+  // The customer-facing tracking link — opened with no session at all,
+  // authorised only by the token in the URL.
+  '/track/',
 ];
 
 function isPublicPath(pathname) {
