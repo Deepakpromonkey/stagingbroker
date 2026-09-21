@@ -8,6 +8,7 @@ import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
 import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
 
 import { apiFetch } from "../../../lib/api";
+import EldMilestones from "../trackshipment-eld/EldMilestones";
 
 /*
 | The link a broker hands their customer. No session, no company context —
@@ -35,7 +36,17 @@ import { apiFetch } from "../../../lib/api";
 
 const trackUrl = (token) => `/public/tracking/${token}`;
 
-const containerStyle = { width: "100%", height: "100%", minHeight: "280px" };
+// See EldShipmentDetail.jsx for why this is a fixed height, not "100%".
+const containerStyle = { width: "100%", height: "280px" };
+
+// See EldShipmentDetail.jsx for the same style — Google's default labels
+// every real business/landmark it knows about, which is noise on a load
+// tracker and looks especially odd to a customer seeing unrelated business
+// names near "their" truck.
+const CLEAN_MAP_STYLE = [
+  { featureType: "poi", stylers: [{ visibility: "off" }] },
+  { featureType: "transit", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+];
 
 function useGoogleMapsReady() {
   const [ready, setReady] = useState(() => Boolean(window.google?.maps));
@@ -84,6 +95,14 @@ export default function PublicTracking() {
   const [notFound, setNotFound] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Same reasoning as EldShipmentDetail.jsx: GoogleMap's `center` prop must
+  // not be a fresh object on every poll, or the map re-centers (and can go
+  // blank) on every refresh. Set once via a guarded setState call during
+  // render (React's sanctioned pattern for this — not a ref, which isn't
+  // allowed to be mutated mid-render); the Marker's `position` is what's
+  // safe to keep updating live.
+  const [initialCenter, setInitialCenter] = useState(null);
+
   useEffect(() => {
     let cancelled = false;
     let timer = null;
@@ -99,8 +118,14 @@ export default function PublicTracking() {
         // delivered/cancelled/pending load has nothing new to report between
         // polls, so there's no reason to keep hitting the API on a page a
         // customer may leave open in a tab for hours.
+        //
+        // The wait itself follows the shipment's own tracking_interval_seconds
+        // rather than a flat number — see EldShipmentDetail.jsx for the same
+        // reasoning: asking faster than new data could possibly exist is
+        // just wasted requests.
         if (res.data.state === "in_transit") {
-          timer = setTimeout(load, 30000);
+          const delay = Math.min(300000, Math.max(30000, ((res.data.tracking_interval_seconds || 300) * 1000) / 3));
+          timer = setTimeout(load, delay);
         }
       } catch (err) {
         if (cancelled) return;
@@ -134,6 +159,10 @@ export default function PublicTracking() {
 
   const current = data.current;
   const position = current ? { lat: Number(current.latitude), lng: Number(current.longitude) } : null;
+
+  if (position && initialCenter === null) {
+    setInitialCenter(position);
+  }
 
   return (
     <div className="min-h-screen bg-[#F4F5F1]">
@@ -193,6 +222,17 @@ export default function PublicTracking() {
               </div>
             )}
 
+            {data.milestone && (
+              <div className="mb-6">
+                <EldMilestones
+                  milestone={data.milestone}
+                  arrivedAtOriginAt={data.arrived_at_origin_at}
+                  arrivedAtDestinationAt={data.arrived_at_destination_at}
+                  deliveredAt={data.delivered_at}
+                />
+              </div>
+            )}
+
             {(data.state === "in_transit" || data.state === "pending") && (
               <div className="mb-6 overflow-hidden rounded-xl border border-slate-100" style={{ minHeight: 280 }}>
                 {!position ? (
@@ -203,9 +243,18 @@ export default function PublicTracking() {
                 ) : isLoaded ? (
                   <GoogleMap
                     mapContainerStyle={containerStyle}
-                    center={position}
+                    center={initialCenter}
                     zoom={9}
+                    onLoad={(map) => {
+                      // Same fix as EldShipmentDetail.jsx — force a
+                      // re-measure once the layout has actually settled.
+                      setTimeout(() => {
+                        window.google.maps.event.trigger(map, "resize");
+                        if (initialCenter) map.setCenter(initialCenter);
+                      }, 0);
+                    }}
                     options={{
+                      styles: CLEAN_MAP_STYLE,
                       streetViewControl: false,
                       mapTypeControl: false,
                       fullscreenControl: false,

@@ -10,6 +10,7 @@ import SatelliteAltIcon from "@mui/icons-material/SatelliteAlt";
 
 import { apiFetch } from "../../../lib/api";
 import { toast } from "../../../components/ui/Toaster";
+import EldMilestones from "./EldMilestones";
 
 /*
 | Broker-facing ELD shipment detail page. Styled to match the rest of this
@@ -18,7 +19,22 @@ import { toast } from "../../../components/ui/Toaster";
 */
 
 const trackUrl = (uuid) => `/shipments/${uuid}/eld/track`;
-const containerStyle = { width: "100%", height: "100%", minHeight: "340px" };
+// A fixed pixel height, not "100%" — Google Maps measures its container the
+// instant it initializes, and a percentage height resolved against a parent
+// that only declares minHeight can read as zero/ambiguous at that exact
+// moment. The map then locks in at the wrong size and never repaints
+// correctly on its own, which is what was showing as a blank/grey map.
+const containerStyle = { width: "100%", height: "340px" };
+
+// Google's default style labels every real business, gate and landmark it
+// knows about — fine for a consumer maps app, noise on a load tracker where
+// the only thing that matters is the road network and the truck. Turning
+// off POI/transit icons is what keeps a zoomed-in view from turning into a
+// wall of unrelated business names.
+const CLEAN_MAP_STYLE = [
+  { featureType: "poi", stylers: [{ visibility: "off" }] },
+  { featureType: "transit", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+];
 
 // See ControlTowerShipment.jsx for why this waits on the global script
 // instead of using @react-google-maps/api's own loader — index.html already
@@ -97,17 +113,49 @@ export default function EldShipmentDetail() {
   const mapRef = useRef(null);
   const hasFramedRef = useRef(false);
 
+  // GoogleMap's `center` prop isn't meant to track live data — passing a new
+  // {lat,lng} object on every poll makes the library re-center (and in
+  // practice, sometimes blank) the map on every single refresh. It's set
+  // once, from the first position seen, and never touched again; the
+  // Marker's own `position` prop is what's safe to update live, and the
+  // fitBounds/panTo effect below already handles reframing deliberately.
+  //
+  // Set via a guarded setState call during render, not a ref — React runs
+  // this branch, sees the state actually changed, and re-renders immediately
+  // before anything commits, so there's no extra paint. A ref mutated here
+  // would violate React's own rule against touching refs during render.
+  const [initialCenter, setInitialCenter] = useState(null);
+
+  // Checking every 10s made sense only if new data could actually land that
+  // often — it can't. A shipment's own tracking_interval_seconds (the same
+  // number the "pings every N min" line already shows) is the real limit on
+  // how fast anything can change, so the poll rate follows it instead of a
+  // flat number: about a third of the real interval, so a fresh position
+  // shows up reasonably soon after it lands without asking dozens of times
+  // for nothing in between. Floored at 20s (no point being frantic even for
+  // a 1-minute shipment) and capped at 5 min (so the page doesn't feel dead
+  // on a 6-hour interval).
+  const pollDelayFor = (intervalSeconds) =>
+    Math.min(300000, Math.max(20000, ((intervalSeconds || 300) * 1000) / 3));
+
+  // A self-scheduling timeout, not setInterval — each run reads the interval
+  // from the response it just received, so if a broker edited the shipment's
+  // interval elsewhere, the next wait picks that up immediately rather than
+  // being locked to whatever was true when polling first started.
   const load = async (showSpinner) => {
     if (showSpinner) setLoading(true);
     try {
       const res = await apiFetch(trackUrl(uuid));
       if (res?.status) {
         setData(res.data);
-        if (res.data.status === "active" && pollRef.current === null) {
-          pollRef.current = setInterval(() => load(false), 10000);
-        } else if (res.data.status !== "active" && pollRef.current) {
-          clearInterval(pollRef.current);
+
+        if (pollRef.current) {
+          clearTimeout(pollRef.current);
           pollRef.current = null;
+        }
+
+        if (res.data.status === "active") {
+          pollRef.current = setTimeout(() => load(false), pollDelayFor(res.data.tracking_interval_seconds));
         }
       }
     } catch (err) {
@@ -120,7 +168,7 @@ export default function EldShipmentDetail() {
   useEffect(() => {
     load(true);
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
+      if (pollRef.current) clearTimeout(pollRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uuid]);
@@ -129,6 +177,10 @@ export default function EldShipmentDetail() {
   const trail = (data?.trail || [])
     .filter((p) => p.latitude && p.longitude)
     .map((p) => ({ lat: Number(p.latitude), lng: Number(p.longitude) }));
+
+  if (current && initialCenter === null) {
+    setInitialCenter({ lat: Number(current.latitude), lng: Number(current.longitude) });
+  }
 
   useEffect(() => {
     if (!isLoaded || !mapRef.current || hasFramedRef.current) return;
@@ -238,10 +290,20 @@ export default function EldShipmentDetail() {
                 ) : isLoaded ? (
                   <GoogleMap
                     mapContainerStyle={containerStyle}
-                    center={{ lat: Number(current.latitude), lng: Number(current.longitude) }}
+                    center={initialCenter}
                     zoom={9}
-                    onLoad={(map) => { mapRef.current = map; }}
-                    options={{ streetViewControl: false, mapTypeControl: false, fullscreenControl: false }}
+                    onLoad={(map) => {
+                      mapRef.current = map;
+                      // Standard fix for a Google Map that initializes at
+                      // the wrong size: force it to re-measure its
+                      // container and re-apply the center once the layout
+                      // has actually settled, one tick after mount.
+                      setTimeout(() => {
+                        window.google.maps.event.trigger(map, "resize");
+                        if (initialCenter) map.setCenter(initialCenter);
+                      }, 0);
+                    }}
+                    options={{ styles: CLEAN_MAP_STYLE, streetViewControl: false, mapTypeControl: false, fullscreenControl: false }}
                   >
                     {trail.length > 1 && <Polyline path={trail} options={trailOptions} />}
                     <Marker
@@ -289,27 +351,36 @@ export default function EldShipmentDetail() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
-            <h2 className="mb-1 flex items-center gap-2 text-sm font-bold text-slate-900">
-              <LocalShippingOutlinedIcon sx={{ fontSize: 17 }} className="text-[#1D4ED8]" /> Shipment details
-            </h2>
-            <div className="mt-3">
-              <DetailRow
-                label="Carrier"
-                value={data.eld_provider ? `${data.carrier_name} (${data.eld_provider})` : data.carrier_name}
-              />
-              <DetailRow label="DOT #" value={data.carrier_dot} />
-              <DetailRow
-                label="Truck / Trailer"
-                value={[data.truck_number, data.trailer_number].filter(Boolean).join(" / ") || data.truck_number}
-              />
-              <DetailRow label="Driver" value={data.driver_name} />
-              <DetailRow label="Origin" value={data.origin || "Origin not entered"} />
-              <DetailRow label="Destination" value={data.destination || "Destination not entered"} />
-              <DetailRow label="Pickup window" value={formatWindow(data.pickup_date, data.pickup_time, data.pickup_timezone)} />
-              <DetailRow label="Delivery window" value={formatWindow(data.delivery_date, data.delivery_time, data.delivery_timezone)} />
-              <DetailRow label="Dispatched" value={timeAgo(data.tracking_started_at)} />
+          <div className="space-y-5">
+            <div className="rounded-2xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
+              <h2 className="mb-1 flex items-center gap-2 text-sm font-bold text-slate-900">
+                <LocalShippingOutlinedIcon sx={{ fontSize: 17 }} className="text-[#1D4ED8]" /> Shipment details
+              </h2>
+              <div className="mt-3">
+                <DetailRow
+                  label="Carrier"
+                  value={data.eld_provider ? `${data.carrier_name} (${data.eld_provider})` : data.carrier_name}
+                />
+                <DetailRow label="DOT #" value={data.carrier_dot} />
+                <DetailRow
+                  label="Truck / Trailer"
+                  value={[data.truck_number, data.trailer_number].filter(Boolean).join(" / ") || data.truck_number}
+                />
+                <DetailRow label="Driver" value={data.driver_name} />
+                <DetailRow label="Origin" value={data.origin || "Origin not entered"} />
+                <DetailRow label="Destination" value={data.destination || "Destination not entered"} />
+                <DetailRow label="Pickup window" value={formatWindow(data.pickup_date, data.pickup_time, data.pickup_timezone)} />
+                <DetailRow label="Delivery window" value={formatWindow(data.delivery_date, data.delivery_time, data.delivery_timezone)} />
+                <DetailRow label="Dispatched" value={timeAgo(data.tracking_started_at)} />
+              </div>
             </div>
+
+            <EldMilestones
+              milestone={data.milestone}
+              arrivedAtOriginAt={data.arrived_at_origin_at}
+              arrivedAtDestinationAt={data.arrived_at_destination_at}
+              deliveredAt={data.tracking_stopped_at}
+            />
           </div>
         </div>
       </div>

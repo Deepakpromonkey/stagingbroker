@@ -42,6 +42,23 @@ const TIMEZONES = [
 ];
 const timezoneName = (tz) => (tz ? tz.split(") ")[1] || tz : "");
 
+// Identical to trackshipment/Step1's TRACKING_INTERVALS — how often the
+// backend asks Terminal for this truck's position. Was missing from this
+// form entirely before, silently defaulting every ELD load to 300s with no
+// way for a broker to choose otherwise.
+const TRACKING_INTERVALS = [
+  { value: 60, label: "Every 1 minute" },
+  { value: 120, label: "Every 2 minutes" },
+  { value: 300, label: "Every 5 minutes (default)" },
+  { value: 600, label: "Every 10 minutes" },
+  { value: 900, label: "Every 15 minutes" },
+  { value: 1800, label: "Every 30 minutes" },
+  { value: 3600, label: "Every 1 hour" },
+  { value: 7200, label: "Every 2 hours" },
+  { value: 14400, label: "Every 4 hours" },
+  { value: 21600, label: "Every 6 hours" },
+];
+
 const inputClass =
   "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
 const selectClass = inputClass + " appearance-none pr-9";
@@ -515,6 +532,7 @@ export default function EldShipmentForm() {
     trailerNumber: "",
     vehicleTerminalId: "",
     driverTerminalId: "",
+    trackingIntervalSeconds: 300,
     pickupDate: "",
 
     // CustomTimePicker displays "12:00 AM" whenever its value is empty —
@@ -676,6 +694,7 @@ export default function EldShipmentForm() {
           delivery_date: fields.deliveryDate,
           delivery_time: fields.deliveryTime,
           delivery_timezone: timezoneName(fields.deliveryTimezone),
+          tracking_interval_seconds: fields.trackingIntervalSeconds,
         }),
       });
 
@@ -832,6 +851,26 @@ export default function EldShipmentForm() {
                   <ErrorText>{errors.deliveryTimezone}</ErrorText>
                 </div>
               </div>
+            </div>
+
+            <div className="mt-4">
+              <FieldLabel>Tracking frequency</FieldLabel>
+              <div className="relative">
+                <select
+                  value={fields.trackingIntervalSeconds}
+                  onChange={(e) => setField("trackingIntervalSeconds", Number(e.target.value))}
+                  className={selectClass}
+                >
+                  {TRACKING_INTERVALS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+                <ChevronDown />
+              </div>
+              <p className="mt-1.5 text-xs text-slate-400">
+                How often we ask Terminal for this truck's position once tracking starts. Shorter
+                intervals mean fresher positions, but cost more against your Terminal usage.
+              </p>
             </div>
           </div>
 
