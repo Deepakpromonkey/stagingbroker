@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { z } from 'zod';
 import Box from '@mui/material/Box';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
@@ -13,17 +14,28 @@ import PersonSearchOutlinedIcon from '@mui/icons-material/PersonSearchOutlined';
 import PlaceOutlinedIcon from '@mui/icons-material/PlaceOutlined';
 import SearchIcon from '@mui/icons-material/Search';
 
-const PARTNER_TYPES = ['All Companies', 'Brokers', 'Carriers', 'Shippers'];
+const PARTNER_TYPES = ['All Companies', 'Brokers', 'Carriers'];
 const DEFAULT_TYPE = PARTNER_TYPES[0];
 const FIELD_HEIGHT = 44;
+const MIN_LOCATION_LENGTH = 2;
+const MAX_LOCATION_LENGTH = 30;
+
+const locationSchema = z
+    .string()
+    .trim()
+    .min(MIN_LOCATION_LENGTH, `Please enter at least ${MIN_LOCATION_LENGTH} characters`)
+    .max(MAX_LOCATION_LENGTH, `Please enter no more than ${MAX_LOCATION_LENGTH} characters`)
+    .or(z.literal(''));
 
 export default function FindPartnerOverlay({ open, onClose, onSearch }) {
     const [type, setType] = useState(DEFAULT_TYPE);
     const [location, setLocation] = useState('');
+    const [locationError, setLocationError] = useState('');
 
     const resetFields = () => {
         setType(DEFAULT_TYPE);
         setLocation('');
+        setLocationError('');
     };
 
     const handleClose = () => {
@@ -31,21 +43,37 @@ export default function FindPartnerOverlay({ open, onClose, onSearch }) {
         onClose?.();
     };
 
+    const handleLocationChange = (e) => {
+        const value = e.target.value.slice(0, MAX_LOCATION_LENGTH);
+        setLocation(value);
+        if (locationError) setLocationError('');
+    };
+
+    const validateLocation = (value) => {
+        const result = locationSchema.safeParse(value);
+        if (!result.success) {
+            return result.error.issues[0]?.message || 'Invalid location';
+        }
+        return '';
+    };
+
     const handleSearch = () => {
+        const error = validateLocation(location);
+        if (error) {
+            setLocationError(error);
+            return;
+        }
+
         try {
-            onSearch?.({ type, location });
+            onSearch?.({ type, location: location.trim() });
         } finally {
-            // finally guarantees this runs even if onSearch throws,
-            // so the modal ALWAYS closes on search.
             resetFields();
             onClose?.();
         }
     };
 
-    // Handles both the Search button click AND the Enter key from any
-    // field inside the <form> below (not just the location input).
     const handleSubmit = (e) => {
-        e.preventDefault(); // stop native form submission / page reload
+        e.preventDefault();
         handleSearch();
     };
 
@@ -96,7 +124,6 @@ export default function FindPartnerOverlay({ open, onClose, onSearch }) {
                         <CloseIcon fontSize="small" />
                     </IconButton>
 
-                    {/* Icon badge */}
                     <Box
                         sx={{
                             width: 44,
@@ -112,7 +139,6 @@ export default function FindPartnerOverlay({ open, onClose, onSearch }) {
                         <PersonSearchOutlinedIcon sx={{ color: '#fff', fontSize: 22 }} />
                     </Box>
 
-                    {/* Heading */}
                     <Box sx={{ fontSize: { xs: 20, sm: 22 }, fontWeight: 700, color: '#f8fafc', mb: 0.5 }}>
                         Find a new partner
                     </Box>
@@ -120,7 +146,6 @@ export default function FindPartnerOverlay({ open, onClose, onSearch }) {
                         Search verified brokers and carriers near you.
                     </Box>
 
-                    {/* Fields */}
                     <Box component="form" onSubmit={handleSubmit} noValidate>
                     <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1.5 }}>
                         <Box sx={{ flex: '0 0 auto', width: { xs: '100%', sm: 190 } }}>
@@ -168,13 +193,16 @@ export default function FindPartnerOverlay({ open, onClose, onSearch }) {
                                     bgcolor: '#ffffff',
                                     borderRadius: '999px',
                                     pl: 2.5,
+                                    border: locationError ? '1.5px solid #ef4444' : '1.5px solid transparent',
                                 }}
                             >
                                 <PlaceOutlinedIcon sx={{ fontSize: 18, color: '#94a3b8', flexShrink: 0 }} />
                                 <InputBase
                                     value={location}
-                                    onChange={(e) => setLocation(e.target.value)}
+                                    onChange={handleLocationChange}
+                                    onBlur={() => setLocationError(validateLocation(location))}
                                     placeholder="Enter City, State, or Zip"
+                                    inputProps={{ maxLength: MAX_LOCATION_LENGTH }}
                                     sx={{
                                         fontSize: 13.5,
                                         color: '#0f172a',
@@ -185,11 +213,14 @@ export default function FindPartnerOverlay({ open, onClose, onSearch }) {
                                     }}
                                 />
                             </Box>
+                            {locationError && (
+                                <Box sx={{ fontSize: 11.5, fontWeight: 600, color: '#f87171', mt: 0.6, pl: 0.5 }}>
+                                    {locationError}
+                                </Box>
+                            )}
                         </Box>
                     </Box>
 
-                    {/* Search button — type="submit" so it goes through the
-                        same form onSubmit as pressing Enter in any field */}
                     <Button
                         type="submit"
                         fullWidth
