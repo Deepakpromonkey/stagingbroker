@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Login from './pages/auth/Login'
 import Signup from './pages/auth/Signup'
@@ -11,6 +10,7 @@ import LoadSearch from './pages/app/loadsearch/LoadSearch'
 import CarrierSearch from './pages/app/carriers/CarrierSearch'
 import CarrierProfile from './pages/app/carriers/CarrierProfile'
 import ConnectedCarriers from './pages/app/carriers/ConnectedCarriers'
+import NewPartnerCard from './pages/app/new-partner/Card'
 
 import UsersList from './pages/app/users/UsersList'
 
@@ -63,9 +63,6 @@ DTPay Guest Pay
 import DtPayGuestPay from './pages/app/DtPayGuestPay';
 
 
-import NewPartnerCard from './pages/app/new-partner/Card';
-
-
 // Paths that should render full-page, without the app header/nav chrome.
 // /subscribe is one of these: it's shown as a forced, standalone step
 // (right after signup, or when RouteGuard redirects here for not having
@@ -78,10 +75,6 @@ const NO_HEADER_PATHS = ['/subscribe', '/accept-invitation'];
 function AppShell() {
   const location = useLocation();
   const hideHeader = NO_HEADER_PATHS.includes(location.pathname);
-
-  useEffect(() => {
-  window.scrollTo(0, 0);
-}, [location.pathname]);
 
   return (
     <RouteGuard>
@@ -138,12 +131,11 @@ function AppShell() {
           <Route path="/profile/carriers/shortlisted" element={<ShortlistedCarriers />} />
           <Route path="/profile/carriers/blocked" element={<BlockedCarriers />} />
 
-          <Route path="/carriers/new-partner" element={<NewPartnerCard />} />
-
           {/* The header's Carriers link points here; before this it fell
               through to the catch-all and bounced back to login. */}
           <Route path="/carriers" element={<ConnectedCarriers />} />
           <Route path="/carriers/search" element={<CarrierSearch />} />
+          <Route path="/carriers/new-partner" element={<NewPartnerCard />} />
           <Route path="/carriers/:row_id" element={<CarrierProfile />} />
 
           <Route path="/profile/scoring-weights" element={<ScoringWeights />} />

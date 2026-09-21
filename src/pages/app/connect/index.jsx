@@ -30,15 +30,43 @@ import PdfViewer from "./PdfViewer";
 import BrokerQuestions from "./BrokerQuestions";
 import ThankYou from "./ThankYou";
 
-const steps = [
+/*
+| The ELD step is finished and left wired up, but switched off in the wizard for
+| now. Flip this to true to put it back: the step's own screen, its Terminal
+| calls and its return-from-Terminal handling are all still here, and the
+| numbering, the progress bar and Next/Back follow this flag on their own.
+|
+| The API is untouched either way — it still reports eld_connected/eld_skipped,
+| and the broker's profile still tells the two apart.
+*/
+const ELD_STEP_ENABLED = false;
+
+const ELD_STEP = 4;
+
+const allSteps = [
   { id: 1, label: "CARRIER DETAILS" },
   { id: 2, label: "GOVERNMENT ID" },
   { id: 3, label: "BANK & FACTORING" },
-  { id: 4, label: "ELD CONNECTION" },
+  { id: ELD_STEP, label: "ELD CONNECTION" },
   { id: 5, label: "BROKER QUESTIONS" },
   { id: 6, label: "DOCUMENTS" },
   { id: 7, label: "E-SIGN & SUBMIT" },
 ];
+
+// Step ids stay as they are so every `currentStep === n` below keeps its
+// meaning; only what the carrier is shown, and walked through, is filtered.
+const steps = allSteps.filter((step) => ELD_STEP_ENABLED || step.id !== ELD_STEP);
+
+// Where a step sits in the list the carrier actually sees, so the circles and
+// the "step x of y" count read 1..6 rather than skipping a number.
+const stepPosition = (id) => steps.findIndex((step) => step.id === id) + 1;
+
+// Navigation hops the gap the filter leaves behind.
+const nextVisibleStep = (id) =>
+  steps.find((step) => step.id > id)?.id ?? steps[steps.length - 1].id;
+
+const prevVisibleStep = (id) =>
+  [...steps].reverse().find((step) => step.id < id)?.id ?? steps[0].id;
 
 const stepTitles = {
   1: "Carrier Details",
@@ -253,7 +281,7 @@ export default function OnboardPage() {
 
     if (!idSettled) return 2;
     if (!bankSettled || !request?.factoring_answered) return 3;
-    if (!eldSettled) return 4;
+    if (ELD_STEP_ENABLED && !eldSettled) return ELD_STEP;
     if (!request?.questionnaire_completed) return 5;
     if (!request?.documents_completed) return 6;
     return 7;
@@ -492,8 +520,9 @@ export default function OnboardPage() {
 
       applyRequest(res.data);
 
-      // Each skip lands on the step after the one declined.
-      setCurrentStep({ identity: 3, bank: 4, eld: 5 }[step] ?? 4);
+      // Each skip lands on the step after the one declined — the next one
+      // still shown, so a skipped bank clears the switched-off ELD step too.
+      setCurrentStep(nextVisibleStep({ identity: 2, bank: 3, eld: ELD_STEP }[step] ?? 3));
     } catch (err) {
       setErrorMessage(err?.message || "Could not skip this step.");
     } finally {
@@ -902,6 +931,13 @@ export default function OnboardPage() {
     }
 
     if (searchParams.get("eld")) {
+      // A return URL from before the step was switched off would otherwise
+      // drop the carrier on a screen that no longer renders.
+      if (!ELD_STEP_ENABLED) {
+        clearReturnFlag();
+        return;
+      }
+
       // "exit" means they closed Terminal without linking anything. Nothing to
       // verify, and nothing went wrong — just drop them back on the step.
       if (searchParams.get("result") === "success") {
@@ -972,7 +1008,7 @@ export default function OnboardPage() {
           return;
         }
 
-        setCurrentStep(4);
+        setCurrentStep(nextVisibleStep(3));
       };
 
       // Already stored and unchanged — re-posting it would only earn a 422 for
@@ -1025,7 +1061,7 @@ export default function OnboardPage() {
     }
   };
 
-  const goBack = () => setCurrentStep((step) => Math.max(step - 1, 1));
+  const goBack = () => setCurrentStep((step) => prevVisibleStep(step));
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -1088,7 +1124,7 @@ export default function OnboardPage() {
             <div
               className="h-full bg-[#1D4ED8] transition-all duration-300 ease-in-out"
               style={{
-                width: `${((currentStep - 1) / (steps.length - 1)) * 100}%`,
+                width: `${((stepPosition(currentStep) - 1) / (steps.length - 1)) * 100}%`,
               }}
             />
           </div>
@@ -1111,7 +1147,7 @@ export default function OnboardPage() {
                           : "border-2 border-[#E5E7EB] bg-white text-[#9CA3AF]"
                       }`}
                     >
-                      {step.id}
+                      {stepPosition(step.id)}
                     </div>
 
                     <span
@@ -1130,7 +1166,7 @@ export default function OnboardPage() {
       </div>
 
       <div className="mb-4 rounded-full bg-[#EFF6FF] px-4 py-1.5 text-[11px] font-bold tracking-widest text-[#1E40AF] uppercase">
-        Step {currentStep} of {steps.length}
+        Step {stepPosition(currentStep)} of {steps.length}
       </div>
 
       <h1 className="mb-2 text-4xl font-bold tracking-tight text-[#111827]">
@@ -1988,7 +2024,7 @@ export default function OnboardPage() {
                 disabled={busy}
                 className="rounded-xl bg-[#1D4ED8] px-10 py-3.5 text-sm font-semibold tracking-wide text-white shadow-md transition-all hover:bg-[#1E40AF] hover:shadow-lg disabled:cursor-not-allowed disabled:bg-gray-300"
               >
-                Continue to step {currentStep + 1}
+                Continue to step {stepPosition(currentStep) + 1}
               </button>
             </div>
           )}

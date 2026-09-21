@@ -1086,7 +1086,7 @@ function AuthorityTypeBadge({ commonStat, contractStat, brokerStat }) {
             actions={[
               !isShortlisted
                 ? {
-                    label: "Monitoring",
+                    label: "Add to Preferred",
                     icon: <Add />,
                     variant: "secondary",
                     onClick: addToPreferred,
@@ -1094,7 +1094,7 @@ function AuthorityTypeBadge({ commonStat, contractStat, brokerStat }) {
                     loading: shortlisting,
                   }
                 : {
-                    label: "Unmonitor",
+                    label: "Remove from Shortlisted",
                     icon: <DeleteOutline />,
                     variant: "danger",
                     onClick: removeFromShortlist,
@@ -1103,7 +1103,7 @@ function AuthorityTypeBadge({ commonStat, contractStat, brokerStat }) {
                   },
               !isBlocked
                 ? {
-                    label: "Block",
+                    label: "Block Carrier",
                     icon: <BlockOutlined className="!text-[18px]" />,
                     variant: "danger",
                     onClick: blockCarrier,
@@ -1111,7 +1111,7 @@ function AuthorityTypeBadge({ commonStat, contractStat, brokerStat }) {
                     loading: blocking,
                   }
                 : {
-                    label: "Unblock",
+                    label: "Unblock Carrier",
                     icon: <CheckCircleOutlined className="!text-[18px]" />,
                     variant: "secondary",
                     onClick: unblockCarrier,
@@ -1119,7 +1119,7 @@ function AuthorityTypeBadge({ commonStat, contractStat, brokerStat }) {
                     loading: unblocking,
                   },
               {
-                label: "Report ",
+                label: "Report Carrier",
                 icon: <ReportProblemOutlined className="!text-[18px]" />,
                 variant: "danger",
                 onClick: () => setReportModalOpen(true),
