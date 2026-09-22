@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
     FileDownloadOutlined,
@@ -33,6 +33,7 @@ const ENTITY_TYPE_MAP = {
 };
 
 const PER_PAGE = 10;
+const SEARCH_DEBOUNCE_MS = 2000;
 
 function parseRadiusMiles(radiusLabel) {
     const match = /^(\d+)/.exec(radiusLabel || '');
@@ -411,6 +412,7 @@ export default function NewPartnerPage() {
     const [overlayOpen, setOverlayOpen] = useState(false);
     const [carriers, setCarriers] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [isPending, setIsPending] = useState(false);
     const [error, setError] = useState(null);
     const [hasSearched, setHasSearched] = useState(false);
     const [shortlisted, setShortlisted] = useState([]);
@@ -446,6 +448,8 @@ export default function NewPartnerPage() {
         e.toLowerCase().includes(equipmentSearch.toLowerCase())
     );
 
+    const debounceTimerRef = useRef(null);
+
     const runSearch = useCallback(async (activeFilters, page = 1, { signal } = {}) => {
         setLoading(true);
         setError(null);
@@ -472,6 +476,11 @@ export default function NewPartnerPage() {
     }, []);
 
     const handleOverlaySearch = ({ type, location }) => {
+        if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+            debounceTimerRef.current = null;
+        }
+        setIsPending(false);
         setOverlayOpen(false);
         const nextFilters = { ...filters, type, location };
         setFilters(nextFilters);
@@ -483,6 +492,12 @@ export default function NewPartnerPage() {
         const location = searchParams.get('location') || '';
 
         if (!type && !location) return;
+
+        if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+            debounceTimerRef.current = null;
+        }
+        setIsPending(false);
 
         const controller = new AbortController();
 
@@ -496,9 +511,28 @@ export default function NewPartnerPage() {
 
     useEffect(() => {
         if (!hasSearched) return;
+
         const controller = new AbortController();
-        runSearch(filters, 1, { signal: controller.signal });
-        return () => controller.abort();
+
+        if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+        }
+
+        setIsPending(true);
+
+        debounceTimerRef.current = setTimeout(() => {
+            setIsPending(false);
+            runSearch(filters, 1, { signal: controller.signal });
+        }, SEARCH_DEBOUNCE_MS);
+
+        return () => {
+            if (debounceTimerRef.current) {
+                clearTimeout(debounceTimerRef.current);
+                debounceTimerRef.current = null;
+            }
+            setIsPending(false);
+            controller.abort();
+        };
     }, [
         filters.radius, filters.authority, filters.authorityAgeMin, filters.authorityAgeMax,
         filters.operation, filters.hazmat, filters.fleetMin, filters.fleetMax,
@@ -591,7 +625,7 @@ export default function NewPartnerPage() {
                         />
                     </button>
 
-                    {hasSearched && !loading && (
+                    {hasSearched && !loading && !isPending && (
                         <span
                             className="text-[11px] font-[800] px-[9px] py-[4px] rounded-full shrink-0"
                             style={{ color: BRAND_PRIMARY_DARK, background: BRAND_PRIMARY_TINT, border: `1px solid ${BRAND_PRIMARY_BORDER}` }}
@@ -638,7 +672,7 @@ export default function NewPartnerPage() {
                                 <FilterAltOutlined sx={{ fontSize: 16 }} style={{ color: BRAND_PRIMARY }} />
                                 Filters
                             </span>
-                            {hasSearched && !loading && (
+                            {hasSearched && !loading && !isPending && (
                                 <span
                                     className="text-[11px] font-[800] px-[9px] py-[2px] rounded-full"
                                     style={{ color: BRAND_PRIMARY_DARK, background: BRAND_PRIMARY_TINT, border: `1px solid ${BRAND_PRIMARY_BORDER}` }}
@@ -804,7 +838,7 @@ export default function NewPartnerPage() {
 
                 <div className="flex-1 min-w-0">
                  <div className="flex items-center justify-between mb-[16px]">
-                    {loading ? (
+                    {(loading || isPending) ? (
                         <div className="h-[22px] sm:h-[26px] w-[220px] rounded-[6px] animate-pulse" style={{ background: '#EAECF0' }} />
                     ) : (
                         <h1 className="text-[16px] sm:text-[20px] font-[800] m-0" style={{ color: INK }}>
@@ -820,7 +854,7 @@ export default function NewPartnerPage() {
                         New search
                     </button>
                 </div>
-                    {loading && (
+                    {(isPending || loading) && (
                         <>
                             {Array.from({ length: 5 }).map((_, i) => (
                                 <CarrierCardSkeleton key={i} />
@@ -828,7 +862,15 @@ export default function NewPartnerPage() {
                         </>
                     )}
 
-                    {!loading && error && (
+                    {(loading || isPending) && (
+                        <>
+                            {Array.from({ length: 5 }).map((_, i) => (
+                                <CarrierCardSkeleton key={i} />
+                            ))}
+                        </>
+                    )}
+
+                    {!loading && !isPending && error && (
                         <div
                             className="w-full py-[24px] px-[20px] rounded-[14px] text-[13px] font-[600]"
                             style={{ background: RED_TINT, border: `1px solid ${RED_BORDER}`, color: RED_TEXT }}
@@ -837,7 +879,7 @@ export default function NewPartnerPage() {
                         </div>
                     )}
 
-                    {!loading && !error && hasSearched && carriers.length === 0 && (
+                    {!loading && !isPending && !error && hasSearched && carriers.length === 0 && (
                         <div
                             className="w-full py-[60px] flex items-center justify-center text-[13px] font-[600] rounded-[16px] bg-white text-center px-[16px]"
                             style={{ color: MUTED, border: `1px solid ${BORDER}` }}
@@ -846,7 +888,7 @@ export default function NewPartnerPage() {
                         </div>
                     )}
 
-                    {!loading && !error && !hasSearched && (
+                    {!loading && !isPending && !error && !hasSearched && (
                         <div
                             className="w-full py-[60px] flex items-center justify-center text-[13px] font-[600] rounded-[16px] bg-white text-center px-[16px]"
                             style={{ color: MUTED, border: `1px solid ${BORDER}` }}
@@ -855,7 +897,7 @@ export default function NewPartnerPage() {
                         </div>
                     )}
 
-                    {!loading && !error && carriers.map((carrier) => (
+                    {!loading && !isPending && !error && carriers.map((carrier) => (
                         <CarrierCard
                             key={carrier.row_id || carrier.carrier_id}
                             carrier={carrier}
@@ -866,7 +908,7 @@ export default function NewPartnerPage() {
                         />
                     ))}
 
-                    {!loading && !error && carriers.length > 0 && (
+                    {!loading && !isPending && !error && carriers.length > 0 && (
                         <PaginationBar
                             currentPage={currentPage}
                             lastPage={lastPage}
