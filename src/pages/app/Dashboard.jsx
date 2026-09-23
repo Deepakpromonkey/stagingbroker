@@ -14,6 +14,7 @@ import WarningAmberOutlined from '@mui/icons-material/WarningAmberOutlined';
 import SendRounded from '@mui/icons-material/SendRounded';
 import Chip from '@mui/material/Chip';
 import { format } from 'date-fns';
+import DataUpdateNotice, { shouldShowDataUpdateNotice } from './data-update/DataUpdateNotice';
 
 const BASE_URL = 'https://ai.dollartraq.com';
 
@@ -434,7 +435,11 @@ class Dashboard extends Component {
         const user = localStorage.getItem('crm_user');
 
         if (account_token) {
-            this.setState({ account_token, logged_in: true }, () => {
+            this.setState({
+                account_token,
+                logged_in: true,
+                show_data_update_notice: shouldShowDataUpdateNotice(),
+            }, () => {
                 // this.init();
                 this.loadShipmentTotals();
                 this.loadActiveShipmentCount();
@@ -702,7 +707,11 @@ class Dashboard extends Component {
 
         return (
             <div className="px-4 sm:px-6 md:px-8 py-5 sm:py-6 md:py-8">
-
+   {this.state.show_data_update_notice && (
+                    <DataUpdateNotice
+                        onAcknowledge={() => this.setState({ show_data_update_notice: false })}
+                    />
+                )}
                 {/* ── Inline messages ── */}
                 {this.state.error_message ? (
                     <div className="mb-4 flex items-center justify-between rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
