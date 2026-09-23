@@ -55,7 +55,7 @@ function DataUpdateNotice({ userKey, onAcknowledge }) {
 
                 <p className="text-[13px] text-[#374151] leading-relaxed text-center mb-4">
                     Due to recent changes in FMCSA data sharing, carrier profiles may show
-                    different information than usual. This affects Carrier Assure and other
+                    different information than usual. This affects Dollar Traq and other
                     compliance platforms industry-wide.
                 </p>
 
