@@ -1,9 +1,52 @@
 import React, { useState, useEffect } from 'react';
 import Skeleton from '@mui/material/Skeleton';
 import { useNavigate } from 'react-router-dom';
+import ChevronLeft from '@mui/icons-material/ChevronLeft';
+import ChevronRight from '@mui/icons-material/ChevronRight';
 import CarrierCard from '../../../components/CarrierCards';
 import CarrierListActions from '../../../components/CarrierListActions';
 import { apiFetch } from '../../../lib/api';
+
+const PER_PAGE = 20;
+
+// Identical to CarrierSearch.jsx's own Pagination component - same look,
+// same props, same page a broker already knows how to use.
+function Pagination(props) {
+    const currentPage = props.currentPage;
+    const lastPage = props.lastPage;
+    const hasMore = props.hasMore;
+    const onPrev = props.onPrev;
+    const onNext = props.onNext;
+
+    if (!hasMore && currentPage <= 1) return null;
+
+    const iconButtonClass =
+        'w-[36px] h-[36px] flex items-center justify-center rounded-full text-[#4b5563] disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#f1f5f9] transition-colors';
+
+    return (
+        <div className='flex items-center justify-center gap-[18px] py-[6px]'>
+            <button onClick={onPrev} disabled={currentPage === 1} aria-label='Previous page' className={iconButtonClass}>
+                <ChevronLeft className='!text-[20px]' />
+            </button>
+
+            <span className='text-[13px] text-[#6b7280] font-[500]'>
+                Page <span className='text-[#111827] font-[700]'>{currentPage}</span>
+                {lastPage ? ` of ${lastPage.toLocaleString()}` : ''}
+            </span>
+
+            <button onClick={onNext} disabled={!hasMore} aria-label='Next page' className={iconButtonClass}>
+                <ChevronRight className='!text-[20px]' />
+            </button>
+        </div>
+    );
+}
+
+// AuthorityTag (CarrierCards.jsx) reads this as an FMCSA status code
+// ("A" = active), not a boolean - matching the same convention
+// CarrierController's own search response uses.
+function authorityCode(isActive) {
+    return isActive ? 'A' : 'I';
+}
 
 function CarrierCardSkeleton() {
     return (
@@ -35,9 +78,12 @@ function ShortlistedCarriers() {
     const [loading, setLoading] = useState(true);
     const [carriers, setCarriers] = useState([]);
     const [total, setTotal] = useState(0);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [lastPage, setLastPage] = useState(null);
+    const [hasMore, setHasMore] = useState(false);
 
     useEffect(() => {
-        loadShortlistedCarriers();
+        loadShortlistedCarriers(1);
     }, []);
 
     function flashSuccess(message) {
@@ -56,10 +102,14 @@ function ShortlistedCarriers() {
         navigate('/carriers/' + carrier.carrier_id);
     }
 
-    function loadShortlistedCarriers() {
+    function loadShortlistedCarriers(pageNumber) {
         setLoading(true);
 
-        apiFetch('/shortlist', {
+        const params = new URLSearchParams();
+        params.append('page', pageNumber);
+        params.append('per_page', PER_PAGE);
+
+        apiFetch(`/shortlist?${params.toString()}`, {
             method: 'GET'
         })
             .then(response => {
@@ -78,20 +128,40 @@ function ShortlistedCarriers() {
                     mileage: item.mcs150_mileage || item.recent_mileage || null,
                     fleet_size: item.nbr_power_unit || item.driver_total || null,
                     carrier_operation: item.carrier_operation || 'A',
-                    active_authority: "A",
-                    authority_verified: true,
-                    insurance_current: true,
-                    risk_level: "low"
+
+                    // Real values from the API now - see CarrierShortlistController.
+                    // active_authority and authority_verified come off the same
+                    // computed flag; the card just wants two different shapes of
+                    // it (an FMCSA-style code for the badge, a boolean for the
+                    // checkmark row).
+                    active_authority: authorityCode(item.active_authority),
+                    authority_verified: !!item.authority_verified,
+                    insurance_current: !!item.insurance_current,
+                    risk_level: item.risk_level || null,
+                    dt_score: item.dt_score ?? null
                 }));
 
                 setCarriers(mappedCarriers);
-                setTotal(mappedCarriers.length);
+                setTotal(response.total ?? mappedCarriers.length);
+                setCurrentPage(response.current_page ?? pageNumber);
+                setLastPage(response.last_page ?? null);
+                setHasMore(!!response.has_more_pages);
             })
             .catch(err => {
                 setErrorMessage(err.message || 'Failed to load shortlisted carriers.');
                 setTimeout(() => setErrorMessage(''), 4000);
             })
             .finally(() => setLoading(false));
+    }
+
+    function handlePrevPage() {
+        if (currentPage <= 1) return;
+        loadShortlistedCarriers(currentPage - 1);
+    }
+
+    function handleNextPage() {
+        if (!hasMore) return;
+        loadShortlistedCarriers(currentPage + 1);
     }
 
     function removeFromShortlist(carrier_id) {
@@ -197,6 +267,16 @@ return (
                         onClick={handleCarrierClick}
                     />
                 ))}
+
+                {!loading && carriers.length > 0 && (
+                    <Pagination
+                        currentPage={currentPage}
+                        lastPage={lastPage}
+                        hasMore={hasMore}
+                        onPrev={handlePrevPage}
+                        onNext={handleNextPage}
+                    />
+                )}
             </div>
         </div>
     </div>

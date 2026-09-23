@@ -14,6 +14,7 @@ import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined';
 import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import ShareIcon from '@mui/icons-material/Share';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import CheckIcon from '@mui/icons-material/Check';
@@ -31,6 +32,7 @@ import ShipmentChat from '../../../components/ShipmentChat';
 import { GoogleMap, Polyline, Marker, InfoWindow } from '@react-google-maps/api';
 
 import { apiFetch } from '../../../lib/api';
+import { toast } from '../../../components/ui/Toaster';
 
 const containerStyle = {
     width: '100%',
@@ -403,6 +405,19 @@ function ControlTowerShipment() {
         ? shipment.status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
         : 'Unknown Status';
 
+    // Same shareable link an ELD load gets - built server-side off the same
+    // tracking_token every shipment has, ELD or not (see EldShipmentDetail.jsx
+    // for the identical pattern this mirrors).
+    const copyTrackingLink = async () => {
+        if (!shipment.public_tracking_url) return;
+        try {
+            await navigator.clipboard.writeText(shipment.public_tracking_url);
+            toast.success({ title: 'Tracking link copied', duration: 2500 });
+        } catch {
+            toast.error({ title: 'Could not copy the link' });
+        }
+    };
+
     return (
         <div className="min-h-screen bg-[#F4F5F1] px-4 py-5 sm:px-6 md:px-8 lg:px-14 antialiased text-[#1E293B]">
 
@@ -450,7 +465,22 @@ function ControlTowerShipment() {
                                 </div>
                             </div>
                             <div className="flex items-center gap-2 mt-4">
-                                <button className="bg-[#001A48] hover:bg-[#1E293B] text-white text-xs font-bold py-3 px-6 rounded-2xl transition flex items-center justify-center gap-2 shadow-sm">
+                                {shipment.public_tracking_url && (
+                                    <a
+                                        href={`${shipment.public_tracking_url}?preview=1`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                                    >
+                                        <OpenInNewIcon sx={{ fontSize: 15 }} /> Preview customer link
+                                    </a>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={copyTrackingLink}
+                                    disabled={!shipment.public_tracking_url}
+                                    className="bg-[#001A48] hover:bg-[#1E293B] text-white text-xs font-bold py-3 px-6 rounded-2xl transition flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+                                >
                                     <ShareIcon style={{ fontSize: '15px' }} /> Share Tracking
                                 </button>
                             </div>

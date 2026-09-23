@@ -233,7 +233,7 @@ export default function EldShipmentDetail() {
           onClick={() => navigate("/load-search")}
           className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 transition hover:text-slate-800"
         >
-          <ArrowBackIcon sx={{ fontSize: 16 }} /> Back to Load Search
+          <ArrowBackIcon sx={{ fontSize: 16 }} /> Back to Load Search 2
         </button>
 
         <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
