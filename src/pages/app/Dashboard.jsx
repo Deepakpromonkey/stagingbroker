@@ -32,6 +32,15 @@ const DRIVER_TYPE_LABELS = {
 
 const INACTIVE_STATUSES = ['draft', 'delivered', 'cancelled', 'canceled'];
 
+// Two different detail pages live behind two different routes (see App.jsx):
+// /shipment/:row_id for a manually/driver-phone-tracked load, and the more
+// specific /shipment/eld/:uuid for an ELD one. Every "click this shipment
+// row" handler needs to pick the right one, so it lives here once rather
+// than being re-decided (and re-forgotten) at each call site.
+function shipmentDetailPath(row) {
+    return row?.tracking_method === 'eld' ? `/shipment/eld/${row.uuid}` : `/shipment/${row.uuid}`;
+}
+
 function statusChipColor(status) {
     const k = (status || '').toLowerCase();
     if (k.includes('delivered')) return 'success';
@@ -987,7 +996,7 @@ class Dashboard extends Component {
                                                 e.currentTarget.style.background = '#fff';
                                                 e.currentTarget.style.borderLeft = '3px solid transparent';
                                             }}
-                                            onClick={() => this.setState({ redirect: `/shipment/${row.uuid}` })}
+                                            onClick={() => this.setState({ redirect: shipmentDetailPath(row) })}
                                         >
                                             {/* Shipment Number */}
                                             <td style={{ ...td, color: '#003178', fontWeight: 700 }}>
@@ -1061,7 +1070,7 @@ class Dashboard extends Component {
                         return (
                             <div
                                 key={row.uuid || i}
-                                onClick={() => this.setState({ redirect: `/shipment/${row.uuid}` })}
+                                onClick={() => this.setState({ redirect: shipmentDetailPath(row) })}
                                 className="bg-[#fff] border border-[#e5e7eb] rounded-2xl p-4 cursor-pointer active:bg-[#f8fafc]"
                                 style={{ borderLeft: '3px solid #185FA5' }}
                             >
