@@ -10,6 +10,7 @@ import RiskAlerts from './pages/app/riskalert/RiskAlerts'
 import LoadSearch from './pages/app/loadsearch/LoadSearch'
 import CarrierSearch from './pages/app/carriers/CarrierSearch'
 import CarrierProfile from './pages/app/carriers/CarrierProfile'
+import DtScoreHowItWorks from './pages/app/carriers/DtScoreHowItWorks'
 import ConnectedCarriers from './pages/app/carriers/ConnectedCarriers'
 
 import UsersList from './pages/app/users/UsersList'
@@ -147,6 +148,11 @@ function AppShell() {
           <Route path="/carriers/:row_id" element={<CarrierProfile />} />
 
           <Route path="/profile/scoring-weights" element={<ScoringWeights />} />
+
+          {/* DT Trust Score explainer — linked from DtScoreHoverCard's
+              "See how the DT Trust Score works" and from the AppHeader's
+              profile-menu link that sits right after Scoring Weights. */}
+          <Route path="/dt-score/how-it-works" element={<DtScoreHowItWorks />} />
 
 
           {/* DTPay Payments module */}
