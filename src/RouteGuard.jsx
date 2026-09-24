@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "./components/ui/Toaster";
+import DataUpdateNotice, { shouldShowDataUpdateNotice } from "./pages/app/data-update/DataUpdateNotice";
 import { apiFetch } from "./lib/api";
 
 const LOGIN_PATH = "/";
@@ -185,6 +186,10 @@ export default function RouteGuard({ children }) {
   const navigate = useNavigate();
   const token = getToken();
   const [planAccess, setPlanAccess] = useState(cachedPlanAccess);
+  const [needsDataUpdateAck, setNeedsDataUpdateAck] = useState(() =>
+    shouldShowDataUpdateNotice(getUser()?.email)
+  );
+
 
   // Re-run the check whenever refreshPlanAccess() clears the cache.
   const [planAccessNonce, setPlanAccessNonce] = useState(0);
@@ -194,6 +199,10 @@ export default function RouteGuard({ children }) {
     planAccessListeners.add(notify);
     return () => planAccessListeners.delete(notify);
   }, []);
+
+    useEffect(() => {
+    setNeedsDataUpdateAck(shouldShowDataUpdateNotice(getUser()?.email));
+  }, [token]);
 
   // Ask the API once whether this account is subscribed, and keep the
   // localStorage flag in step with the answer so the rest of the app (which
@@ -302,6 +311,17 @@ export default function RouteGuard({ children }) {
       navigate("/dashboard?unauthorized=1", { replace: true });
     }
   }, [pathname, token, navigate, planAccess]);
+
+ const isPublic = isPublicPath(pathname);
+
+  if (token && !isPublic && needsDataUpdateAck) {
+    return (
+      <DataUpdateNotice
+        userKey={getUser()?.email}
+        onAcknowledge={() => setNeedsDataUpdateAck(false)}
+      />
+    );
+  }
 
   return children;
 }
