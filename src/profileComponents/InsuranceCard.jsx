@@ -12,7 +12,11 @@ import {
 
 import Skeleton from '@mui/material/Skeleton';
 
+import { Document, Page } from 'react-pdf';
+
 import { apiFetch, apiBlobUrl, apiDownload } from '../lib/api';
+import { ensurePdfWorker, PDF_OPTIONS } from '../lib/pdfWorker';
+import { findHolderMasks } from './coiHolderMask';
 
 const PREFERRED_LIMIT_KEYS = [
     'COMBINED SINGLE LIMIT (Ea accident)',
@@ -49,6 +53,133 @@ function extractCoverages(rows) {
     return [];
 }
 
+/*
+ * One page of the certificate, held back until its holder block has been
+ * located so the name never flashes up before the cover lands on it.
+ *
+ * No text or annotation layer: either would leave the covered name selectable
+ * and copyable underneath the cover.
+ */
+function CoiPage({ pageNumber, width }) {
+    const [masks, setMasks] = useState(null);
+
+    function handleLoad(page) {
+        findHolderMasks(page)
+            .then(setMasks)
+            .catch(function (err) {
+                console.error('InsuranceCard holder mask error:', err);
+                setMasks([]);
+            });
+    }
+
+    return (
+        <div
+            className='relative mx-auto mb-[12px] bg-white shadow-sm'
+            style={{ width, minHeight: masks ? undefined : Math.round(width * 1.294) }}
+        >
+            <div style={{ visibility: masks ? 'visible' : 'hidden' }}>
+                <Page
+                    pageNumber={pageNumber}
+                    width={width}
+                    renderTextLayer={false}
+                    renderAnnotationLayer={false}
+                    onLoadSuccess={handleLoad}
+                />
+            </div>
+
+            {(masks || []).map((mask, index) => (
+                <div
+                    key={index}
+                    className='absolute bg-white'
+                    style={{
+                        left: `${mask.left * 100}%`,
+                        top: `${mask.top * 100}%`,
+                        width: `${(mask.right - mask.left) * 100}%`,
+                        height: `${(mask.bottom - mask.top) * 100}%`
+                    }}
+                />
+            ))}
+
+            {!masks ? (
+                <div className='absolute inset-0'>
+                    <Skeleton variant='rectangular' height='100%' />
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
+/*
+ * A certificate, every page of it, with the Certificate Holder block covered -
+ * see coiHolderMask.js for why and how it is found.
+ *
+ * pdf.js has to read the file itself to find the block. When it cannot, the
+ * certificate is not shown at all: the browser's own viewer would put the
+ * holder straight back on screen.
+ *
+ * Sized to its container, so the same component serves the full-height modal
+ * and the preview inside the insurance thread.
+ */
+function MaskedCertificate({ file, maxWidth = 860 }) {
+    const bodyRef = useRef(null);
+    const [numPages, setNumPages] = useState(0);
+    const [width, setWidth] = useState(0);
+    const [loadFailed, setLoadFailed] = useState(false);
+
+    ensurePdfWorker();
+
+    useEffect(function () {
+
+        const body = bodyRef.current;
+        if (!body) return undefined;
+
+        const observer = new ResizeObserver(function ([entry]) {
+            setWidth(Math.min(maxWidth, Math.floor(entry.contentRect.width) - 32));
+        });
+
+        observer.observe(body);
+
+        return function () {
+            observer.disconnect();
+        };
+
+    }, [maxWidth]);
+
+    return (
+        <div ref={bodyRef} className='h-full w-full'>
+            {loadFailed ? (
+                <p className='p-[16px] text-[13px] font-[500] text-[#991b1b]'>
+                    The certificate could not be displayed.
+                </p>
+            ) : width > 0 ? (
+                <Document
+                    file={file}
+                    options={PDF_OPTIONS}
+                    onLoadSuccess={({ numPages: count }) => setNumPages(count)}
+                    onLoadError={function (err) {
+                        console.error('InsuranceCard COI render error:', err);
+                        setLoadFailed(true);
+                    }}
+                    loading={
+                        <div className='p-[16px]'>
+                            <Skeleton variant='rounded' height={480} sx={{ borderRadius: '8px' }} />
+                        </div>
+                    }
+                    className='py-[16px]'
+                >
+                    {Array.from({ length: numPages }, (_, index) => (
+                        <CoiPage
+                            key={index + 1}
+                            pageNumber={index + 1}
+                            width={width}
+                        />
+                    ))}
+                </Document>
+            ) : null}
+        </div>
+    );
+}
+
 function CoiDocumentModal({ url, onClose }) {
     return (
         <div
@@ -75,12 +206,8 @@ function CoiDocumentModal({ url, onClose }) {
                     </div>
                 </div>
 
-                <div className='flex-1 bg-[#f8fafc]'>
-                    <iframe
-                        src={url}
-                        title='Certificate of Insurance'
-                        className='h-full w-full border-0'
-                    />
+                <div className='flex-1 overflow-auto bg-[#f8fafc]'>
+                    <MaskedCertificate file={url} />
                 </div>
             </div>
         </div>
@@ -165,8 +292,8 @@ function formatBytes(bytes) {
  * summary of it - so the certificate opens in place, selected by default,
  * instead of behind a download that lands in a folder.
  *
- * The file sits behind the bearer token, which an <iframe src> cannot carry.
- * It is fetched as a blob instead, and the object URL is revoked when the
+ * The file sits behind the bearer token, which a plain URL cannot carry. It
+ * is fetched as a blob instead, and the object URL is revoked when the
  * selection changes or the modal closes - without that, every certificate a
  * broker opened would stay in memory until the tab was.
  */
@@ -322,11 +449,9 @@ function ResponseAttachments({ attachments }) {
                     <p className='text-[12px] font-[500] text-[#991b1b]'>{shown.error}</p>
                 ) : shown.url ? (
                     isPdf ? (
-                        <iframe
-                            src={shown.url}
-                            title={active.filename}
-                            className='h-[420px] w-full rounded-[10px] ring-1 ring-[#e5e7eb]'
-                        />
+                        <div className='h-[420px] w-full overflow-auto rounded-[10px] bg-[#f8fafc] ring-1 ring-[#e5e7eb]'>
+                            <MaskedCertificate file={shown.url} />
+                        </div>
                     ) : (
                         <img
                             src={shown.url}
@@ -576,11 +701,18 @@ function InsuranceCard(props) {
         };
 
     }, [dotNumber]);
+/*
+ * Fetched through this site's own /coi-files/ path, which the web server (and
+ * the Vite dev server) proxies to the bucket. The bucket sends no CORS
+ * headers, and pdf.js has to read the file itself to cover the holder block.
+ */
 const coiUrl = coiDocument?.document_url
-    ? coiDocument.document_url.replace(
-        's3://dollartraq/',
-        'https://dollartraq.s3.us-east-2.amazonaws.com/'
-      )
+    ? `/coi-files${new URL(
+        coiDocument.document_url.replace(
+          's3://dollartraq/',
+          'https://dollartraq.s3.us-east-2.amazonaws.com/'
+        )
+      ).pathname}`
     : null;
     const coverageRows = useMemo(function () {
 

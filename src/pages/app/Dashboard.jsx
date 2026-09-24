@@ -16,6 +16,7 @@ import WarningAmberOutlined from '@mui/icons-material/WarningAmberOutlined';
 import SendRounded from '@mui/icons-material/SendRounded';
 import Chip from '@mui/material/Chip';
 import { format } from 'date-fns';
+import DataUpdateNotice, { shouldShowDataUpdateNotice } from './data-update/DataUpdateNotice';
 
 const TRACKING_METHOD_LABELS = {
     driver_phone: "Driver's Cell Phone",
@@ -530,6 +531,7 @@ class Dashboard extends Component {
             ai_modal_open: false,
             ai_seed_query: '',
 
+            show_data_update_notice: false,
             // shipment totals — derived from /shipments pagination
             // metadata (see loadShipmentTotals) rather than a separate
             // totals endpoint
@@ -548,8 +550,12 @@ class Dashboard extends Component {
         const account_token = localStorage.getItem('crm_auth_token');
         const user = localStorage.getItem('crm_user');
 
-        if (account_token) {
-            this.setState({ account_token, logged_in: true }, () => {
+             if (account_token) {
+            this.setState({
+                account_token,
+                logged_in: true,
+                show_data_update_notice: shouldShowDataUpdateNotice(),
+            }, () => {
                 // this.init();
                 this.loadShipmentTotals();
                 this.loadActiveShipmentCount();
@@ -817,6 +823,11 @@ class Dashboard extends Component {
 
         return (
             <div className="px-4 sm:px-6 md:px-8 py-5 sm:py-6 md:py-8">
+                 {this.state.show_data_update_notice && (
+                    <DataUpdateNotice
+                        onAcknowledge={() => this.setState({ show_data_update_notice: false })}
+                    />
+                )}
 
                 {/* ── Inline messages ── */}
                 {this.state.error_message ? (
