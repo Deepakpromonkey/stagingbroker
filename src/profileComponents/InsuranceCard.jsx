@@ -15,7 +15,7 @@ import Skeleton from '@mui/material/Skeleton';
 import { Document, Page } from 'react-pdf';
 
 import { apiFetch, apiBlobUrl, apiDownload } from '../lib/api';
-import { ensurePdfWorker } from '../lib/pdfWorker';
+import { ensurePdfWorker, PDF_OPTIONS } from '../lib/pdfWorker';
 import { findHolderMasks } from './coiHolderMask';
 
 const PREFERRED_LIMIT_KEYS = [
@@ -154,6 +154,7 @@ function MaskedCertificate({ file, maxWidth = 860 }) {
             ) : width > 0 ? (
                 <Document
                     file={file}
+                    options={PDF_OPTIONS}
                     onLoadSuccess={({ numPages: count }) => setNumPages(count)}
                     onLoadError={function (err) {
                         console.error('InsuranceCard COI render error:', err);
