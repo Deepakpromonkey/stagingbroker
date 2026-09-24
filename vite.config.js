@@ -87,6 +87,15 @@ export default defineConfig({
     host: true,
     // This allows VS Code's forwarded URL to access your local server
     allowedHosts: true, 
+    // Mirrors the /coi-files/ location on the web server: the COI bucket
+    // sends no CORS headers, and pdf.js must read the certificate itself.
+    proxy: {
+      '/coi-files': {
+        target: 'https://dollartraq.s3.us-east-2.amazonaws.com',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/coi-files/, ''),
+      },
+    },
   },
     proxy: {
       "/fleetra": {

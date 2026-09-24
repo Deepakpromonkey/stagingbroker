@@ -18,6 +18,8 @@ import Chip from '@mui/material/Chip';
 import { format } from 'date-fns';
 import DataUpdateNotice, { shouldShowDataUpdateNotice } from './data-update/DataUpdateNotice';
 
+const BASE_URL = 'https://ai.dollartraq.com';
+
 const TRACKING_METHOD_LABELS = {
     driver_phone: "Driver's Cell Phone",
     eld: 'ELD / Telematics',
