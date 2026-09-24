@@ -46,7 +46,25 @@ export default defineConfig({
   server: {
     host: true,
     // This allows VS Code's forwarded URL to access your local server
-    allowedHosts: true, 
+    allowedHosts: true,
+    // Fleetra (the chat API) runs as a separate service. Forwarding it here
+    // keeps the browser on ONE origin: no CORS, and the requests work the same
+    // through a VS Code forwarded URL or from another device on the LAN,
+    // because the forwarding happens on the machine running Vite, not in the
+    // browser. Mirrors what nginx does in production.
+    proxy: {
+      "/fleetra": {
+        target: process.env.FLEETRA_URL || "http://127.0.0.1:8088",
+        changeOrigin: true,
+        // Fleetra streams its replies; don't let the proxy sit on them.
+        configure: (proxy) => {
+          proxy.on("proxyRes", (proxyRes) => {
+            delete proxyRes.headers["content-encoding"];
+            proxyRes.headers["cache-control"] = "no-cache, no-transform";
+          });
+        },
+      },
+    },
   },
   resolve: {
         alias: {
