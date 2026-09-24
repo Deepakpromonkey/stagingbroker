@@ -12,7 +12,11 @@ import {
 
 import Skeleton from '@mui/material/Skeleton';
 
+import { Document, Page } from 'react-pdf';
+
 import { apiFetch, apiBlobUrl, apiDownload } from '../lib/api';
+import { ensurePdfWorker } from '../lib/pdfWorker';
+import { findHolderMasks } from './coiHolderMask';
 
 const PREFERRED_LIMIT_KEYS = [
     'COMBINED SINGLE LIMIT (Ea accident)',
@@ -49,7 +53,96 @@ function extractCoverages(rows) {
     return [];
 }
 
+/*
+ * One page of the certificate, held back until its holder block has been
+ * located so the name never flashes up before the cover lands on it.
+ *
+ * No text or annotation layer: either would leave the covered name selectable
+ * and copyable underneath the cover.
+ */
+function CoiPage({ pageNumber, width }) {
+    const [masks, setMasks] = useState(null);
+
+    function handleLoad(page) {
+        findHolderMasks(page)
+            .then(setMasks)
+            .catch(function (err) {
+                console.error('InsuranceCard holder mask error:', err);
+                setMasks([]);
+            });
+    }
+
+    return (
+        <div
+            className='relative mx-auto mb-[12px] bg-white shadow-sm'
+            style={{ width, minHeight: masks ? undefined : Math.round(width * 1.294) }}
+        >
+            <div style={{ visibility: masks ? 'visible' : 'hidden' }}>
+                <Page
+                    pageNumber={pageNumber}
+                    width={width}
+                    renderTextLayer={false}
+                    renderAnnotationLayer={false}
+                    onLoadSuccess={handleLoad}
+                />
+            </div>
+
+            {(masks || []).map((mask, index) => (
+                <div
+                    key={index}
+                    className='absolute bg-white'
+                    style={{
+                        left: `${mask.left * 100}%`,
+                        top: `${mask.top * 100}%`,
+                        width: `${(mask.right - mask.left) * 100}%`,
+                        height: `${(mask.bottom - mask.top) * 100}%`
+                    }}
+                />
+            ))}
+
+            {!masks ? (
+                <div className='absolute inset-0'>
+                    <Skeleton variant='rectangular' height='100%' />
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
+/*
+ * The carrier's certificate, every page of it, with the Certificate Holder
+ * block covered - see coiHolderMask.js for why and how it is found.
+ *
+ * pdf.js has to read the file itself to find the block, which needs the
+ * bucket to allow this origin. If it cannot, the certificate still opens in
+ * the browser's own viewer - uncovered, but a broker who cannot see the COI at
+ * all is worse off than one who can see who else it was issued to.
+ */
 function CoiDocumentModal({ url, onClose }) {
+    const bodyRef = useRef(null);
+    const [numPages, setNumPages] = useState(0);
+    const [width, setWidth] = useState(0);
+    const [loadFailed, setLoadFailed] = useState(false);
+
+    ensurePdfWorker();
+
+    useEffect(function () {
+
+        const body = bodyRef.current;
+        if (!body) return undefined;
+
+        const observer = new ResizeObserver(function ([entry]) {
+            setWidth(Math.min(860, Math.floor(entry.contentRect.width) - 32));
+        });
+
+        observer.observe(body);
+
+        return function () {
+            observer.disconnect();
+        };
+
+    }, []);
+
     return (
         <div
             className='fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-[16px]'
@@ -75,12 +168,37 @@ function CoiDocumentModal({ url, onClose }) {
                     </div>
                 </div>
 
-                <div className='flex-1 bg-[#f8fafc]'>
-                    <iframe
-                        src={url}
-                        title='Certificate of Insurance'
-                        className='h-full w-full border-0'
-                    />
+                <div ref={bodyRef} className='flex-1 overflow-auto bg-[#f8fafc]'>
+                    {loadFailed ? (
+                        <iframe
+                            src={url}
+                            title='Certificate of Insurance'
+                            className='h-full w-full border-0'
+                        />
+                    ) : width > 0 ? (
+                        <Document
+                            file={url}
+                            onLoadSuccess={({ numPages: count }) => setNumPages(count)}
+                            onLoadError={function (err) {
+                                console.error('InsuranceCard COI render error:', err);
+                                setLoadFailed(true);
+                            }}
+                            loading={
+                                <div className='p-[16px]'>
+                                    <Skeleton variant='rounded' height={480} sx={{ borderRadius: '8px' }} />
+                                </div>
+                            }
+                            className='py-[16px]'
+                        >
+                            {Array.from({ length: numPages }, (_, index) => (
+                                <CoiPage
+                                    key={index + 1}
+                                    pageNumber={index + 1}
+                                    width={width}
+                                />
+                            ))}
+                        </Document>
+                    ) : null}
                 </div>
             </div>
         </div>
