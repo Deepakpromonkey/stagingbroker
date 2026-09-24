@@ -26,3 +26,26 @@ export const ensurePdfWorker = () => {
     pdfjs.GlobalWorkerOptions.workerPort = workerPort;
   }
 };
+
+/*
+| Where pdf.js finds the decoders and font data it does not bundle - copied
+| out of pdfjs-dist by the pdfjsAssets plugin in vite.config.js.
+|
+| Without them pdf.js still renders, just not faithfully: agency certificates
+| are often scans (JPEG 2000 / JBIG2 images under a text layer), and with no
+| wasm decoder the image is dropped - table lines, check marks and the
+| signature vanish, leaving only the text. Missing font data swaps in
+| look-alike fonts.
+|
+| One object for the life of the app: react-pdf reloads the document whenever
+| `options` changes identity.
+*/
+const PDFJS_BASE = `${import.meta.env.BASE_URL}pdfjs/`;
+
+export const PDF_OPTIONS = {
+  wasmUrl: `${PDFJS_BASE}wasm/`,
+  iccUrl: `${PDFJS_BASE}iccs/`,
+  standardFontDataUrl: `${PDFJS_BASE}standard_fonts/`,
+  cMapUrl: `${PDFJS_BASE}cmaps/`,
+  cMapPacked: true,
+};

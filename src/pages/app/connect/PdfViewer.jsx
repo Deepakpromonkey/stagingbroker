@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { Document, Page } from "react-pdf";
 
-import { ensurePdfWorker } from "../../../lib/pdfWorker";
+import { ensurePdfWorker, PDF_OPTIONS } from "../../../lib/pdfWorker";
 
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -123,6 +123,7 @@ export default function PdfViewer({
         <div className="h-[520px] overflow-auto rounded-xl border-8 border-[#F5F7FB] bg-[#F5F7FB]">
           <Document
             file={pdfUrl}
+            options={PDF_OPTIONS}
             onLoadSuccess={({ numPages: count }) => setNumPages(count)}
             onLoadError={() => setLoadError(true)}
             loading={
