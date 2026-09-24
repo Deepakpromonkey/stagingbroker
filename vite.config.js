@@ -97,6 +97,19 @@ export default defineConfig({
       },
     },
   },
+    proxy: {
+      "/fleetra": {
+        target: process.env.FLEETRA_URL || "http://127.0.0.1:8088",
+        changeOrigin: true,
+        // Fleetra streams its replies; don't let the proxy sit on them.
+        configure: (proxy) => {
+          proxy.on("proxyRes", (proxyRes) => {
+            delete proxyRes.headers["content-encoding"];
+            proxyRes.headers["cache-control"] = "no-cache, no-transform";
+          });
+        },
+      },
+    },
   resolve: {
         alias: {
             "@": path.resolve(import.meta.dirname, "./src"),

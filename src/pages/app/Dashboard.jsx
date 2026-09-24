@@ -1,6 +1,8 @@
-import React, { Component, useState, useRef, useEffect } from 'react';
+import React, { Component, useState, useMemo, useRef, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { apiFetch } from '../../lib/api';
+import { send as fleetraSend, resume as fleetraResume } from '../../lib/fleetraClient';
+import { createHistoryStore } from '../../lib/fleetraHistory';
 import SettingsOutlined from '@mui/icons-material/SettingsOutlined';
 import CheckCircleOutlined from '@mui/icons-material/CheckCircleOutlined';
 import ChevronRight from '@mui/icons-material/ChevronRight';
@@ -65,14 +67,37 @@ function statusLabel(status) {
 // Concierge chat
 //
 // Slides in from the right on desktop, and takes the full screen on mobile.
-// Integrates directly with Fleetra Chat API using crm_company from localStorage.
+// Talks to the Fleetra streaming API (see ../../fleetra/lib/fleetraClient.js,
+// base URL http://127.0.0.1:8088) via the shared `send`/`resume` transport,
+// with per-user conversation memory from fleetraHistory.js.
 //
 // NOTE: this component intentionally does NOT fall back to a hardcoded
-// company/session UUID when localStorage is missing the real one. If we
-// can't identify the company, we don't init a session and we don't send
-// chat requests — surfacing that as an inline message instead of silently
+// token or company/user identity. If we can't identify the account (no
+// crm_auth_token or no crm_company in localStorage), we don't send chat
+// requests — surfacing that as an inline message instead of silently
 // talking to the API as some other tenant.
 // ─────────────────────────────────────────────────────────────────────────
+
+function getFleetraToken() {
+    try {
+        return localStorage.getItem('crm_auth_token') || '';
+    } catch (e) {
+        return '';
+    }
+}
+
+function getFleetraUserKey() {
+    try {
+        const storedCompany = localStorage.getItem('crm_company');
+        const storedUser = localStorage.getItem('crm_user');
+        const companyUuid = storedCompany ? JSON.parse(storedCompany)?.uuid : null;
+        const userId = storedUser ? JSON.parse(storedUser)?.id : null;
+        if (!companyUuid) return null;
+        return `${companyUuid}:${userId ?? 'anonymous'}`;
+    } catch (e) {
+        return null;
+    }
+}
 
 const SUGGESTIONS = [
     { icon: ShieldOutlined, label: 'Vet a carrier', value: 'Vet MC 1234567' },
@@ -80,18 +105,6 @@ const SUGGESTIONS = [
     { icon: ScheduleOutlined, label: 'Expiring COIs', value: "What's expiring this week?" },
     { icon: WarningAmberOutlined, label: 'At-risk loads', value: 'Show me at-risk loads' },
 ];
-
-function getStoredCompanyUuid() {
-    try {
-        const storedCompany = localStorage.getItem('crm_company');
-        if (!storedCompany) return null;
-
-        const parsed = JSON.parse(storedCompany);
-        return parsed?.uuid || null;
-    } catch (e) {
-        return null;
-    }
-}
 
 function ConciergeChat({ isOpen, onClose, seedQuery, onSeedConsumed }) {
     const [messages, setMessages] = useState([
@@ -103,62 +116,95 @@ function ConciergeChat({ isOpen, onClose, seedQuery, onSeedConsumed }) {
     ]);
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
-    const [sessionId, setSessionId] = useState(null);
-    const [sessionError, setSessionError] = useState(false);
-    const [conversationId, setConversationId] = useState(null);
+    // Active interrupt from the server: { type: 'ask'|'disambiguation'|'confirm', thread_id, ... }
+    const [pending, setPending] = useState(null);
 
     const scrollRef = useRef(null);
     const inputRef = useRef(null);
     const seededRef = useRef(false);
+    const abortRef = useRef(null);
+    const lastUserTextRef = useRef('');
 
-    // Initialize a Fleetra session using the real company_id from localStorage.
-    // No fallback UUID: if we don't know the company, we don't create a
-    // session, and `send` below refuses to fire without one.
-    useEffect(() => {
-        const initSession = async () => {
-            const companyUuid = getStoredCompanyUuid();
+    const token = getFleetraToken();
+    const userKey = getFleetraUserKey();
+    const tokenMissing = !token || !userKey;
 
-            if (!companyUuid) {
-                setSessionError(true);
-                return;
-            }
+    // Per tenant+user history bucket (sessionStorage-backed, see fleetraHistory.js)
+    const history = useMemo(() => createHistoryStore({ userKey: userKey || 'anonymous' }), [userKey]);
 
-            try {
-                const res = await fetch(`${BASE_URL}/api/session`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        company_id: companyUuid,
-                    }),
-                });
+    useEffect(() => () => abortRef.current?.abort(), []);
 
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data && data.session_id) {
-                        setSessionId(data.session_id);
-                        setSessionError(false);
-                        return;
-                    }
+    // A card interrupt (disambiguation/confirm) locks the composer; an "ask"
+    // interrupt keeps it open because the typed reply IS the answer.
+    const cardOpen = pending && pending.type !== 'ask';
+
+    const handlersFor = (botMsgId) => {
+        const controller = new AbortController();
+        abortRef.current = controller;
+        return {
+            token,
+            signal: controller.signal,
+            onToken: (text) => {
+                setMessages((prev) =>
+                    prev.map((m) => (m.id === botMsgId ? { ...m, text: (m.text || '') + text } : m))
+                );
+            },
+            onInterrupt: (p) => {
+                // "ask" interrupts show their question as the bot's message;
+                // card interrupts (disambiguation/confirm) render below instead.
+                if (p.type === 'ask') {
+                    setMessages((prev) =>
+                        prev.map((m) => (m.id === botMsgId ? { ...m, text: p.question } : m))
+                    );
                 }
-
-                setSessionError(true);
-            } catch (err) {
-                console.error('Failed to initialize session:', err);
-                setSessionError(true);
-            }
+                setPending(p);
+            },
+            onChips: (chips) => {
+                setMessages((prev) => prev.map((m) => (m.id === botMsgId ? { ...m, chips } : m)));
+            },
+            onTurn: (summary) => {
+                setMessages((prev) => {
+                    const botMsg = prev.find((m) => m.id === botMsgId);
+                    history.record({
+                        user: lastUserTextRef.current,
+                        assistant: botMsg?.text || '',
+                        intent_id: summary.intent_id,
+                        carrier: summary.carrier,
+                    });
+                    return prev;
+                });
+            },
+            onError: (message) => {
+                setMessages((prev) =>
+                    prev.map((m) => (m.id === botMsgId ? { ...m, text: message, error: true } : m))
+                );
+            },
         };
+    };
 
-        if (isOpen && !sessionId && !sessionError) {
-            initSession();
+    const startTurn = async (echoText, runner) => {
+        setIsTyping(true);
+        const botMsgId = `b-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+        setMessages((prev) => [
+            ...prev,
+            { id: `u-${Date.now()}`, role: 'user', text: echoText },
+            { id: botMsgId, role: 'bot', text: '', chips: [] },
+        ]);
+
+        try {
+            await runner(handlersFor(botMsgId));
+        } finally {
+            setIsTyping(false);
+            abortRef.current = null;
         }
-    }, [isOpen, sessionId, sessionError]);
+    };
 
     const send = async (text) => {
         const value = (text ?? input).trim();
         if (!value || isTyping) return;
 
-        // Refuse to talk to the API without a real session — no fallback ID.
-        if (!sessionId) {
+        if (tokenMissing) {
             setMessages((prev) => [
                 ...prev,
                 { id: `u-${Date.now()}`, role: 'user', text: value },
@@ -172,51 +218,36 @@ function ConciergeChat({ isOpen, onClose, seedQuery, onSeedConsumed }) {
             return;
         }
 
-        setMessages((prev) => [...prev, { id: `u-${Date.now()}`, role: 'user', text: value }]);
         setInput('');
-        setIsTyping(true);
+        lastUserTextRef.current = value;
+        setPending(null);
 
-        try {
-            const payload = {
-                message: value,
-                session_id: sessionId,
-            };
+        await startTurn(value, (handlers) =>
+            fleetraSend({ message: value, context: history.context(), ...handlers })
+        );
+    };
 
-            if (conversationId) {
-                payload.conversation_id = conversationId;
-            }
+    const answerPending = async (value, echo) => {
+        if (!pending) return;
+        const threadId = pending.thread_id;
+        setPending(null);
+        lastUserTextRef.current = echo;
 
-            const response = await fetch(`${BASE_URL}/api/chat`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload),
-            });
+        await startTurn(echo, (handlers) =>
+            fleetraResume({ threadId, value, context: history.context(), ...handlers })
+        );
+    };
 
-            if (response.ok) {
-                const data = await response.json();
-                if (data.conversation_id) {
-                    setConversationId(data.conversation_id);
-                }
-                setMessages((prev) => [
-                    ...prev,
-                    { id: `b-${Date.now()}`, role: 'bot', text: data.reply || 'No response from assistant.' },
-                ]);
-            } else {
-                setMessages((prev) => [
-                    ...prev,
-                    { id: `b-${Date.now()}`, role: 'bot', text: 'Sorry, I encountered an issue processing your request.' },
-                ]);
-            }
-        } catch (error) {
-            setMessages((prev) => [
-                ...prev,
-                { id: `b-${Date.now()}`, role: 'bot', text: 'Network error. Please try again later.' },
-            ]);
-        } finally {
-            setIsTyping(false);
+    const submit = () => {
+        if (isTyping) return;
+        if (pending?.type === 'ask') {
+            const text = input.trim();
+            if (!text) return;
+            setInput('');
+            answerPending({ text }, text);
+            return;
         }
+        send();
     };
 
     // Seed the thread once with whatever was typed into the top bar, then
@@ -241,7 +272,7 @@ function ConciergeChat({ isOpen, onClose, seedQuery, onSeedConsumed }) {
 
     useEffect(() => {
         scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-    }, [messages, isTyping]);
+    }, [messages, isTyping, pending]);
 
     return (
         <>
@@ -301,7 +332,7 @@ function ConciergeChat({ isOpen, onClose, seedQuery, onSeedConsumed }) {
 
                 {/* Message thread */}
                 <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 sm:px-5 py-5 flex flex-col gap-3.5">
-                    {sessionError && (
+                    {tokenMissing && (
                         <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[12px] text-amber-800">
                             We couldn't verify your account for this session, so lookups are disabled until you refresh or sign in again.
                         </div>
@@ -317,19 +348,89 @@ function ConciergeChat({ isOpen, onClose, seedQuery, onSeedConsumed }) {
                                     <AutoAwesomeOutlined style={{ fontSize: 13 }} />
                                 </span>
                             )}
-                            <div
-                                className={`max-w-[78%] px-3.5 py-2.5 text-[13px] leading-relaxed ${
-                                    m.role === 'user'
-                                        ? 'bg-[#1d4ed8] text-white rounded-2xl rounded-br-md'
-                                        : 'bg-white text-[#1a1a1a] border border-[#e8edf2] rounded-2xl rounded-bl-md'
-                                }`}
-                            >
-                                {m.text}
+                            <div className={`flex flex-col gap-2 max-w-[78%] ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
+                                {(m.text || m.role === 'user') && (
+                                    <div
+                                        className={`px-3.5 py-2.5 text-[13px] leading-relaxed ${
+                                            m.role === 'user'
+                                                ? 'bg-[#1d4ed8] text-white rounded-2xl rounded-br-md'
+                                                : m.error
+                                                    ? 'bg-red-50 text-red-700 border border-red-200 rounded-2xl rounded-bl-md'
+                                                    : 'bg-white text-[#1a1a1a] border border-[#e8edf2] rounded-2xl rounded-bl-md'
+                                        }`}
+                                    >
+                                        {m.text}
+                                    </div>
+                                )}
+
+                                {/* Quick-action chips returned alongside a reply */}
+                                {m.chips?.length > 0 && (
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {m.chips.map((chip) => (
+                                            <button
+                                                key={chip.action}
+                                                type="button"
+                                                onClick={() =>
+                                                    window.dispatchEvent(new CustomEvent('fleetra:action', { detail: chip }))
+                                                }
+                                                className="rounded-full border border-[#dbe4ee] bg-white px-3 py-1 text-[11px] font-semibold text-[#185FA5] cursor-pointer hover:bg-[#EFF6FF]"
+                                            >
+                                                {chip.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))}
 
-                    {isTyping && (
+                    {/* Disambiguation card — pick one of several matched carriers */}
+                    {pending?.type === 'disambiguation' && (
+                        <div className="ml-8 rounded-2xl border border-[#e8edf2] bg-white p-3.5">
+                            <p className="m-0 mb-2.5 text-[13px] font-semibold text-[#1a1a1a]">{pending.question}</p>
+                            <div className="flex flex-col gap-1.5">
+                                {pending.options.map((o) => (
+                                    <button
+                                        key={o.carrier_id}
+                                        type="button"
+                                        onClick={() => answerPending({ carrier_id: o.carrier_id }, o.label)}
+                                        className="text-left rounded-xl border border-[#dbe4ee] bg-[#F7F9FB] px-3 py-2 text-[12px] cursor-pointer hover:border-[#185FA5] hover:bg-[#EFF6FF]"
+                                    >
+                                        <div className="font-semibold text-[#1a1a1a]">{o.label}</div>
+                                        <div className="text-[11px] text-[#6b7280] mt-0.5">
+                                            {o.matched_on ? `${o.matched_on} · ` : ''}
+                                            MC{o.mc} · DOT{o.dot} · {o.state ?? '—'} · {o.authority}
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Confirm card — yes/no before a T1 action runs */}
+                    {pending?.type === 'confirm' && (
+                        <div className="ml-8 rounded-2xl border border-[#e8edf2] bg-white p-3.5">
+                            <p className="m-0 mb-2.5 text-[13px] font-semibold text-[#1a1a1a]">{pending.copy}</p>
+                            <div className="flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => answerPending({ approved: true }, 'Yes')}
+                                    className="flex-1 rounded-lg bg-[#1d4ed8] hover:bg-blue-700 text-white text-[12px] font-semibold py-2 border-none cursor-pointer"
+                                >
+                                    Confirm
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => answerPending({ approved: false }, 'Cancel')}
+                                    className="flex-1 rounded-lg bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#334155] text-[12px] font-semibold py-2 border-none cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {isTyping && !pending && (
                         <div className="flex items-end gap-2">
                             <span className="mb-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#185FA5]/10 text-[#185FA5]">
                                 <AutoAwesomeOutlined style={{ fontSize: 13 }} />
@@ -347,7 +448,7 @@ function ConciergeChat({ isOpen, onClose, seedQuery, onSeedConsumed }) {
                     )}
 
                     {/* Suggestions — shown until the person sends their first message */}
-                    {messages.length === 1 && !isTyping && (
+                    {messages.length === 1 && !isTyping && !pending && (
                         <div className="grid grid-cols-2 gap-2 pt-1">
                             {SUGGESTIONS.map(({ icon: Icon, label, value }) => (
                                 <button
@@ -373,15 +474,22 @@ function ConciergeChat({ isOpen, onClose, seedQuery, onSeedConsumed }) {
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={(e) => {
-                                if (e.key === 'Enter') send();
+                                if (e.key === 'Enter') submit();
                             }}
-                            placeholder="Message the concierge…"
-                            className="flex-1 min-w-0 bg-transparent border-none outline-none text-[13px] text-[#1a1a1a] placeholder-[#94a3b8]"
+                            disabled={Boolean(cardOpen)}
+                            placeholder={
+                                cardOpen
+                                    ? 'Choose an option above to continue'
+                                    : pending?.type === 'ask'
+                                        ? 'Type your answer…'
+                                        : "Message the concierge…"
+                            }
+                            className="flex-1 min-w-0 bg-transparent border-none outline-none text-[13px] text-[#1a1a1a] placeholder-[#94a3b8] disabled:cursor-not-allowed"
                         />
                         <button
                             type="button"
-                            onClick={() => send()}
-                            disabled={!input.trim() || isTyping}
+                            onClick={submit}
+                            disabled={!input.trim() || isTyping || Boolean(cardOpen)}
                             aria-label="Send message"
                             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-none text-white cursor-pointer transition-colors disabled:cursor-not-allowed disabled:bg-[#CBD5E1] bg-[#1d4ed8] hover:enabled:bg-blue-700"
                         >
