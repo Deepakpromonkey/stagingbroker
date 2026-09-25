@@ -5,6 +5,13 @@ import CarrierCard from '../../../components/CarrierCards';
 import CarrierListActions from '../../../components/CarrierListActions';
 import { apiFetch } from '../../../lib/api';
 
+// AuthorityTag (CarrierCards.jsx) reads this as an FMCSA status code
+// ("A" = active), not a boolean - same convention ShortlistedCarriers.jsx
+// uses for the same component.
+function authorityCode(isActive) {
+    return isActive ? 'A' : 'I';
+}
+
 function CarrierCardSkeleton() {
     return (
         <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-5 flex flex-col gap-3 sm:gap-4">
@@ -78,10 +85,19 @@ function BlockedCarriers() {
                     mileage: item.mcs150_mileage || item.recent_mileage || null,
                     fleet_size: item.nbr_power_unit || item.driver_total || null,
                     carrier_operation: item.carrier_operation || 'A',
-                    active_authority: "A",
-                    authority_verified: true,
-                    insurance_current: true,
-                    risk_level: "low",
+
+                    // Real values from the API now - see
+                    // DtSearchScoringService::enrichCarriers(), called from
+                    // CarrierBlockedController. active_authority and
+                    // authority_verified come off the same computed flag;
+                    // the card just wants two different shapes of it (an
+                    // FMCSA-style code for the badge, a boolean for the
+                    // checkmark row).
+                    active_authority: authorityCode(item.active_authority),
+                    authority_verified: !!item.authority_verified,
+                    insurance_current: !!item.insurance_current,
+                    risk_level: item.risk_level || null,
+                    dt_score: item.dt_score ?? null,
                     // Supplied by the blocked endpoint on top of the carrier
                     // record itself — who blocked them, and when.
                     blocked_by: item.blocked_by || null,

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
     FileDownloadOutlined,
@@ -81,6 +81,24 @@ async function searchCarriers(filters, page = 1, { signal } = {}) {
     });
 
     return response || {};
+}
+
+/**
+ * The scores a search returned as dt_score: null, filled in by
+ * AdvancedCarrierSearchController's background scoring job - see
+ * ScoreCarrierSearchPage. Returns { dotNumber: score }, only for whichever
+ * of the requested DOTs actually have one cached yet; a DOT missing from
+ * the response is still unscored.
+ */
+async function fetchScores(dots, { signal } = {}) {
+    if (!dots || dots.length === 0) return {};
+
+    const params = new URLSearchParams();
+    dots.forEach((dot) => params.append('dots[]', dot));
+
+    const response = await apiFetch(`/carrier/scores?${params.toString()}`, { signal });
+
+    return response?.scores || {};
 }
 
 async function exportCarriersCsv(filters) {
@@ -446,6 +464,12 @@ export default function NewPartnerPage() {
         e.toLowerCase().includes(equipmentSearch.toLowerCase())
     );
 
+    // Bumped once per completed search - the score-polling effect below
+    // keys off this, not off `carriers` directly, so a score arriving and
+    // updating `carriers` mid-poll doesn't look like "a new search" and
+    // reset the poll's own two-minute clock.
+    const [searchVersion, setSearchVersion] = useState(0);
+
     const runSearch = useCallback(async (activeFilters, page = 1, { signal } = {}) => {
         setLoading(true);
         setError(null);
@@ -457,6 +481,7 @@ export default function NewPartnerPage() {
             setTotal(response?.total ?? (data ? data.length : 0));
             setCurrentPage(response?.current_page ?? page);
             setLastPage(response?.last_page ?? 1);
+            setSearchVersion((v) => v + 1);
         } catch (err) {
             if (err.name !== 'AbortError') {
                 setError(err.message || 'Something went wrong while searching.');
@@ -470,6 +495,79 @@ export default function NewPartnerPage() {
             setHasSearched(true);
         }
     }, []);
+
+    // Keeps a live snapshot of `carriers` the polling effect can read
+    // without depending on it - see searchVersion above for why.
+    const carriersRef = useRef(carriers);
+    useEffect(() => {
+        carriersRef.current = carriers;
+    }, [carriers]);
+
+    /*
+    | Fills in dt_score for rows the search returned as "Calculating..." -
+    | AdvancedCarrierSearchController now scores brand-new carriers in the
+    | background (see ScoreCarrierSearchPage) instead of making the whole
+    | search wait on it, so a real score can land a few seconds after the
+    | results themselves. This asks for exactly the DOTs still missing one
+    | every few seconds and merges in whatever comes back.
+    |
+    | Stops on its own once nothing is left to ask about, and never runs
+    | past two minutes regardless - a carrier the engine genuinely could not
+    | score should end up reading as unscored, not poll forever.
+    */
+    useEffect(() => {
+        if (searchVersion === 0) return undefined;
+
+        const controller = new AbortController();
+        let cancelled = false;
+        let timeoutId = null;
+        const deadline = Date.now() + 120000;
+
+        const pendingDots = () =>
+            carriersRef.current
+                .filter((c) => c.dt_score === null || c.dt_score === undefined)
+                .map((c) => c.dot_number)
+                .filter(Boolean);
+
+        const tick = async () => {
+            if (cancelled) return;
+
+            const dots = pendingDots();
+
+            if (dots.length === 0 || Date.now() > deadline) {
+                return;
+            }
+
+            try {
+                const scores = await fetchScores(dots, { signal: controller.signal });
+
+                if (cancelled) return;
+
+                if (Object.keys(scores).length > 0) {
+                    setCarriers((prev) => prev.map((c) => (
+                        c.dot_number && scores[c.dot_number] !== undefined
+                            ? { ...c, dt_score: scores[c.dot_number] }
+                            : c
+                    )));
+                }
+            } catch {
+                // A failed poll just tries again next tick - this is
+                // background enrichment, not worth surfacing an error for.
+            }
+
+            if (!cancelled) {
+                timeoutId = setTimeout(tick, 4000);
+            }
+        };
+
+        timeoutId = setTimeout(tick, 4000);
+
+        return () => {
+            cancelled = true;
+            controller.abort();
+            if (timeoutId) clearTimeout(timeoutId);
+        };
+    }, [searchVersion]);
 
     const handleOverlaySearch = ({ type, location }) => {
         setOverlayOpen(false);

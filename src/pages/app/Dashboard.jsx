@@ -847,7 +847,7 @@ class Dashboard extends Component {
                                 <div className="text-[10px] font-bold tracking-[0.5px] text-[#8a94a6] uppercase mb-1.5">
                                     COIs expiring ≤7d
                                 </div>
-                                <div className="text-2xl font-bold text-[#1e293b]">05</div>
+                                <div className="text-2xl font-bold text-[#1e293b]">00</div>
                             </div>
 
                             {/* NOTE: static placeholder value, not yet wired to an API field */}
@@ -855,20 +855,20 @@ class Dashboard extends Component {
                                 <div className="text-[10px] font-bold tracking-[0.5px] text-[#dc2626] uppercase mb-1.5">
                                     At-risk loads
                                 </div>
-                                <div className="text-2xl font-bold text-[#b91c1c]">02</div>
+                                <div className="text-2xl font-bold text-[#b91c1c]">00</div>
                             </div>
                         </div>
                     </div>
 
                     <div className="bg-[#005EA4] rounded-2xl p-5 sm:p-6 text-white flex flex-col justify-between relative min-h-[240px] sm:min-h-[280px]">
-                        <button
-                            type="button"
-                            onClick={() => this.props.navigate?.('/subscribe')}
-                            className="absolute top-4 right-4 z-50 rounded-lg w-8 h-8 flex items-center justify-center cursor-pointer"
-                            style={{ backgroundColor: "rgba(255, 255, 255, 0.1)" }}
-                        >
-                            <SettingsOutlined sx={{ fontSize: 18, color: "#fff" }} />
-                        </button>
+                       <button
+  type="button"
+  onClick={() => this.setState({ redirect: "/billing" })}
+  className="absolute top-4 right-4 z-50 rounded-lg w-8 h-8 flex items-center justify-center cursor-pointer"
+  style={{ backgroundColor: "rgba(255, 255, 255, 0.1)" }}
+>
+  <SettingsOutlined sx={{ fontSize: 18, color: "#fff" }} />
+</button>
 
                         <div>
                             <div className="text-[10px] font-semibold tracking-wider uppercase opacity-60 mb-1.5">
@@ -1070,7 +1070,7 @@ class Dashboard extends Component {
                         return (
                             <div
                                 key={row.uuid || i}
-                                onClick={() => this.setState({ redirect: shipmentDetailPath(row) })}
+                                onClick={() => this.setState({ redirect: `/shipment/${row.uuid}` })}
                                 className="bg-[#fff] border border-[#e5e7eb] rounded-2xl p-4 cursor-pointer active:bg-[#f8fafc]"
                                 style={{ borderLeft: '3px solid #185FA5' }}
                             >
