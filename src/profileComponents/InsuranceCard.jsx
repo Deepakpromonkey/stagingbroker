@@ -421,16 +421,31 @@ function money(value) {
     return '$' + value.toLocaleString('en-US');
 }
 
+function hasReading(reading) {
+
+    if (!reading) {
+        return false;
+    }
+
+    return Boolean(
+        reading.summary
+        || reading.coverages?.length || reading.exclusions?.length
+        || reading.sub_limits?.length || reading.signals?.length
+        || reading.policy_number || reading.insurer || reading.holder_name
+        || reading.alternate_email
+    );
+}
+
 /*
- * The model's reading of one reply, beside the reply itself.
+ * The model's reading of one reply.
  *
  * A broker books loads on limits and exclusions as much as on the expiry date,
  * and those arrive as prose buried in the same mail - so what was read out of
- * it is shown next to it rather than left in the JSON.
+ * it is shown rather than left in the JSON.
  */
 function ReplyReading({ reading }) {
 
-    if (!reading) {
+    if (!hasReading(reading)) {
         return null;
     }
 
@@ -438,13 +453,6 @@ function ReplyReading({ reading }) {
     const exclusions = Array.isArray(reading.exclusions) ? reading.exclusions : [];
     const subLimits = Array.isArray(reading.sub_limits) ? reading.sub_limits : [];
     const signals = Array.isArray(reading.signals) ? reading.signals : [];
-
-    const hasBody = coverages.length || exclusions.length || subLimits.length
-        || signals.length || reading.policy_number || reading.insurer || reading.holder_name;
-
-    if (!hasBody) {
-        return null;
-    }
 
     return (
         <div className='mt-[8px] rounded-[8px] bg-[#f8fafc] p-[10px] ring-1 ring-[#e5e7eb]'>
@@ -553,6 +561,196 @@ function ReplyReading({ reading }) {
     );
 }
 
+function formatBytes(bytes) {
+
+    if (!bytes || bytes < 1024) {
+        return `${bytes || 0} B`;
+    }
+
+    const units = ['KB', 'MB', 'GB'];
+    let value = bytes / 1024;
+    let unit = 0;
+
+    while (value >= 1024 && unit < units.length - 1) {
+        value /= 1024;
+        unit += 1;
+    }
+
+    return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
+}
+
+/*
+ * The files that came attached to one reply.
+ *
+ * The summary above is the machine's account of a document; this is the
+ * document. A broker about to book a load on an extracted date should be able
+ * to open the certificate rather than take the reading's word for it, so it
+ * opens in place instead of behind a download.
+ *
+ * The file sits behind the bearer token, which a plain URL cannot carry, so it
+ * is fetched as a blob and handed over as an object URL - revoked when the
+ * selection changes or the thread closes. The preview state carries the path
+ * it belongs to, so a slow fetch for a file the broker has already clicked
+ * past cannot render over the one they are looking at.
+ */
+function MessageAttachments({ attachments }) {
+
+    const previewable = attachments.filter((file) => file.previewable);
+
+    const [activeUuid, setActiveUuid] = useState(previewable[0]?.uuid || null);
+    const [preview, setPreview] = useState(null);
+    const [downloadError, setDownloadError] = useState(null);
+
+    const active = attachments.find((file) => file.uuid === activeUuid) || null;
+
+    // The effect depends on the path alone, not on the object around it - a
+    // re-render that rebuilds the same list must not re-fetch the same PDF.
+    const activePath = active?.path || null;
+
+    useEffect(function () {
+
+        if (!activePath) {
+            return undefined;
+        }
+
+        let cancelled = false;
+        let objectUrl = null;
+
+        apiBlobUrl(activePath)
+            .then(function (url) {
+
+                objectUrl = url;
+
+                // Nothing is holding this URL if the selection already moved
+                // on, so it is released here rather than leaked.
+                if (cancelled) {
+                    URL.revokeObjectURL(url);
+                    return;
+                }
+
+                setPreview({ path: activePath, url, error: null });
+            })
+            .catch(function (err) {
+                if (cancelled) return;
+                setPreview({ path: activePath, url: null, error: err.message || 'Could not load the file.' });
+            });
+
+        return function () {
+            cancelled = true;
+
+            if (objectUrl) {
+                URL.revokeObjectURL(objectUrl);
+            }
+        };
+
+    }, [activePath]);
+
+    if (!attachments.length) {
+        return null;
+    }
+
+    const isPdf = (active?.content_type || '').toLowerCase() === 'application/pdf';
+
+    // A result from a previous selection is not this file's, so it does not
+    // get to render as though it were.
+    const shown = preview && preview.path === activePath ? preview : null;
+
+    return (
+        <div className='mt-[10px]'>
+
+            <p className='mb-[6px] text-[10px] font-[700] uppercase tracking-[0.08em] text-[#94a3b8]'>
+                {attachments.length === 1 ? 'Attachment' : `Attachments (${attachments.length})`}
+            </p>
+
+            <div className='mb-[8px] flex flex-col gap-[5px]'>
+
+                {attachments.map(function (file) {
+
+                    const isActive = file.uuid === activeUuid;
+
+                    return (
+                        <div
+                            key={file.uuid}
+                            className={`flex items-center gap-[8px] rounded-[8px] border px-[9px] py-[7px] transition-colors ${
+                                isActive ? 'border-[#93c5fd] bg-[#eff6ff]' : 'border-[#e5e7eb] bg-white'
+                            }`}
+                        >
+
+                            {(file.content_type || '').toLowerCase() === 'application/pdf' ? (
+                                <PictureAsPdfOutlined className='text-[#b91c1c]' sx={{ fontSize: 18 }} />
+                            ) : (
+                                <InsertDriveFileOutlined className='text-[#64748b]' sx={{ fontSize: 18 }} />
+                            )}
+
+                            <button
+                                type='button'
+                                disabled={!file.previewable}
+                                onClick={() => setActiveUuid(file.uuid)}
+                                className='min-w-0 flex-1 text-left disabled:cursor-default'
+                            >
+                                <span className='block truncate text-[12px] font-[600] text-[#111827]'>
+                                    {file.filename}
+                                </span>
+
+                                <span className='block text-[10.5px] font-[500] text-[#94a3b8]'>
+                                    {formatBytes(file.size_bytes)}
+                                    {file.previewable ? (isActive ? ' · showing below' : ' · click to view') : ''}
+                                </span>
+                            </button>
+
+                            <button
+                                type='button'
+                                title='Download'
+                                onClick={() => {
+                                    setDownloadError(null);
+
+                                    // Unhandled otherwise: apiDownload rejects
+                                    // on a file that has since been cleared off
+                                    // the disk, and a click that silently does
+                                    // nothing reads as a bug.
+                                    apiDownload(file.path, file.filename).catch(
+                                        (err) => setDownloadError(err.message || 'Could not download the file.')
+                                    );
+                                }}
+                                className='flex items-center justify-center rounded-[6px] p-[5px] text-[#64748b] transition-colors hover:bg-[#f1f5f9] hover:text-[#111827]'
+                            >
+                                <DownloadOutlined sx={{ fontSize: 16 }} />
+                            </button>
+
+                        </div>
+                    );
+                })}
+
+            </div>
+
+            {downloadError ? (
+                <p className='mb-[6px] text-[11px] font-[500] text-[#991b1b]'>{downloadError}</p>
+            ) : null}
+
+            {active ? (
+                !shown ? (
+                    <Skeleton variant='rounded' height={360} sx={{ borderRadius: '8px' }} />
+                ) : shown.error ? (
+                    <p className='text-[11px] font-[500] text-[#991b1b]'>{shown.error}</p>
+                ) : shown.url ? (
+                    isPdf ? (
+                        <div className='h-[420px] w-full overflow-auto rounded-[8px] bg-[#f8fafc] ring-1 ring-[#e5e7eb]'>
+                            <MaskedCertificate file={shown.url} />
+                        </div>
+                    ) : (
+                        <img
+                            src={shown.url}
+                            alt={active.filename}
+                            className='max-h-[420px] w-full rounded-[8px] object-contain ring-1 ring-[#e5e7eb]'
+                        />
+                    )
+                ) : null
+            ) : null}
+
+        </div>
+    );
+}
+
 /*
  * One message in the thread.
  *
@@ -650,42 +848,79 @@ function ThreadMessage({ message }) {
                 </p>
             )}
 
-            {message.extracted_expiry_date ? (
-                <div className='mt-[8px] rounded-[8px] bg-[#f0fdf4] px-[10px] py-[7px]'>
-
-                    <p className='text-[10px] font-[700] uppercase tracking-[0.08em] text-[#15803d]'>
-                        Expiry date read from this reply
-                    </p>
-
-                    <p className='mt-[2px] text-[14px] font-[800] text-[#166534]'>
-                        {formatDate(message.extracted_expiry_date)}
-                    </p>
-
-                </div>
-            ) : null}
-
-            <ReplyReading reading={message.extracted} />
-
-            {/*
-              * The machine's reading of the reply, folded away. A broker
-              * acting on an extracted date should be able to check it against
-              * the source, but it is not what they open the thread to see.
-              */}
-            {message.llm_response ? (
-                <details className='mt-[8px]'>
-
-                    <summary className='cursor-pointer text-[11px] font-[600] text-[#0f57c8]'>
-                        How this was read
-                    </summary>
-
-                    <pre className='mt-[6px] whitespace-pre-wrap break-words rounded-[8px] bg-[#f8fafc] p-[10px] text-[11px] leading-[1.6] text-[#475569] ring-1 ring-[#e5e7eb]'>
-                        {message.llm_response}
-                    </pre>
-
-                </details>
-            ) : null}
+            <MessageAttachments attachments={Array.isArray(message.attachments) ? message.attachments : []} />
 
         </li>
+    );
+}
+
+/*
+ * What the agency's replies were read to say, gathered above the thread.
+ *
+ * The reading is what a broker opens the modal for; the mails it came from
+ * sit underneath to check it against. Newest first, since a later reply
+ * supersedes an earlier one.
+ */
+function ReplySummaries({ messages }) {
+
+    const replies = messages
+        .filter(function (message) {
+            return message.direction !== 'outbound'
+                && (message.extracted_expiry_date || hasReading(message.extracted));
+        })
+        .reverse();
+
+    if (replies.length === 0) {
+        return null;
+    }
+
+    return (
+        <div className='mb-[16px]'>
+
+            <p className='mb-[6px] text-[10px] font-[700] uppercase tracking-[0.08em] text-[#94a3b8]'>
+                Summary
+            </p>
+
+            <ul className='flex flex-col gap-[10px]'>
+                {replies.map(function (message, index) {
+                    return (
+                        <li
+                            key={message.uuid || `summary-${index}`}
+                            className='rounded-[10px] bg-white p-[12px] ring-1 ring-[#bfdbfe]'
+                        >
+                            <div className='flex flex-wrap items-baseline justify-between gap-[6px]'>
+
+                                <p className='text-[12px] font-[700] text-[#111827]'>
+                                    Reply from agency
+                                </p>
+
+                                <p className='text-[11px] font-[500] text-[#94a3b8]'>
+                                    {formatDateTime(message.at)}
+                                </p>
+
+                            </div>
+
+                            {message.extracted_expiry_date ? (
+                                <div className='mt-[8px] rounded-[8px] bg-[#f0fdf4] px-[10px] py-[7px]'>
+
+                                    <p className='text-[10px] font-[700] uppercase tracking-[0.08em] text-[#15803d]'>
+                                        Expiry date read from this reply
+                                    </p>
+
+                                    <p className='mt-[2px] text-[14px] font-[800] text-[#166534]'>
+                                        {formatDate(message.extracted_expiry_date)}
+                                    </p>
+
+                                </div>
+                            ) : null}
+
+                            <ReplyReading reading={message.extracted} />
+                        </li>
+                    );
+                })}
+            </ul>
+
+        </div>
     );
 }
 
@@ -986,6 +1221,8 @@ function InsuranceThreadModal({ detail, isLoading, error, onClose }) {
                         <p className='text-[13px] font-[500] text-[#991b1b]'>{error}</p>
                     ) : detail ? (
                         <>
+                            <ReplySummaries messages={messages} />
+
                             <TrustBanner trust={detail.request?.trust} />
 
                             <VerificationBanner verification={detail.request?.verification} />
