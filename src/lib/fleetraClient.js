@@ -11,6 +11,8 @@
  * caller doesn't need to track depth; it just handles onInterrupt again.
  */
 
+import { API_BASE } from "./api";
+
 // Same origin by default: "/fleetra/chat" is served by the Vite proxy in
 // development (see vite.config.js) and by nginx in production. Keeping it
 // relative means no CORS, and the same code in both places.
@@ -21,6 +23,27 @@ const BASE_URL = (import.meta.env?.VITE_FLEETRA_URL ?? "").replace(/\/$/, "");
 
 const CHAT = `${BASE_URL}/fleetra/chat`;
 const RESUME = `${BASE_URL}/fleetra/resume`;
+
+// Fleetra rejects the dashboard's Sanctum token: it only trusts a short-lived
+// JWT that Laravel signs for it. Swap one for the other, and reuse the JWT
+// until a minute before it expires.
+let fleetraJwt = null; // { sanctum, token, expiresAt }
+
+async function fleetraToken(sanctum, { force = false, signal } = {}) {
+  if (!force && fleetraJwt?.sanctum === sanctum && Date.now() < fleetraJwt.expiresAt) {
+    return fleetraJwt.token;
+  }
+  const res = await fetch(`${API_BASE}/fleetra/token`, {
+    method: "POST",
+    headers: { Accept: "application/json", Authorization: `Bearer ${sanctum}` },
+    signal,
+  });
+  if (res.status === 401) return null;
+  if (!res.ok) throw new Error(`fleetra token: ${res.status}`);
+  const { token, expires_in } = await res.json();
+  fleetraJwt = { sanctum, token, expiresAt: Date.now() + (expires_in - 60) * 1000 };
+  return token;
+}
 
 /**
  * Start a new turn. Never pass a thread id here — the server mints a fresh one
@@ -56,17 +79,29 @@ async function stream(url, body, {
   onDone,
   onError,
 }) {
+  const post = (jwt) => fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${jwt}`,
+    },
+    body: JSON.stringify(body),
+    signal,
+  });
+
   let response;
   try {
-    response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(body),
-      signal,
-    });
+    const jwt = await fleetraToken(token, { signal });
+    if (!jwt) {
+      onError?.("Your session expired. Reload the dashboard to sign in again.");
+      return;
+    }
+    response = await post(jwt);
+    // A cached JWT can be rejected (e.g. Fleetra's key was rotated): retry once fresh.
+    if (response.status === 401) {
+      const fresh = await fleetraToken(token, { force: true, signal });
+      if (fresh) response = await post(fresh);
+    }
   } catch (err) {
     if (err.name === "AbortError") return;
     onError?.("Couldn't reach Fleetra. Check your connection and try again.");
