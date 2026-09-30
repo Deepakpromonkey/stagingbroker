@@ -55,6 +55,7 @@ function normalizeRequestRow(row) {
         responded_at: row.responded_at,
         response_uuid: row.response_uuid || null,
         last_error: row.last_error || null,
+        has_certificate: typeof row.has_certificate === 'boolean' ? row.has_certificate : null,
     };
 }
 
@@ -481,7 +482,7 @@ function formatBytes(bytes) {
     return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
 }
 
-function MessageAttachments({ attachments }) {
+function MessageAttachments({ attachments, viewOnly = false }) {
 
     const previewable = attachments.filter((file) => file.previewable);
 
@@ -537,93 +538,112 @@ function MessageAttachments({ attachments }) {
 
     const shown = preview && preview.path === activePath ? preview : null;
 
+    const hideList = viewOnly && attachments.length === 1;
+
+    const previewContent = active ? (
+        !shown ? (
+            <Skeleton variant='rounded' height={360} sx={{ borderRadius: '8px' }} />
+        ) : shown.error ? (
+            <p className='text-[11px] font-[500] text-[#991b1b]'>{shown.error}</p>
+        ) : shown.url ? (
+            isPdf ? (
+                <div className='h-[420px] w-full overflow-auto rounded-[8px] bg-[#f8fafc] ring-1 ring-[#e5e7eb]'>
+                    <MaskedCertificate file={shown.url} />
+                </div>
+            ) : (
+                <img
+                    src={shown.url}
+                    alt={active.filename}
+                    draggable={!viewOnly}
+                    className={`max-h-[420px] w-full rounded-[8px] object-contain ring-1 ring-[#e5e7eb] ${viewOnly ? 'pointer-events-none' : ''}`}
+                />
+            )
+        ) : null
+    ) : null;
+
     return (
         <div className='mt-[10px]'>
 
-            <p className='mb-[6px] text-[10px] font-[700] uppercase tracking-[0.08em] text-[#94a3b8]'>
-                {attachments.length === 1 ? 'Attachment' : `Attachments (${attachments.length})`}
-            </p>
+            {!viewOnly ? (
+                <p className='mb-[6px] text-[10px] font-[700] uppercase tracking-[0.08em] text-[#94a3b8]'>
+                    {attachments.length === 1 ? 'Attachment' : `Attachments (${attachments.length})`}
+                </p>
+            ) : null}
 
-            <div className='mb-[8px] flex flex-col gap-[5px]'>
+            {!hideList ? (
+                <div className='mb-[8px] flex flex-col gap-[5px]'>
 
-                {attachments.map(function (file) {
+                    {attachments.map(function (file) {
 
-                    const isActive = file.uuid === activeUuid;
+                        const isActive = file.uuid === activeUuid;
 
-                    return (
-                        <div
-                            key={file.uuid}
-                            className={`flex items-center gap-[8px] rounded-[8px] border px-[9px] py-[7px] transition-colors ${
-                                isActive ? 'border-[#93c5fd] bg-[#eff6ff]' : 'border-[#e5e7eb] bg-white'
-                            }`}
-                        >
-
-                            {(file.content_type || '').toLowerCase() === 'application/pdf' ? (
-                                <PictureAsPdfOutlined className='text-[#b91c1c]' sx={{ fontSize: 18 }} />
-                            ) : (
-                                <InsertDriveFileOutlined className='text-[#64748b]' sx={{ fontSize: 18 }} />
-                            )}
-
-                            <button
-                                type='button'
-                                disabled={!file.previewable}
-                                onClick={() => setActiveUuid(file.uuid)}
-                                className='min-w-0 flex-1 text-left disabled:cursor-default'
+                        return (
+                            <div
+                                key={file.uuid}
+                                className={`flex items-center gap-[8px] rounded-[8px] border px-[9px] py-[7px] transition-colors ${
+                                    isActive ? 'border-[#93c5fd] bg-[#eff6ff]' : 'border-[#e5e7eb] bg-white'
+                                }`}
                             >
-                                <span className='block truncate text-[12px] font-[600] text-[#111827]'>
-                                    {file.filename}
-                                </span>
 
-                                <span className='block text-[10.5px] font-[500] text-[#94a3b8]'>
-                                    {formatBytes(file.size_bytes)}
-                                    {file.previewable ? (isActive ? ' · showing below' : ' · click to view') : ''}
-                                </span>
-                            </button>
+                                {(file.content_type || '').toLowerCase() === 'application/pdf' ? (
+                                    <PictureAsPdfOutlined className='text-[#b91c1c]' sx={{ fontSize: 18 }} />
+                                ) : (
+                                    <InsertDriveFileOutlined className='text-[#64748b]' sx={{ fontSize: 18 }} />
+                                )}
 
-                            <button
-                                type='button'
-                                title='Download'
-                                onClick={() => {
-                                    setDownloadError(null);
+                                <button
+                                    type='button'
+                                    disabled={!file.previewable}
+                                    onClick={() => setActiveUuid(file.uuid)}
+                                    className='min-w-0 flex-1 text-left disabled:cursor-default'
+                                >
+                                    <span className='block truncate text-[12px] font-[600] text-[#111827]'>
+                                        {file.filename}
+                                    </span>
 
-                                    apiDownload(file.path, file.filename).catch(
-                                        (err) => setDownloadError(err.message || 'Could not download the file.')
-                                    );
-                                }}
-                                className='flex items-center justify-center rounded-[6px] p-[5px] text-[#64748b] transition-colors hover:bg-[#f1f5f9] hover:text-[#111827]'
-                            >
-                                <DownloadOutlined sx={{ fontSize: 16 }} />
-                            </button>
+                                    <span className='block text-[10.5px] font-[500] text-[#94a3b8]'>
+                                        {formatBytes(file.size_bytes)}
+                                        {file.previewable ? (isActive ? ' · showing below' : ' · click to view') : ''}
+                                    </span>
+                                </button>
 
-                        </div>
-                    );
-                })}
+                                {!viewOnly ? (
+                                    <button
+                                        type='button'
+                                        title='Download'
+                                        onClick={() => {
+                                            setDownloadError(null);
 
-            </div>
+                                            apiDownload(file.path, file.filename).catch(
+                                                (err) => setDownloadError(err.message || 'Could not download the file.')
+                                            );
+                                        }}
+                                        className='flex items-center justify-center rounded-[6px] p-[5px] text-[#64748b] transition-colors hover:bg-[#f1f5f9] hover:text-[#111827]'
+                                    >
+                                        <DownloadOutlined sx={{ fontSize: 16 }} />
+                                    </button>
+                                ) : null}
 
-            {downloadError ? (
+                            </div>
+                        );
+                    })}
+
+                </div>
+            ) : null}
+
+            {!viewOnly && downloadError ? (
                 <p className='mb-[6px] text-[11px] font-[500] text-[#991b1b]'>{downloadError}</p>
             ) : null}
 
-            {active ? (
-                !shown ? (
-                    <Skeleton variant='rounded' height={360} sx={{ borderRadius: '8px' }} />
-                ) : shown.error ? (
-                    <p className='text-[11px] font-[500] text-[#991b1b]'>{shown.error}</p>
-                ) : shown.url ? (
-                    isPdf ? (
-                        <div className='h-[420px] w-full overflow-auto rounded-[8px] bg-[#f8fafc] ring-1 ring-[#e5e7eb]'>
-                            <MaskedCertificate file={shown.url} />
-                        </div>
-                    ) : (
-                        <img
-                            src={shown.url}
-                            alt={active.filename}
-                            className='max-h-[420px] w-full rounded-[8px] object-contain ring-1 ring-[#e5e7eb]'
-                        />
-                    )
-                ) : null
-            ) : null}
+            {viewOnly ? (
+                <div
+                    className='select-none'
+                    onContextMenu={(e) => e.preventDefault()}
+                    onDragStart={(e) => e.preventDefault()}
+                >
+                    {previewContent}
+                </div>
+            ) : previewContent}
 
         </div>
     );
@@ -876,6 +896,83 @@ function VerificationBanner({ verification }) {
     );
 }
 
+function CertificateModal({ row, onClose }) {
+    const [attachments, setAttachments] = useState(null);
+    const [error, setError] = useState(null);
+
+    useEffect(function () {
+
+        let cancelled = false;
+
+        setAttachments(null);
+        setError(null);
+
+        apiFetch(`${INSURANCE_REQUESTS_ENDPOINT}/${row.row_id}/thread`)
+            .then(function (result) {
+                if (cancelled) return;
+
+                const messages = Array.isArray(result?.data?.messages) ? result.data.messages : [];
+
+                setAttachments(
+                    messages
+                        .filter((message) => message.direction !== 'outbound')
+                        .flatMap((message) => (Array.isArray(message.attachments) ? message.attachments : []))
+                        .filter((file) => file.previewable)
+                );
+            })
+            .catch(function (err) {
+                if (!cancelled) setError(err.message || 'Could not load the certificate.');
+            });
+
+        return function () {
+            cancelled = true;
+        };
+
+    }, [row.row_id]);
+
+    return (
+        <div
+            className='fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-[16px] print:hidden'
+            onClick={onClose}
+        >
+            <div
+                onClick={(event) => event.stopPropagation()}
+                className='flex max-h-[90vh] w-full max-w-[900px] flex-col overflow-hidden rounded-[16px] bg-white shadow-xl'
+            >
+                <div className='flex items-center justify-between border-b border-[#e5e7eb] px-[16px] py-[12px]'>
+
+                    <div>
+                        <h3 className='text-[15px] font-[700] text-[#111827]'>Certificate</h3>
+                        <p className='mt-[1px] text-[11px] font-[500] text-[#94a3b8]'>{row.carrier_name}</p>
+                    </div>
+
+                    <button
+                        type='button'
+                        onClick={onClose}
+                        className='flex items-center justify-center rounded-[8px] p-[6px] text-[#6b7280] transition-colors hover:bg-[#f1f5f9] hover:text-[#111827]'
+                    >
+                        <CloseOutlined sx={{ fontSize: 18 }} />
+                    </button>
+                </div>
+
+                <div className='flex-1 overflow-y-auto px-[16px] py-[14px]'>
+                    {error ? (
+                        <p className='text-[13px] font-[500] text-[#991b1b]'>{error}</p>
+                    ) : !attachments ? (
+                        <Skeleton variant='rounded' height={360} sx={{ borderRadius: '10px' }} />
+                    ) : attachments.length === 0 ? (
+                        <p className='text-[13px] font-[500] text-[#94a3b8]'>
+                            No certificate has been received for this request.
+                        </p>
+                    ) : (
+                        <MessageAttachments attachments={attachments} viewOnly />
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function InsuranceThreadModal({ row, onClose }) {
     const [detail, setDetail] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -989,8 +1086,10 @@ const columnHelper = createColumnHelper();
 export default function CoiRequest() {
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
+    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
     const [selectedRow, setSelectedRow] = useState(null);
+    const [certificateRow, setCertificateRow] = useState(null);
+    const [certMap, setCertMap] = useState({});
 
     const fetchRecords = useCallback(() => {
         setLoading(true);
@@ -1070,22 +1169,33 @@ export default function CoiRequest() {
             columnHelper.display({
                 id: 'actions',
                 header: () => <span className="block text-right">Actions</span>,
-                cell: (info) => (
-                    <div className="flex justify-end">
-                        <button
-                            type="button"
-                            /* RESPONSIVE: shorter padding/text on mobile & tablet; unchanged
-                               (px-3.5 py-1.5 / text-xs) at lg (desktop) and up. */
-                            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] sm:px-2.5 sm:py-1 sm:text-[11px] lg:px-3.5 lg:py-1.5 lg:text-xs font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
-                            onClick={() => setSelectedRow(info.row.original)}
-                        >
-                            View
-                        </button>
-                    </div>
-                ),
+                cell: (info) => {
+                    const original = info.row.original;
+                    const hasReply = Boolean(original.response_uuid) || ['success', 'responded'].includes(original.status);
+                    const hasCertificate = hasReply && (
+                        original.has_certificate === null
+                            ? certMap[original.row_id] === true
+                            : original.has_certificate
+                    );
+                    const btnClass = "rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] sm:px-2.5 sm:py-1 sm:text-[11px] lg:px-3.5 lg:py-1.5 lg:text-xs font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50";
+
+                    return (
+                        <div className="flex justify-end gap-2">
+                            <button type="button" className={btnClass} onClick={() => setSelectedRow(original)}>
+                                View
+                            </button>
+
+                            {hasCertificate ? (
+                                <button type="button" className={btnClass} onClick={() => setCertificateRow(original)}>
+                                    Certificate
+                                </button>
+                            ) : null}
+                        </div>
+                    );
+                },
             }),
         ],
-        []
+        [certMap]
     );
 
     const table = useReactTable({
@@ -1102,6 +1212,42 @@ export default function CoiRequest() {
     const visibleRowCount = table.getRowModel().rows.length;
     const rangeStart = total === 0 ? 0 : pageIndex * pageSize + 1;
     const rangeEnd = total === 0 ? 0 : rangeStart + visibleRowCount - 1;
+
+    const visibleRows = table.getRowModel().rows.map((row) => row.original);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        visibleRows.forEach((original) => {
+            const hasReply = Boolean(original.response_uuid) || ['success', 'responded'].includes(original.status);
+
+            if (!hasReply || original.has_certificate !== null || certMap[original.row_id] !== undefined) {
+                return;
+            }
+
+            apiFetch(`${INSURANCE_REQUESTS_ENDPOINT}/${original.row_id}/thread`)
+                .then((res) => {
+                    if (cancelled) return;
+
+                    const messages = Array.isArray(res?.data?.messages) ? res.data.messages : [];
+                    const found = messages.some((message) =>
+                        message.direction !== 'outbound'
+                        && Array.isArray(message.attachments)
+                        && message.attachments.some((file) => file.previewable)
+                    );
+
+                    setCertMap((prev) => ({ ...prev, [original.row_id]: found }));
+                })
+                .catch(() => {
+                    if (cancelled) return;
+                    setCertMap((prev) => ({ ...prev, [original.row_id]: false }));
+                });
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [rows, pageIndex, pageSize]);
 
     return (
         <div className="min-h-screen bg-[#F4F5F1] px-8 py-5 md:px-14">
@@ -1215,6 +1361,13 @@ export default function CoiRequest() {
                 <InsuranceThreadModal
                     row={selectedRow}
                     onClose={() => setSelectedRow(null)}
+                />
+            )}
+
+            {certificateRow && (
+                <CertificateModal
+                    row={certificateRow}
+                    onClose={() => setCertificateRow(null)}
                 />
             )}
 
