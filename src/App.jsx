@@ -9,7 +9,6 @@ import TrackShipmentEld from './pages/app/trackshipment-eld/EldShipmentForm'
 import EldShipmentDetail from './pages/app/trackshipment-eld/EldShipmentDetail'
 import PublicTracking from './pages/app/PublicTracking/PublicTracking'
 import SearchVet from './pages/app/SearchVet/SearchVet'
-import RiskAlerts from './pages/app/riskalert/RiskAlerts'
 import LoadSearch from './pages/app/loadsearch/LoadSearch'
 import CarrierSearch from './pages/app/carriers/CarrierSearch'
 import CarrierProfile from './pages/app/carriers/CarrierProfile'
@@ -69,6 +68,8 @@ import DtPayGuestPay from './pages/app/DtPayGuestPay';
 
 import NewPartnerCard from './pages/app/new-partner/Card';
 
+import CoiRequest from './pages/app/coi-request/CoiRequest'
+
 
 // Paths that should render full-page, without the app header/nav chrome.
 // /subscribe is one of these: it's shown as a forced, standalone step
@@ -124,7 +125,7 @@ function AppShell() {
           <Route path="/trackshipment/eld" element={<TrackShipmentEld />} />
           <Route path="/load-search" element={<LoadSearch />} />
           <Route path="/search-vet" element={<SearchVet />} />
-          <Route path="/risk-alerts" element={<RiskAlerts />} />
+        <Route path="/coi-request" element={<CoiRequest />} />
           <Route path="/users" element={<UsersList />} />
           <Route path="/profile" element={<ProfileUpdate />} />
           <Route path="/settings/carrier" element={<CarrierSettings />} />
