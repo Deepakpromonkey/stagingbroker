@@ -185,6 +185,9 @@ export default function RouteGuard({ children }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const token = getToken();
+
+  console.log("RouteGuard rendered:", pathname);
+  
   const [planAccess, setPlanAccess] = useState(cachedPlanAccess);
   const [needsDataUpdateAck, setNeedsDataUpdateAck] = useState(() =>
     shouldShowDataUpdateNotice(getUser()?.email)
