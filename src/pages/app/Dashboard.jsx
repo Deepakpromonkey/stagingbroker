@@ -294,7 +294,7 @@ function ConciergeChat({ isOpen, onClose, seedQuery, onSeedConsumed }) {
                         </span>
                         <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                                <h3 className="m-0 text-[15px] font-bold tracking-tight truncate">Concierge</h3>
+                                <h3 className="m-0 text-[15px] font-bold tracking-tight truncate">Fleetra</h3>
                                 <span className="text-[9px] font-bold tracking-wide bg-white/15 rounded-full px-2 py-0.5 shrink-0">
                                     BETA
                                 </span>
