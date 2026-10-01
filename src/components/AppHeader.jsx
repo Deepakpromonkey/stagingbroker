@@ -29,6 +29,7 @@ import CreditCardOutlined from '@mui/icons-material/CreditCardOutlined';
 import MenuIcon from '@mui/icons-material/Menu';
 import CloseIcon from '@mui/icons-material/Close';
 import PersonSearchOutlinedIcon from '@mui/icons-material/PersonSearchOutlined';
+import HelpOutlineOutlined from '@mui/icons-material/HelpOutlineOutlined';
 
 import { logout } from '../utils/Auth';
 import logo from '../assets/images/logo.webp';
@@ -73,6 +74,12 @@ const PROFILE_LINKS = [
     { key: 'profile_shortlisting', label: 'Carriers Shortlisted', icon: <Checklist sx={{ fontSize: 18 }} />, to: '/profile/carriers/shortlisted' },
     { key: 'profile_blocked', label: 'Carriers Blocked', icon: <BlockOutlined sx={{ fontSize: 18 }} />, to: '/profile/carriers/blocked' },
     { key: 'scoring_weights', label: 'Scoring Weights', icon: <SettingsOutlined sx={{ fontSize: 18 }} />, to: '/profile/scoring-weights', permission: 'edit-scoring-config' },
+    {
+        key: 'dt_score_how_it_works',
+        label: 'How DT Score Works',
+        icon: <HelpOutlineOutlined sx={{ fontSize: 18 }} />,
+        to: '/dt-score/how-it-works',
+    },
     {
         key: 'carrier_settings',
         label: 'Carrier Settings',
