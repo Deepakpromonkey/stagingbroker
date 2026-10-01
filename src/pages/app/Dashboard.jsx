@@ -278,7 +278,7 @@ function ConciergeChat({ isOpen, onClose, seedQuery, onSeedConsumed }) {
             <div
                 role="dialog"
                 aria-modal="true"
-                aria-label="Concierge chat"
+                aria-label="Fleetra chat"
                 className={`fixed inset-y-0 right-0 z-[100] w-full sm:w-[420px] bg-[#F7F9FB] shadow-2xl flex flex-col transition-transform duration-300 ease-out ${
                     isOpen ? 'translate-x-0' : 'translate-x-full'
                 }`}
