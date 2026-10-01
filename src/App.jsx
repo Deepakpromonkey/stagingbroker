@@ -62,6 +62,8 @@ DTPay Guest Pay
 */
 import DtPayGuestPay from './pages/app/DtPayGuestPay';
 
+import CoiRequest from './pages/app/coi-request/CoiRequest'
+
 
 // Paths that should render full-page, without the app header/nav chrome.
 // /subscribe is one of these: it's shown as a forced, standalone step
@@ -108,6 +110,7 @@ function AppShell() {
           <Route path="/load-search" element={<LoadSearch />} />
           <Route path="/search-vet" element={<SearchVet />} />
           <Route path="/risk-alerts" element={<RiskAlerts />} />
+          <Route path="/coi-request" element={<CoiRequest />} />
           <Route path="/users" element={<UsersList />} />
           <Route path="/profile" element={<ProfileUpdate />} />
           <Route path="/settings/carrier" element={<CarrierSettings />} />

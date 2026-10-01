@@ -50,6 +50,7 @@ const NAV_LINKS = [
     },
     { label: 'Carrier Q/A', to: '/carrier-questions' },
     // { label: 'Risk & Alerts', to: '/risk-alerts' },
+    { label: 'COI Request', to: '/coi-request' },
     { label: 'DT-Pay', to: '/dt-pay' },
 ];
 
