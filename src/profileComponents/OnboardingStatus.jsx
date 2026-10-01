@@ -1,5 +1,6 @@
 import CheckCircle from "@mui/icons-material/CheckCircle";
 import RadioButtonUnchecked from "@mui/icons-material/RadioButtonUnchecked";
+import DoNotDisturbOnOutlined from "@mui/icons-material/DoNotDisturbOnOutlined";
 import HandshakeOutlined from "@mui/icons-material/HandshakeOutlined";
 import WarningAmber from "@mui/icons-material/WarningAmber";
 import AccountBalanceOutlined from "@mui/icons-material/AccountBalanceOutlined";
@@ -39,18 +40,25 @@ function formatDate(value) {
 export default function OnboardingStatus({ request }) {
   if (!request) return null;
 
-  const steps = [
-    { label: "Phone verified", done: request.mobile_verified },
-    { label: "Government ID verified", done: request.identity_verified },
-    { label: "Bank account connected", done: request.bank_verified },
-    { label: "Broker questions answered", done: request.questionnaire_completed },
-    { label: "Agreement signed", done: request.signed },
-  ];
+  // The API's own step list, not a hardcoded guess at what exists - it's
+  // the one place that actually knows all 7 steps (this used to list only
+  // 5 built from flat fields, which had no way to represent "ELD" or
+  // "Documents" at all, let alone tell a skipped step apart from one the
+  // carrier just hasn't reached yet). Non-applicable steps are left out,
+  // matching how the API's own steps_total/steps_completed are counted.
+  const steps = (request.steps || [])
+    .filter((step) => step.applicable !== false)
+    .map((step) => ({
+      key: step.key,
+      label: step.label,
+      done: step.completed,
+      skipped: !step.completed && step.skipped,
+    }));
 
   const stageClass = STAGE_STYLES[request.stage] || STAGE_STYLES.invited;
 
   const percent = Math.round(
-    ((request.steps_completed || 0) / (request.steps_total || 5)) * 100,
+    ((request.steps_completed || 0) / (request.steps_total || 7)) * 100,
   );
 
   const factoring = request.factoring || {};
@@ -93,18 +101,23 @@ export default function OnboardingStatus({ request }) {
           </div>
 
           <span className="text-xs font-semibold text-[#4B5563]">
-            {request.steps_completed || 0} of {request.steps_total || 5} steps
+            {request.steps_completed || 0} of {request.steps_total || 7} steps
           </span>
         </div>
 
         {/* Step checklist */}
         <div className="grid grid-cols-1 gap-x-8 gap-y-2.5 sm:grid-cols-2">
           {steps.map((step) => (
-            <div key={step.label} className="flex items-center gap-2">
+            <div key={step.key} className="flex items-center gap-2">
               {step.done ? (
                 <CheckCircle
                   sx={{ fontSize: 18 }}
                   className="text-emerald-600"
+                />
+              ) : step.skipped ? (
+                <DoNotDisturbOnOutlined
+                  sx={{ fontSize: 18 }}
+                  className="text-gray-400"
                 />
               ) : (
                 <RadioButtonUnchecked
@@ -119,6 +132,7 @@ export default function OnboardingStatus({ request }) {
                 }`}
               >
                 {step.label}
+                {step.skipped && " (skipped)"}
               </span>
             </div>
           ))}
