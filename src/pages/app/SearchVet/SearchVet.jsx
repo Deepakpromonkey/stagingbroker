@@ -248,44 +248,49 @@ function SearchVetTable({ keyword, refreshKey }) {
 
     const columns = useMemo(() => ([
         carrierNameColumn,
-        columnHelper.display({
-            id: 'mc_dot',
-            header: 'MC / DOT',
-            cell: (info) => {
-                const row = info.row.original;
+       columnHelper.display({
+    id: 'mc_dot',
+    header: 'MC / DOT',
+    cell: (info) => {
+        const row = info.row.original;
 
-                const mc = row.mc_number || '';
-                const dot = row.dot_number || '';
+        const mc = row.mc_number || '';
+        const dot = row.dot_number || '';
 
-                const display = `${mc || '-'} / ${dot || '-'}`;
+        const rowId = info.row.id;
+        const mcKey = `${rowId}-mc`;
+        const dotKey = `${rowId}-dot`;
 
-                let copyText = '';
-                if (mc && dot) {
-                    copyText = `${mc} / ${dot}`;
-                } else if (mc) {
-                    copyText = mc;
-                } else if (dot) {
-                    copyText = dot;
-                }
+        const renderCopyable = (value, key) => {
+            const isCopied = copiedRowId === key;
 
-                const rowId = info.row.id;
-                const isCopied = copiedRowId === rowId;
+            if (!value) {
+                return <span>-</span>;
+            }
 
-                return (
-                    <span
-                        onClick={() => copyText && copyToClipboard(copyText, rowId)}
-                        title={copyText ? 'Click to copy' : undefined}
-                        className={
-                            'select-none ' +
-                            (copyText ? 'cursor-pointer hover:text-[#2563eb] ' : '') +
-                            (isCopied ? 'text-[#16a34a] font-[600]' : '')
-                        }
-                    >
-                        {isCopied ? 'Copied!' : display}
-                    </span>
-                );
-            },
-        }),
+            return (
+                <span
+                    onClick={() => copyToClipboard(value, key)}
+                    title="Click to copy"
+                    className={
+                        'select-none cursor-pointer hover:text-[#2563eb] ' +
+                        (isCopied ? 'text-[#16a34a] font-[600]' : '')
+                    }
+                >
+                    {isCopied ? 'Copied!' : value}
+                </span>
+            );
+        };
+
+        return (
+            <span className="inline-flex items-center gap-1">
+                {renderCopyable(mc, mcKey)}
+                <span className="text-gray-400">/</span>
+                {renderCopyable(dot, dotKey)}
+            </span>
+        );
+    },
+}),
         columnHelper.accessor('carrier_operation', {
             header: 'Authority',
             id: 'carrier_operation',

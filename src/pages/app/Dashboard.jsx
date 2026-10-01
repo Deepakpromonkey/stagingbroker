@@ -1,6 +1,6 @@
 import React, { Component, useState, useMemo, useRef, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
-import { apiFetch } from '../../lib/api';
+import { apiFetch, getToken } from '../../lib/api';
 import { send as fleetraSend, resume as fleetraResume } from '../../lib/fleetraClient';
 import { createHistoryStore } from '../../lib/fleetraHistory';
 import SettingsOutlined from '@mui/icons-material/SettingsOutlined';
@@ -16,7 +16,6 @@ import WarningAmberOutlined from '@mui/icons-material/WarningAmberOutlined';
 import SendRounded from '@mui/icons-material/SendRounded';
 import Chip from '@mui/material/Chip';
 import { format } from 'date-fns';
-import DataUpdateNotice, { shouldShowDataUpdateNotice } from './data-update/DataUpdateNotice';
 
 const BASE_URL = 'https://ai.dollartraq.com';
 
@@ -78,9 +77,11 @@ function statusLabel(status) {
 // talking to the API as some other tenant.
 // ─────────────────────────────────────────────────────────────────────────
 
+// Uses the shared helper so the chat sees the same token as the rest of the
+// app (localStorage first, cookie as fallback).
 function getFleetraToken() {
     try {
-        return localStorage.getItem('crm_auth_token') || '';
+        return getToken() || '';
     } catch (e) {
         return '';
     }
@@ -533,7 +534,6 @@ class Dashboard extends Component {
             ai_modal_open: false,
             ai_seed_query: '',
 
-            show_data_update_notice: false,
             // shipment totals — derived from /shipments pagination
             // metadata (see loadShipmentTotals) rather than a separate
             // totals endpoint
@@ -552,11 +552,10 @@ class Dashboard extends Component {
         const account_token = localStorage.getItem('crm_auth_token');
         const user = localStorage.getItem('crm_user');
 
-             if (account_token) {
+        if (account_token) {
             this.setState({
                 account_token,
                 logged_in: true,
-                show_data_update_notice: shouldShowDataUpdateNotice(),
             }, () => {
                 // this.init();
                 this.loadShipmentTotals();
@@ -825,11 +824,6 @@ class Dashboard extends Component {
 
         return (
             <div className="px-4 sm:px-6 md:px-8 py-5 sm:py-6 md:py-8">
-                 {this.state.show_data_update_notice && (
-                    <DataUpdateNotice
-                        onAcknowledge={() => this.setState({ show_data_update_notice: false })}
-                    />
-                )}
 
                 {/* ── Inline messages ── */}
                 {this.state.error_message ? (
@@ -876,7 +870,7 @@ class Dashboard extends Component {
                         <div className="border-l border-[#e5e5e5] h-12 mx-0.5" />
                         <div>
                             <div className="text-xs font-bold text-[#333]">{monthYear}</div>
-                         
+
                         </div>
                     </div>
                 </div>
@@ -979,6 +973,7 @@ class Dashboard extends Component {
                         </div>
                     </div>
 
+                    {/* Right — Account Status */}
                     <div className="bg-[#005EA4] rounded-2xl p-5 sm:p-6 text-white flex flex-col justify-between relative min-h-[240px] sm:min-h-[280px]">
                         <button
                             type="button"
@@ -993,12 +988,24 @@ class Dashboard extends Component {
                             <div className="text-[10px] font-semibold tracking-wider uppercase opacity-60 mb-1.5">
                                 Account Status
                             </div>
-                            <h2 className="text-[22px] sm:text-[24px] md:text-[28px] font-bold text-white m-0 tracking-[-0.5px]">
-                                {planName}
-                            </h2>
-                            <p className="text-xs opacity-75 mt-2.5 leading-normal">
-                                {planBlurb}
-                            </p>
+
+                            {/* Placeholder until /subscription answers, so the wrong
+                                plan name / trial text never flashes first. */}
+                            {this.state.subscription_loading ? (
+                                <>
+                                    <div className="h-8 w-40 bg-white/20 rounded animate-pulse" />
+                                    <div className="h-3 w-56 bg-white/20 rounded animate-pulse mt-3" />
+                                </>
+                            ) : (
+                                <>
+                                    <h2 className="text-[22px] sm:text-[24px] md:text-[28px] font-bold text-white m-0 tracking-[-0.5px]">
+                                        {planName}
+                                    </h2>
+                                    <p className="text-xs opacity-75 mt-2.5 leading-normal">
+                                        {planBlurb}
+                                    </p>
+                                </>
+                            )}
                         </div>
 
                         <div className="my-5">
@@ -1030,9 +1037,8 @@ class Dashboard extends Component {
 
                         <div className="flex flex-col gap-3">
                             {/* Only offer an upgrade to someone who is not
-                                already paying — the CTA used to read "Upgrade
-                                to Professional" regardless of plan. */}
-                            {!subscription && (
+                                already paying, and only once we know. */}
+                            {!this.state.subscription_loading && !subscription && (
                                 <a
                                     href="/subscribe"
                                     className="block text-center bg-white text-[#185FA5] text-xs font-bold rounded-lg py-3.5 no-underline"
@@ -1041,7 +1047,7 @@ class Dashboard extends Component {
                                 </a>
                             )}
 
-                          
+
                         </div>
                     </div>
                 </div>
