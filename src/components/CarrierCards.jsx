@@ -88,12 +88,12 @@ function DTScorePanel(props) {
                     DT Score
                 </span>
 
-                <div className='flex items-center justify-center w-[72px] h-[72px] rounded-full border-2 border-dashed border-[#CBD2DC] bg-white'>
+                <div className='flex items-center justify-center w-[72px] h-[72px] rounded-full border-2 border-dashed border-[#CBD2DC] bg-white animate-pulse'>
                     <Remove className='!text-[16px] text-[#98A2B3]' />
                 </div>
 
                 <span className='text-[10.5px] font-[700] text-[#98A2B3]'>
-                    Not yet scored
+                    Calculating...
                 </span>
 
             </div>
