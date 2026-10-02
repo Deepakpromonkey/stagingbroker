@@ -33,7 +33,9 @@ const ENTITY_TYPE_MAP = {
 };
 
 const PER_PAGE = 10;
-const SEARCH_DEBOUNCE_MS = 2000;
+// Long enough to batch a few quick filter clicks into one search; a search
+// itself now returns in a second or two, so a longer wait would dominate.
+const SEARCH_DEBOUNCE_MS = 800;
 
 function parseRadiusMiles(radiusLabel) {
     const match = /^(\d+)/.exec(radiusLabel || '');
@@ -871,12 +873,12 @@ export default function NewPartnerPage() {
 
                         <FilterPanel id="insurance" label="Insurance" icon={<ShieldOutlined sx={{ fontSize: 15 }} />} open={openSections.insurance} onToggle={() => toggleSection('insurance')}>
                             <div className="text-[9.5px] font-[700] tracking-[0.06em] uppercase mb-[4px]" style={{ color: FAINT }}>
-                                Minimum BIPD on file
+                                Minimum BIPD on file ($)
                             </div>
                             <input
                                 type="number"
                                 min="0"
-                                placeholder="0"
+                                placeholder="e.g. 750000"
                                 value={filters.minBIPD}
                                 onKeyDown={blockNegativeKeys}
                                 onChange={(e) => setFilter('minBIPD', clampNonNegative(e.target.value))}
@@ -960,13 +962,6 @@ export default function NewPartnerPage() {
                         </>
                     )}
 
-                    {(loading || isPending) && (
-                        <>
-                            {Array.from({ length: 5 }).map((_, i) => (
-                                <CarrierCardSkeleton key={i} />
-                            ))}
-                        </>
-                    )}
 
                     {!loading && !isPending && error && (
                         <div
