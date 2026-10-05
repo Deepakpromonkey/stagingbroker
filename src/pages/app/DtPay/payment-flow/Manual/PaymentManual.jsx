@@ -495,7 +495,7 @@ export default function PaymentManual() {
                 if(data.status){
 
                     setSuccessMessage(data.message);
-                    localStorage.setItem('flash_success_message', data.messsge)
+                    sessionStorage.setItem('flash_success_message', data.messsge)
 
                     setCurrentNum(3)
                     navigate(`/dt-pay/payment/manual/done/${transaction_id}`)

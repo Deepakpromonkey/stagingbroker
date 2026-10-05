@@ -10,6 +10,7 @@ import {
 } from '@mui/icons-material';
 
 import { apiFetch } from '../lib/api';
+import { getCached, setCached, forgetCached } from '../lib/memoryCache';
 
 const PAGE_SIZE = 5;
 const VIN_PREVIEW_COUNT = 5;
@@ -167,7 +168,7 @@ useEffect(function () {
 
         const cacheKey = `equipment_insights_${resolvedDotNumber}`;
 
-        const cached = localStorage.getItem(cacheKey);
+        const cached = getCached(cacheKey);
 
         if (cached) {
             try {
@@ -180,10 +181,10 @@ useEffect(function () {
                     setFetchError('');
                     return;
                 }
-                localStorage.removeItem(cacheKey);
+                forgetCached(cacheKey);
             } catch (err) {
                 console.error('Failed to parse cached equipment insights:', err);
-                localStorage.removeItem(cacheKey);
+                forgetCached(cacheKey);
             }
         }
 
@@ -208,7 +209,7 @@ useEffect(function () {
                 // Never cache an empty result - it would suppress future fetches.
                 if (finalRows.length > 0) {
                     try {
-                        localStorage.setItem(cacheKey, JSON.stringify(finalRows));
+                        setCached(cacheKey, JSON.stringify(finalRows));
                     } catch (err) {
                         console.error('Failed to cache equipment insights:', err);
                     }

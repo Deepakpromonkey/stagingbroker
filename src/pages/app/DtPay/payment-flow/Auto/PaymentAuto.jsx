@@ -295,7 +295,7 @@ export default function PaymentAuto() {
                 if(data.status){
 
                     setSuccessMessage(data.message);
-                    localStorage.setItem('flash_success_message', data.message)
+                    sessionStorage.setItem('flash_success_message', data.message)
 
                     setCurrentNum(3)
                     navigate(`/dt-pay/payment/auto/done/${transaction_id}`)
