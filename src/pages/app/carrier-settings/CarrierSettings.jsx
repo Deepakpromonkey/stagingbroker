@@ -32,7 +32,8 @@ const TABS = [
 ];
 
 const JODIT_CONFIG = {
-    height: 300,
+    // Tall enough to work on a full designed email, not just a few lines.
+    height: 560,
     toolbarAdaptive: false,
     buttons: [
         'bold', 'italic', 'underline', 'strikethrough', '|',
@@ -936,7 +937,17 @@ function TemplateEditorDialog({ template, templateTypes, onClose, onSaved }) {
             ? template.available_variables
             : (templateTypes.find((t) => t.type === type)?.variables || []);
 
+    // At the cursor: the stock templates are full designs, so appending would
+    // land the placeholder below the footer.
     const insertVariable = (placeholder) => {
+        const editor = editorRef.current;
+
+        if (editor?.selection?.insertHTML) {
+            editor.selection.insertHTML(placeholder);
+            setBody(editor.value);
+            return;
+        }
+
         setBody((prev) => `${prev || ''}${placeholder}`);
     };
 
@@ -1005,7 +1016,7 @@ function TemplateEditorDialog({ template, templateTypes, onClose, onSaved }) {
     };
 
     return (
-        <Dialog open onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: '20px', overflow: 'hidden' } }}>
+        <Dialog open onClose={onClose} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: '20px', overflow: 'hidden' } }}>
 
             {/* ── Header ── */}
             <div className="flex items-center justify-between px-[18px] sm:px-[22px] md:px-[28px] py-[16px] sm:py-[18px] md:py-[20px] bg-white border-b border-[#eef1f6]">
@@ -1018,7 +1029,7 @@ function TemplateEditorDialog({ template, templateTypes, onClose, onSaved }) {
                             {isEdit ? 'Edit email template' : 'New email template'}
                         </div>
                         <div className="text-[11.5px] md:text-[12.5px] text-[#94a3b8] mt-[1px] truncate">
-                            Sent automatically during carrier onboarding
+                            Sent automatically by DollarTraq
                         </div>
                     </div>
                 </div>
@@ -1089,6 +1100,8 @@ function TemplateEditorDialog({ template, templateTypes, onClose, onSaved }) {
                             <button
                                 key={v.name}
                                 type="button"
+                                // Keeps the editor's cursor where the user left it.
+                                onMouseDown={(e) => e.preventDefault()}
                                 onClick={() => insertVariable(v.placeholder)}
                                 title={v.description}
                                 className="rounded-[6px] border border-[#e2e8f0] bg-[#f8fafc] px-[8px] py-[3px] text-[11px] font-[600] text-[#334155] hover:border-[#1c5dbe] hover:bg-[#eff6ff]"
