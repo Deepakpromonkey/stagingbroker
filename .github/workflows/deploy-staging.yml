@@ -56,6 +56,12 @@ jobs:
         # staging build has always used.
         env:
           VITE_API_BASE: https://staggingapi.dollartraq.com/api/v1
+          # Reverb, through nginx on the API host (see the API repository's
+          # deploy/staging/provision.sh). The app key is public by design.
+          VITE_REVERB_APP_KEY: 1ae5459053a68564f4566360
+          VITE_REVERB_HOST: staggingapi.dollartraq.com
+          VITE_REVERB_PORT: '443'
+          VITE_REVERB_SCHEME: https
         run: npm run build
 
       - name: SSH

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -19,6 +19,7 @@ import SatelliteAltOutlinedIcon from "@mui/icons-material/SatelliteAltOutlined";
 
 import { useNavigate } from "react-router-dom";
 
+import { companyChannel, useLive } from "../../../lib/live";
 import { apiFetch } from "../../../lib/api";
 
 const SHIPMENTS_ENDPOINT = "/shipments";
@@ -79,9 +80,35 @@ function useShipments(pageIndex, pageSize) {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
+  // Bumped by a push from the API (a shipment added or moving on elsewhere),
+  // which refetches the page being looked at.
+  const [revision, setRevision] = useState(0);
+  useLive(companyChannel(), "shipment.updated", () => setRevision((n) => n + 1));
+
+  // The real count, for the pager. It used to be the first page's row count,
+  // which left a single page however many shipments there were.
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+
+    apiFetch("/shipments/summary")
+      .then((res) => {
+        if (!cancelled && res?.status) setTotal(Number(res.data?.total) || 0);
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [revision]);
+
+  // A push refreshes in place; a page change shows the spinner.
+  const fetchedRevision = useRef(revision);
+
+  useEffect(() => {
+    let cancelled = false;
+    const isPush = fetchedRevision.current !== revision;
+    fetchedRevision.current = revision;
+    if (!isPush) setLoading(true);
 
     const page = pageIndex + 1;
     const query = `page=${page}&per_page=${pageSize}&sort_by=shipment.added_on&sort_order=desc`;
@@ -92,8 +119,6 @@ function useShipments(pageIndex, pageSize) {
         if (shipmentsRes && shipmentsRes.status) {
           const records = Array.isArray(shipmentsRes.data) ? shipmentsRes.data : [];
           setRows(records);
-
-          setTotal((prev) => (prev > 0 ? prev : records.length));
         } else {
           setRows([]);
         }
@@ -118,7 +143,7 @@ function useShipments(pageIndex, pageSize) {
     return () => {
       cancelled = true;
     };
-  }, [pageIndex, pageSize]);
+  }, [pageIndex, pageSize, revision]);
 
   return { rows, total, loading };
 }

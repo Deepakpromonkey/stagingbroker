@@ -11,6 +11,7 @@ import SatelliteAltIcon from "@mui/icons-material/SatelliteAlt";
 import { apiFetch } from "../../../lib/api";
 import { toast } from "../../../components/ui/Toaster";
 import EldMilestones from "./EldMilestones";
+import { shipmentChannel, useLive } from "../../../lib/live";
 
 /*
 | Broker-facing ELD shipment detail page. Styled to match the rest of this
@@ -172,6 +173,10 @@ export default function EldShipmentDetail() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uuid]);
+
+  // A new position or a status change arrives as it happens; the timer above
+  // stays as the safety net for a dropped socket.
+  useLive(shipmentChannel(uuid), "shipment.updated", () => load(false));
 
   const current = data?.current;
   const trail = (data?.trail || [])
