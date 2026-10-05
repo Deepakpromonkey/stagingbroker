@@ -182,3 +182,17 @@
     border-right-color: var(--border);
   }
 }
+
+/* App.jsx's PageLoading: the moment a lazily loaded page is being fetched. */
+.dt-page-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(30, 64, 175, 0.15);
+  border-top-color: #1e40af;
+  border-radius: 50%;
+  animation: dt-page-spin 0.8s linear infinite;
+}
+
+@keyframes dt-page-spin {
+  to { transform: rotate(360deg); }
+}

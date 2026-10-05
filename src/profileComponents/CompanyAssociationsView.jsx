@@ -9,6 +9,7 @@ import {
 } from '@mui/icons-material';
 
 import { apiFetch } from '../lib/api';
+import { getCached, setCached, forgetCached } from '../lib/memoryCache';
 
 const PAGE_SIZE = 5;
 
@@ -329,12 +330,11 @@ useEffect(() => {
             return;
         }
 
-        // Versioned: the cache has no expiry, so anyone who had already viewed
-        // a carrier would otherwise keep the pre-change-log rows forever.
+        // Per carrier, in memory for ten minutes (lib/memoryCache).
         const cacheKey = `company_associations_v3_${dotNumber}`;
 
-        // 1. Check localStorage first
-        const cached = localStorage.getItem(cacheKey);
+        // 1. Check the in-memory cache first
+        const cached = getCached(cacheKey);
 
         if (cached) {
             try {
@@ -349,10 +349,10 @@ useEffect(() => {
                     setFetchError('');
                     return; // no API call
                 }
-                localStorage.removeItem(cacheKey);
+                forgetCached(cacheKey);
             } catch (err) {
                 console.error('Failed to parse cached associations:', err);
-                localStorage.removeItem(cacheKey);
+                forgetCached(cacheKey);
                 // falls through to fetch fresh data below
             }
         }
@@ -378,7 +378,7 @@ useEffect(() => {
                 // result - that would suppress every future fetch.
                 if (finalRows.length > 0) {
                     try {
-                        localStorage.setItem(cacheKey, JSON.stringify(finalRows));
+                        setCached(cacheKey, JSON.stringify(finalRows));
                     } catch (err) {
                         console.error('Failed to cache associations:', err);
                     }

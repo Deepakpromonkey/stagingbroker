@@ -1,74 +1,74 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Login from './pages/auth/Login'
-import Signup from './pages/auth/Signup'
-import Dashboard from './pages/app/Dashboard'
-import TrackShipmentStep1 from './pages/app/trackshipment/Step1'
-import TrackShipmentStep2 from './pages/app/trackshipment/Step2'
-import TrackShipmentEld from './pages/app/trackshipment-eld/EldShipmentForm'
-import EldShipmentDetail from './pages/app/trackshipment-eld/EldShipmentDetail'
-import PublicTracking from './pages/app/PublicTracking/PublicTracking'
-import SearchVet from './pages/app/SearchVet/SearchVet'
-import LoadSearch from './pages/app/loadsearch/LoadSearch'
-import CarrierSearch from './pages/app/carriers/CarrierSearch'
-import CarrierProfile from './pages/app/carriers/CarrierProfile'
-import DtScoreHowItWorks from './pages/app/carriers/DtScoreHowItWorks'
-import ConnectedCarriers from './pages/app/carriers/ConnectedCarriers'
+const Signup = lazy(() => import('./pages/auth/Signup'))
+const Dashboard = lazy(() => import('./pages/app/Dashboard'))
+const TrackShipmentStep1 = lazy(() => import('./pages/app/trackshipment/Step1'))
+const TrackShipmentStep2 = lazy(() => import('./pages/app/trackshipment/Step2'))
+const TrackShipmentEld = lazy(() => import('./pages/app/trackshipment-eld/EldShipmentForm'))
+const EldShipmentDetail = lazy(() => import('./pages/app/trackshipment-eld/EldShipmentDetail'))
+const PublicTracking = lazy(() => import('./pages/app/PublicTracking/PublicTracking'))
+const SearchVet = lazy(() => import('./pages/app/SearchVet/SearchVet'))
+const LoadSearch = lazy(() => import('./pages/app/loadsearch/LoadSearch'))
+const CarrierSearch = lazy(() => import('./pages/app/carriers/CarrierSearch'))
+const CarrierProfile = lazy(() => import('./pages/app/carriers/CarrierProfile'))
+const DtScoreHowItWorks = lazy(() => import('./pages/app/carriers/DtScoreHowItWorks'))
+const ConnectedCarriers = lazy(() => import('./pages/app/carriers/ConnectedCarriers'))
 
-import UsersList from './pages/app/users/UsersList'
+const UsersList = lazy(() => import('./pages/app/users/UsersList'))
 
-import ControlTowerList from './pages/app/control_tower/ControlTowerList'
-import ControlTowerShipment from './pages/app/control_tower/ControlTowerShipment'
+const ControlTowerList = lazy(() => import('./pages/app/control_tower/ControlTowerList'))
+const ControlTowerShipment = lazy(() => import('./pages/app/control_tower/ControlTowerShipment'))
 
 
-import Subscription from './pages/app/subscription/Subscription'
-import BillingSuccess from './pages/app/subscription/BillingSuccess'
-import Billing from './pages/app/billing/Billing'
+const Subscription = lazy(() => import('./pages/app/subscription/Subscription'))
+const BillingSuccess = lazy(() => import('./pages/app/subscription/BillingSuccess'))
+const Billing = lazy(() => import('./pages/app/billing/Billing'))
 
 import AppHeader from './components/AppHeader';
 import RouteGuard from './RouteGuard'
-import ShortlistedCarriers from './pages/app/profile/ShortlistedCarriers'
-import BlockedCarriers from './pages/app/profile/BlockedCarriers'
+const ShortlistedCarriers = lazy(() => import('./pages/app/profile/ShortlistedCarriers'))
+const BlockedCarriers = lazy(() => import('./pages/app/profile/BlockedCarriers'))
 
 import { ToastContainer } from './components/ui/Toaster'
 import './App.css'
-import ProfileUpdate from './pages/app/profile/ProfileUpdate'
-import CarrierSettings from './pages/app/carrier-settings/CarrierSettings'
-import CarrierQuestions from './pages/app/carrier-questions/CarrierQuestion'
-import ScoringWeights from './pages/app/scoringweight/ScoringWeight'
+const ProfileUpdate = lazy(() => import('./pages/app/profile/ProfileUpdate'))
+const CarrierSettings = lazy(() => import('./pages/app/carrier-settings/CarrierSettings'))
+const CarrierQuestions = lazy(() => import('./pages/app/carrier-questions/CarrierQuestion'))
+const ScoringWeights = lazy(() => import('./pages/app/scoringweight/ScoringWeight'))
 
-import AcceptInvitation from './pages/auth/AcceptInvitation'
+const AcceptInvitation = lazy(() => import('./pages/auth/AcceptInvitation'))
 
-import CarrierOnboard from './pages/app/connect'
-import CarrierNoData from './pages/app/connect/CarrierNoData'
-import EldNotSupported from './pages/app/connect/EldNotSupported'
-import EmailApproval from './pages/app/connect/EmailApproval'
+const CarrierOnboard = lazy(() => import('./pages/app/connect'))
+const CarrierNoData = lazy(() => import('./pages/app/connect/CarrierNoData'))
+const EldNotSupported = lazy(() => import('./pages/app/connect/EldNotSupported'))
+const EmailApproval = lazy(() => import('./pages/app/connect/EmailApproval'))
 
 /*
 DTPay
 */
-import DtPayFundingControl from './pages/app/DtPay/profile/DtPayFundingControl';
+const DtPayFundingControl = lazy(() => import('./pages/app/DtPay/profile/DtPayFundingControl'))
 
-import PaymentsDashbaord from './pages/app/DtPay/PaymentsDashbaord';
-import PaymentInit from './pages/app/DtPay/payment-flow/PaymentInit';
+const PaymentsDashbaord = lazy(() => import('./pages/app/DtPay/PaymentsDashbaord'))
+const PaymentInit = lazy(() => import('./pages/app/DtPay/payment-flow/PaymentInit'))
 
-import PaymentAuto from './pages/app/DtPay/payment-flow/Auto/PaymentAuto';
-import PaymentManual from './pages/app/DtPay/payment-flow/Manual/PaymentManual';
+const PaymentAuto = lazy(() => import('./pages/app/DtPay/payment-flow/Auto/PaymentAuto'))
+const PaymentManual = lazy(() => import('./pages/app/DtPay/payment-flow/Manual/PaymentManual'))
 
-import DtPayTransactions from './pages/app/DtPay/transactions/DtPayTransactions';
-import DtPayTransactionView from './pages/app/DtPay/transactions/DtPayTransactionView';
+const DtPayTransactions = lazy(() => import('./pages/app/DtPay/transactions/DtPayTransactions'))
+const DtPayTransactionView = lazy(() => import('./pages/app/DtPay/transactions/DtPayTransactionView'))
 
-import RaiseDispute from './pages/app/DtPay/dispute/RaiseDispute';
+const RaiseDispute = lazy(() => import('./pages/app/DtPay/dispute/RaiseDispute'))
 
 /*
 DTPay Guest Pay
 */
-import DtPayGuestPay from './pages/app/DtPayGuestPay';
+const DtPayGuestPay = lazy(() => import('./pages/app/DtPayGuestPay'))
 
 
-import NewPartnerCard from './pages/app/new-partner/Card';
+const NewPartnerCard = lazy(() => import('./pages/app/new-partner/Card'))
 
-import CoiRequest from './pages/app/coi-request/CoiRequest'
+const CoiRequest = lazy(() => import('./pages/app/coi-request/CoiRequest'))
 
 
 // Paths that should render full-page, without the app header/nav chrome.
@@ -79,6 +79,16 @@ import CoiRequest from './pages/app/coi-request/CoiRequest'
 // it has no broker session and shouldn't see this app's internal nav at all.
 const NO_HEADER_PATHS = ['/subscribe', '/accept-invitation'];
 const NO_HEADER_PREFIXES = ['/track/'];
+
+// Shown for the moment a page's chunk is loading. Plain markup rather than MUI,
+// so it costs nothing in the initial bundle.
+function PageLoading() {
+  return (
+    <div style={{ display: "flex", justifyContent: "center", padding: "96px 0" }}>
+      <div className="dt-page-spinner" role="status" aria-label="Loading" />
+    </div>
+  );
+}
 
 // Needs to live inside <BrowserRouter> so it can call useLocation() —
 // App() itself renders BrowserRouter, so it isn't inside the router
@@ -103,6 +113,12 @@ function AppShell() {
           background: "linear-gradient(180deg, #F5F2E9 0%, #F8F7F4 30%, #FBFBF8 100%)",
         }}
       >
+        {/*
+          Every page but Login is its own chunk, fetched the first time it is
+          opened: the app used to be a single 3.6 MB bundle that had to be
+          downloaded and parsed before even the sign-in form could render.
+        */}
+        <Suspense fallback={<PageLoading />}>
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
@@ -207,6 +223,7 @@ function AppShell() {
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </Suspense>
       </div>
     </RouteGuard>
   );

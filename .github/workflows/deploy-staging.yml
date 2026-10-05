@@ -1,0 +1,87 @@
+name: Deploy staging
+
+# Every push to main is built and deployed to staging.dollartraq.com.
+# "Run workflow" deploys any branch, tag or commit, which is also how to roll
+# back: run it with the last good commit. See docs/staging-deploy.md.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag or commit to deploy
+        required: true
+        default: main
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  STAGING_HOST: 3.15.199.243
+  STAGING_USER: ubuntu
+  # Pinned so a deploy cannot be pointed at a different machine. Changes only
+  # if the instance is rebuilt: ssh-keyscan -t ed25519 <host>
+  STAGING_HOST_KEY: 3.15.199.243 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE6T/hWGFFt377Zh7CDOsULP7m8/4aXWgcnQDD3HllRw
+  APP_DIR: /var/www/dollartraq-frontend
+
+jobs:
+  deploy:
+    name: Build and deploy
+    # The same code lives in the production repository; this must never
+    # deploy from there.
+    if: github.repository == 'Deepakpromonkey/stagingbroker'
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://staging.dollartraq.com
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: Build
+        # Public values: Vite writes them into the bundle. These are what the
+        # staging build has always used.
+        env:
+          VITE_API_BASE: https://staggingapi.dollartraq.com/api/v1
+        run: npm run build
+
+      - name: SSH
+        env:
+          KEY: ${{ secrets.STAGING_SSH_KEY }}
+        run: |
+          test -n "$KEY" || { echo "::error::Secret STAGING_SSH_KEY is not set"; exit 1; }
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$STAGING_HOST_KEY" > ~/.ssh/known_hosts
+
+      - name: Upload
+        run: |
+          SHA=$(git rev-parse HEAD)
+          echo "SHA=$SHA" >> "$GITHUB_ENV"
+          ssh "$STAGING_USER@$STAGING_HOST" "mkdir -p $APP_DIR/releases/$SHA"
+          rsync -az --delete dist/ "$STAGING_USER@$STAGING_HOST:$APP_DIR/releases/$SHA/"
+
+      - name: Release
+        run: ssh "$STAGING_USER@$STAGING_HOST" "bash -s -- $SHA" < deploy/staging/release.sh
+
+      - name: Check from outside
+        run: |
+          entry=$(grep -oE '/assets/index-[^"]+\.js' dist/index.html | head -n1)
+          curl -fsS --retry 3 --retry-delay 5 https://staging.dollartraq.com/ | grep -qF "$entry"
+
+      - if: always()
+        run: rm -f ~/.ssh/id_ed25519

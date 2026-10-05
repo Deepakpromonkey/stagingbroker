@@ -9,6 +9,7 @@ import {
 import Skeleton from '@mui/material/Skeleton';
 
 import { apiFetch } from '../lib/api';
+import { cachedRequest } from '../lib/memoryCache';
 
 function RiskFactorCard(props) {
 
@@ -27,72 +28,49 @@ useEffect(function () {
             return;
         }
 
-        // unique key per carrier + type (risk vs strength)
-        const cacheKey = `risk_factor_${dotNumber}_${isRisk ? 'risk' : 'strength'}`;
-
-        // 1. Check localStorage first — if present, use it and skip API entirely
-        const cached = localStorage.getItem(cacheKey);
-
-        if (cached) {
-            try {
-                const parsedData = JSON.parse(cached);
-                setItems(parsedData);
-                return; // no API call, no timer
-            } catch (err) {
-                console.error('Failed to parse cached risk factors:', err);
-                localStorage.removeItem(cacheKey);
-                // falls through to fetch fresh data below
-            }
-        }
+        let cancelled = false;
 
         setLoading(true);
         setError('');
 
-        // 2. No cache found -> wait 2s, then call the API
-        const timer = setTimeout(function () {
+        // The risk and strength cards both read this one response; the shared
+        // request means a profile asks the API once rather than twice.
+        cachedRequest(`carrier_risk_${dotNumber}`, () => apiFetch(`/carriers/${dotNumber}/risk`))
 
-            apiFetch(`/carriers/${dotNumber}/risk`)
+            .then(function (data) {
 
-                .then(function (data) {
+                if (cancelled) return;
 
-                    console.log('Risk factors API response:', data);
+                const payload = data?.data || data;
 
-                    const payload = data?.data || data;
+                const list = isRisk
+                    ? (payload?.weaknesses || [])
+                    : (payload?.strengths || []);
 
-                    const list = isRisk
-                        ? (payload?.weaknesses || [])
-                        : (payload?.strengths || []);
+                setItems(list);
 
-                    setItems(list);
+            })
 
-                    try {
-                        localStorage.setItem(cacheKey, JSON.stringify(list));
-                    } catch (err) {
-                        console.error('Failed to cache risk factors:', err);
-                    }
+            .catch(function (err) {
 
-                })
+                if (cancelled) return;
 
-                .catch(function (err) {
+                console.error('Risk factors fetch error:', err.message);
 
-                    console.error('Risk factors fetch error:', err.message);
+                setError(
+                    err.message || 'Failed to load risk factors.'
+                );
 
-                    setError(
-                        err.message || 'Failed to load risk factors.'
-                    );
+            })
 
-                })
+            .finally(function () {
 
-                .finally(function () {
+                if (!cancelled) setLoading(false);
 
-                    setLoading(false);
-
-                });
-
-        }, 2000);
+            });
 
         return function () {
-            clearTimeout(timer);
+            cancelled = true;
         };
 
     }, [props.dotNumber, isRisk]);

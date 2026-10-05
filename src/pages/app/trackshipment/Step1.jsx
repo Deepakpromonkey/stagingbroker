@@ -1100,7 +1100,7 @@ export default function TrackShipmentStep1() {
         return;
       }
 
-      localStorage.setItem("current_shipment_uuid", "pending_draft");
+      sessionStorage.setItem("current_shipment_uuid", "pending_draft");
 
       navigate("/trackshipment/step2", { state: { step1Payload: payload } });
     } catch (err) {
