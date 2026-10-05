@@ -73,6 +73,10 @@ function CarrierProfile() {
 
   const [carrier, setCarrier] = useState(null);
 
+  // The inspection, violation and crash-detail lists come separately (see the
+  // load below): "loading" until they land, "error" if they could not.
+  const [historyState, setHistoryState] = useState("loading");
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -161,10 +165,27 @@ function CarrierProfile() {
 
       setError("");
 
-      apiFetch(`/carrier/detail/${row_id}`, { method: "POST" })
-        .then(function (data) {
-          console.log("Carrier API response:", data);
+      setHistoryState("loading");
 
+      /*
+      | The profile and the carrier's inspection / violation / crash history
+      | are two requests, started together. On a large fleet the history is
+      | tens of thousands of rows, and in one response the profile took a
+      | minute or never opened at all; now the page renders as soon as the
+      | profile arrives and the lists are merged in when they land, shaped as
+      | they always were, so every section computes what it did before.
+      */
+      const historyRequest = apiFetch(`/carrier/${row_id}/safety-history`)
+        .then(function (res) {
+          return res?.data || null;
+        })
+        .catch(function (err) {
+          console.error("Safety history failed to load", err);
+          return null;
+        });
+
+      apiFetch(`/carrier/detail/${row_id}?lean=1`, { method: "POST" })
+        .then(function (data) {
           const carrierData = data.data || data;
 
           if (!carrierData || typeof carrierData !== "object") {
@@ -172,6 +193,22 @@ function CarrierProfile() {
           }
 
           setCarrier(carrierData);
+
+          historyRequest.then(function (history) {
+            if (!history) {
+              setHistoryState("error");
+              return;
+            }
+
+            setCarrier(function (current) {
+              // Only onto the carrier it was fetched for.
+              return current && current.dot_number === carrierData.dot_number
+                ? { ...current, ...history }
+                : current;
+            });
+
+            setHistoryState("ready");
+          });
 
           // The detail endpoint resolves this against the company's shortlist
           // itself. Re-deriving it by fetching the whole list and matching on
@@ -1246,6 +1283,21 @@ function AuthorityTypeBadge({ commonStat, contractStat, brokerStat }) {
                   )}
                 </div>
               </div>
+
+              {historyState !== "ready" && (
+                <div
+                  role="status"
+                  className={`mb-[12px] rounded-[10px] border px-[14px] py-[10px] text-[12px] font-[600] ${
+                    historyState === "error"
+                      ? "border-[#fecaca] bg-[#fef2f2] text-[#991b1b]"
+                      : "border-[#d9e1ee] bg-[#f8fafc] text-[#475569]"
+                  }`}
+                >
+                  {historyState === "error"
+                    ? "Inspection and crash history could not be loaded. Figures below that depend on it may show as empty — reload the page to try again."
+                    : "Loading inspection & crash history…"}
+                </div>
+              )}
 
               <section
                 ref={sectionRefs["OPERATIONAL OBSERVATIONS"]}
