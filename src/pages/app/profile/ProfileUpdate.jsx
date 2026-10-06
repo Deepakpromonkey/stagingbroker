@@ -439,13 +439,22 @@ const ProfileUpdate = () => {
             if (storedUser) {
                 try {
                     const parsedUser = JSON.parse(storedUser);
-                    setUser(parsedUser);
+                    // Some sign-in responses carry the photo as profile_image
+                    // rather than profile_pic_url; settle on one name.
+                    const resolvedPicUrl = parsedUser.profile_pic_url || parsedUser.profile_image || '';
+                    const normalizedUser = { ...parsedUser, profile_pic_url: resolvedPicUrl };
+
+                    if (resolvedPicUrl && !parsedUser.profile_pic_url) {
+                        localStorage.setItem(USER_KEY, JSON.stringify(normalizedUser));
+                    }
+
+                    setUser(normalizedUser);
                     setFormData({
-                        first_name: parsedUser.first_name || '',
-                        last_name: parsedUser.last_name || '',
-                        contact: parsedUser.phone ?? parsedUser.contact ?? '',
-                        country_code: resolveCountryCode(parsedUser.country_code),
-                        profile_pic_url: parsedUser.profile_pic_url || ''
+                        first_name: normalizedUser.first_name || '',
+                        last_name: normalizedUser.last_name || '',
+                        contact: normalizedUser.phone ?? normalizedUser.contact ?? '',
+                        country_code: resolveCountryCode(normalizedUser.country_code),
+                        profile_pic_url: normalizedUser.profile_pic_url || ''
                     });
                 } catch (err) {
                     // eslint-disable-next-line no-console

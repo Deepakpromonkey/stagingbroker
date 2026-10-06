@@ -955,9 +955,10 @@ export default function TrackShipmentStep1() {
         })
         : [{ date: "", time: "", duration: "", interval: "" }];
 
+    // pro_number is deliberately not carried over: it identifies the load the
+    // template was saved from, and a new shipment needs its own. It stays
+    // blank from BLANK_STEP1_VALUES, as does every field a template omits.
     return {
-      proNumber: apiData.pro_number || "",
-
       carrierName: matchedCarrier ? matchedCarrier.row_id : "",
       carrierMc: apiData.carrier_mc || "",
       carrierDot: apiData.carrier_dot || "",

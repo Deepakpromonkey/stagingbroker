@@ -17,6 +17,7 @@ import SendRounded from '@mui/icons-material/SendRounded';
 import Chip from '@mui/material/Chip';
 import { format } from 'date-fns';
 import DataUpdateNotice, { shouldShowDataUpdateNotice } from './data-update/DataUpdateNotice';
+import { companyChannel, listen } from '../../lib/live';
 
 const TRACKING_METHOD_LABELS = {
     driver_phone: "Driver's Cell Phone",
@@ -549,6 +550,10 @@ class Dashboard extends Component {
                 this.loadShipments();
                 this.loadSubscription();
             });
+
+            // A shipment added or moving on elsewhere refreshes the tiles and
+            // recent activity here, without a reload.
+            this.stopLive = listen(companyChannel(), 'shipment.updated', this.onShipmentPush);
         }
 
         if (user) {
@@ -561,6 +566,21 @@ class Dashboard extends Component {
             } catch (e) {
             }
         }
+    };
+
+    componentWillUnmount = () => {
+        this.stopLive?.();
+        clearTimeout(this.pushTimer);
+    };
+
+    // Several pushes in a burst (a bulk import, a trip sheet's stops) become
+    // one refresh.
+    onShipmentPush = () => {
+        clearTimeout(this.pushTimer);
+        this.pushTimer = setTimeout(() => {
+            this.loadShipmentTotals();
+            this.loadShipments();
+        }, 1000);
     };
 
     init = () => {

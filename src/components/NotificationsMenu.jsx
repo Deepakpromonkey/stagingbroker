@@ -18,6 +18,7 @@ import HandshakeOutlinedIcon from "@mui/icons-material/HandshakeOutlined";
 import NotificationsNoneOutlinedIcon from "@mui/icons-material/NotificationsNoneOutlined";
 
 import { apiFetch } from "../lib/api";
+import { companyChannel, useLive, useSocketConnected } from "../lib/live";
 
 const ENDPOINT = "/notifications";
 
@@ -35,6 +36,10 @@ const SEEN_AT_KEY = "crm_notifications_seen_at";
 // Long enough not to hammer the API from an idle tab, short enough that a
 // carrier finishing onboarding shows up without a page reload.
 const POLL_INTERVAL_MS = 60_000;
+
+// With the socket up, changes arrive as they happen (notifications.changed);
+// the timer is only the safety net for a dropped connection.
+const LIVE_POLL_INTERVAL_MS = 5 * 60_000;
 
 const SEVERITY = {
     success: { color: "#059669", background: "#ecfdf5", Icon: CheckCircleOutlineIcon },
@@ -116,10 +121,14 @@ export default function NotificationsMenu({ size = "small" }) {
         }
     }, []);
 
+    const live = useSocketConnected();
+
+    useLive(companyChannel(), "notifications.changed", load);
+
     useEffect(() => {
         load();
 
-        const timer = setInterval(load, POLL_INTERVAL_MS);
+        const timer = setInterval(load, live ? LIVE_POLL_INTERVAL_MS : POLL_INTERVAL_MS);
 
         // A backgrounded tab throttles the interval, so catch up on return
         // rather than leaving a stale count on screen.
@@ -133,7 +142,7 @@ export default function NotificationsMenu({ size = "small" }) {
             clearInterval(timer);
             document.removeEventListener("visibilitychange", onVisible);
         };
-    }, [load]);
+    }, [load, live]);
 
     const markAllRead = useCallback(() => {
         if (!latestAt) return;
