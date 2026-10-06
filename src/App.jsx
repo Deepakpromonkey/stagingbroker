@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Login from './pages/auth/Login'
 const Signup = lazy(() => import('./pages/auth/Signup'))
@@ -89,6 +89,11 @@ function PageLoading() {
 function AppShell() {
   const location = useLocation();
   const hideHeader = NO_HEADER_PATHS.includes(location.pathname);
+
+  // A new page opens at its top, not wherever the last one was scrolled to.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
 
   return (
     <RouteGuard>

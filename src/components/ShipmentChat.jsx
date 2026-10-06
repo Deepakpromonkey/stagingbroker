@@ -16,6 +16,7 @@ import { getEcho, getSocketId } from "../lib/echo";
 */
 
 const POLL_MS = 15000;
+const LIVE_POLL_MS = 120000;
 
 /** Local time, or empty when the timestamp is missing. */
 function formatTime(iso) {
@@ -127,9 +128,11 @@ function ShipmentChat({ shipmentUuid, driverName }) {
     useEffect(() => {
         if (!shipmentUuid) return undefined;
 
-        const timer = setInterval(() => loadThread(false), POLL_MS);
+        // Messages arrive over the socket while it is up; this only catches
+        // what a dropped connection missed.
+        const timer = setInterval(() => loadThread(false), live ? LIVE_POLL_MS : POLL_MS);
         return () => clearInterval(timer);
-    }, [shipmentUuid, loadThread]);
+    }, [shipmentUuid, loadThread, live]);
 
     // Pin to the newest message.
     useEffect(() => {
