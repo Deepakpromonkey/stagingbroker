@@ -953,7 +953,7 @@ class Dashboard extends Component {
                                 <div className="text-[10px] font-bold tracking-[0.5px] text-[#8a94a6] uppercase mb-1.5">
                                     COIs expiring ≤7d
                                 </div>
-                                <div className="text-2xl font-bold text-[#1e293b]">05</div>
+                                <div className="text-2xl font-bold text-[#1e293b]">00</div>
                             </div>
 
                             {/* NOTE: static placeholder value, not yet wired to an API field */}
@@ -961,7 +961,7 @@ class Dashboard extends Component {
                                 <div className="text-[10px] font-bold tracking-[0.5px] text-[#dc2626] uppercase mb-1.5">
                                     At-risk loads
                                 </div>
-                                <div className="text-2xl font-bold text-[#b91c1c]">02</div>
+                                <div className="text-2xl font-bold text-[#b91c1c]">00</div>
                             </div>
                         </div>
                     </div>
