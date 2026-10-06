@@ -522,9 +522,7 @@ class Dashboard extends Component {
             ai_modal_open: false,
             ai_seed_query: '',
 
-            // shipment totals — derived from /shipments pagination
-            // metadata (see loadShipmentTotals) rather than a separate
-            // totals endpoint
+            // shipment totals — from /shipments/summary (see loadShipmentTotals)
             all_shipment: 0,
             active_shipment: 0,
 
@@ -548,7 +546,6 @@ class Dashboard extends Component {
             }, () => {
                 // this.init();
                 this.loadShipmentTotals();
-                this.loadActiveShipmentCount();
                 this.loadShipments();
                 this.loadSubscription();
             });
@@ -615,36 +612,24 @@ class Dashboard extends Component {
             });
     };
 
-    getTotalFromResponse = (data, recordsFallback = []) => {
-        if (!data) return recordsFallback.length;
-        if (typeof data.total === 'number') return data.total;
-        if (typeof data.meta?.total === 'number') return data.meta.total;
-        if (typeof data.pagination?.total === 'number') return data.pagination.total;
-        return recordsFallback.length;
-    };
-
+    /**
+     * Both tiles from one count. These used to page through /shipments,
+     * which returns fifteen rows at most, so neither tile could pass 15 — and
+     * it took two full list requests to get there.
+     */
     loadShipmentTotals = () => {
-        apiFetch('/shipments?page=1&per_page=1')
+        apiFetch('/shipments/summary')
             .then((data) => {
                 if (data && data.status) {
+                    const byStatus = data.data?.by_status || {};
+                    const activeCount = Object.entries(byStatus)
+                        .filter(([status]) => !INACTIVE_STATUSES.includes(status))
+                        .reduce((sum, [, count]) => sum + Number(count || 0), 0);
+
                     this.setState({
-                        all_shipment: this.getTotalFromResponse(data, data.data || []),
+                        all_shipment: Number(data.data?.total) || 0,
+                        active_shipment: activeCount,
                     });
-                }
-            })
-            .catch(() => {});
-    };
-
-    loadActiveShipmentCount = () => {
-        apiFetch('/shipments?page=1&per_page=1000')
-            .then((data) => {
-                if (data && data.status) {
-                    const records = data.data || [];
-                    const activeCount = records.filter(
-                        (row) => !INACTIVE_STATUSES.includes((row.status || '').toLowerCase())
-                    ).length;
-
-                    this.setState({ active_shipment: activeCount });
                 }
             })
             .catch(() => {});

@@ -95,19 +95,23 @@ const validEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 const OTP_SESSION_KEY = 'crm_otp_session';
 const OTP_EMAIL_KEY = 'crm_otp_email';
 
+// sessionStorage: the half-finished sign-in belongs to this tab and survives a
+// refresh, but not the tab closing — it used to sit in localStorage for good.
 function saveOtpSession(otpSession, email) {
-    localStorage.setItem(OTP_SESSION_KEY, otpSession);
-    localStorage.setItem(OTP_EMAIL_KEY, email);
+    sessionStorage.setItem(OTP_SESSION_KEY, otpSession);
+    sessionStorage.setItem(OTP_EMAIL_KEY, email);
 }
 
 function getStoredOtpSession() {
     return {
-        otpSession: localStorage.getItem(OTP_SESSION_KEY) || '',
-        email: localStorage.getItem(OTP_EMAIL_KEY) || '',
+        otpSession: sessionStorage.getItem(OTP_SESSION_KEY) || '',
+        email: sessionStorage.getItem(OTP_EMAIL_KEY) || '',
     };
 }
 
 function clearOtpSession() {
+    sessionStorage.removeItem(OTP_SESSION_KEY);
+    sessionStorage.removeItem(OTP_EMAIL_KEY);
     localStorage.removeItem(OTP_SESSION_KEY);
     localStorage.removeItem(OTP_EMAIL_KEY);
 }

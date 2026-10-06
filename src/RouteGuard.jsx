@@ -133,7 +133,7 @@ const STEP_PREREQUISITES = [
     // Step 1's onSubmit stores this in localStorage right after a
     // successful POST to /shipments — its absence means step 1 was never
     // completed in this session.
-    isSatisfied: () => !!localStorage.getItem("current_shipment_uuid"),
+    isSatisfied: () => !!sessionStorage.getItem("current_shipment_uuid"),
     redirectTo: "/trackshipment/step1",
   },
   {

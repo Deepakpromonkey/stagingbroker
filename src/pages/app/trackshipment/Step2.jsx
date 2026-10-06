@@ -1124,7 +1124,7 @@ export default function TrackShipmentStep2() {
       }
 
       const shipmentUuid = shipmentRes.data?.uuid || shipmentRes.uuid;
-      localStorage.setItem("current_shipment_uuid", shipmentUuid);
+      sessionStorage.setItem("current_shipment_uuid", shipmentUuid);
 
       await apiFetch(`/shipments/${shipmentUuid}/stops`, {
         method: "POST",
