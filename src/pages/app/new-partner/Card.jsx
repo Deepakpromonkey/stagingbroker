@@ -89,19 +89,20 @@ async function searchCarriers(filters, page = 1, { signal } = {}) {
 /**
  * The scores a search returned as dt_score: null, filled in by
  * AdvancedCarrierSearchController's background scoring job - see
- * ScoreCarrierSearchPage. Returns { dotNumber: score }, only for whichever
- * of the requested DOTs actually have one cached yet; a DOT missing from
- * the response is still unscored.
+ * ScoreCarrierSearchPage. Returns { scores: { dotNumber: score }, flags:
+ * { dotNumber: { band, needs_manual_review } } }, only for whichever of the
+ * requested DOTs actually have one cached yet; a DOT missing from the
+ * response is still unscored.
  */
 async function fetchScores(dots, { signal } = {}) {
-    if (!dots || dots.length === 0) return {};
+    if (!dots || dots.length === 0) return { scores: {}, flags: {} };
 
     const params = new URLSearchParams();
     dots.forEach((dot) => params.append('dots[]', dot));
 
     const response = await apiFetch(`/carrier/scores?${params.toString()}`, { signal });
 
-    return response?.scores || {};
+    return { scores: response?.scores || {}, flags: response?.flags || {} };
 }
 
 async function exportCarriersCsv(filters) {
@@ -545,14 +546,19 @@ export default function NewPartnerPage() {
             }
 
             try {
-                const scores = await fetchScores(dots, { signal: controller.signal });
+                const { scores, flags } = await fetchScores(dots, { signal: controller.signal });
 
                 if (cancelled) return;
 
                 if (Object.keys(scores).length > 0) {
                     setCarriers((prev) => prev.map((c) => (
                         c.dot_number && scores[c.dot_number] !== undefined
-                            ? { ...c, dt_score: scores[c.dot_number] }
+                            ? {
+                                ...c,
+                                dt_score: scores[c.dot_number],
+                                dt_band: flags[c.dot_number]?.band ?? c.dt_band ?? null,
+                                dt_needs_manual_review: !!flags[c.dot_number]?.needs_manual_review,
+                            }
                             : c
                     )));
                 }

@@ -1,6 +1,124 @@
 import React, { useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
+import { apiFetch } from "../../../lib/api";
+
+// Plain-language names for the engine's flags (DtTrustScoreV3 $g['flags']).
+const FLAG_LABELS = {
+  insurance_feed_inconsistency: "Insurance records disagree",
+  dual_authority: "Dual authority",
+  fatal_crash_24mo: "Fatal crash in 24 months",
+  reinstated_after_revocation: "Reinstated after revocation",
+  authority_record_missing: "Authority record missing",
+  senior_approval_required: "Senior approval required",
+};
+
+function flagLabel(flag) {
+  return (
+    FLAG_LABELS[flag] ||
+    String(flag)
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase())
+  );
+}
+
+function scoreFlags(trustScore) {
+  return {
+    needsReview: !!(trustScore?.needs_manual_review ?? trustScore?.v3?.needs_manual_review),
+    flags: trustScore?.v3?.flags || trustScore?.flags || [],
+  };
+}
+
+/**
+ * Review badge and flag chips for a carrier's DT score, so a flagged 83 never
+ * reads the same as a clean one. Renders nothing for a clean score.
+ */
+export function DtScoreFlags({ carrier }) {
+  const { needsReview, flags } = scoreFlags(carrier?.computed?.carrier_trust_score);
+
+  if (!needsReview && flags.length === 0) return null;
+
+  return (
+    <div className="mt-[6px] flex max-w-[260px] flex-wrap items-center gap-[4px]">
+      {needsReview && (
+        <span
+          title="The engine flagged this carrier for manual review. Check the details before booking."
+          className="inline-flex items-center gap-[4px] rounded-full border border-[#f2b632] bg-[#fff4e0] px-[8px] py-[2px] text-[10px] font-[800] uppercase tracking-tight text-[#7a4a00]"
+        >
+          <span className="inline-block h-[6px] w-[6px] rounded-full bg-[#e07a1f]" />
+          Needs review
+        </span>
+      )}
+      {flags.map((flag) => (
+        <span
+          key={flag}
+          className="rounded-full border border-[#e4e7ec] bg-white px-[8px] py-[2px] text-[10px] font-[700] text-[#475467]"
+        >
+          {flagLabel(flag)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** When and why this carrier's score changed, from /carrier/{dot}/score-history. */
+function ScoreHistory({ dot }) {
+  const [history, setHistory] = useState(null);
+  const [failed, setFailed] = useState(false);
+
+  React.useEffect(() => {
+    if (!dot) return undefined;
+
+    const controller = new AbortController();
+
+    apiFetch(`/carrier/${dot}/score-history`, { signal: controller.signal })
+      .then((res) => setHistory(res?.history || []))
+      .catch(() => {
+        if (!controller.signal.aborted) setFailed(true);
+      });
+
+    return () => controller.abort();
+  }, [dot]);
+
+  return (
+    <div className="mt-[18px] border-t border-[#eef1f6] pt-[12px]">
+      <p className="m-0 mb-[8px] text-[13px] font-[800] text-[#111827]">Score history</p>
+
+      {failed ? (
+        <p className="m-0 text-[12px] text-[#94a3b8]">Score history could not be loaded.</p>
+      ) : history === null ? (
+        <p className="m-0 text-[12px] text-[#94a3b8]">Loading…</p>
+      ) : history.length === 0 ? (
+        <p className="m-0 text-[12px] text-[#94a3b8]">No recorded changes yet.</p>
+      ) : (
+        <ol className="m-0 list-none p-0">
+          {history.map((entry) => (
+            <li
+              key={entry.id}
+              className="flex items-start justify-between gap-[12px] border-b border-[#f1f3f7] py-[7px] last:border-0"
+            >
+              <div className="min-w-0">
+                <p className="m-0 text-[12.5px] font-[700] text-[#111827]">
+                  {entry.score}
+                  <span className="font-[500] text-[#64748b]"> · {entry.status}</span>
+                  {entry.needs_manual_review && (
+                    <span className="ml-[6px] text-[10.5px] font-[800] uppercase text-[#b45309]">Needs review</span>
+                  )}
+                </p>
+                {entry.rules_fired?.length > 0 && (
+                  <p className="m-0 mt-[2px] text-[11px] text-[#64748b]">{entry.rules_fired.join(", ")}</p>
+                )}
+              </div>
+              <span className="shrink-0 text-[11px] text-[#94a3b8]">
+                {entry.created_at ? new Date(entry.created_at.replace(" ", "T") + "Z").toLocaleString() : ""}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
 
 const SEVERITY_STYLES = {
   Review: { text: "#fff", bg: "#e07a1f", bar: "#e07a1f" },
@@ -136,6 +254,8 @@ export default function DtScoreHoverCard({ carrier, score, onSeeHowItWorks, chil
   }, 0);
 
   const engineVersion = whyThisScore?.model_version || trustScore?.model_version;
+
+  const { needsReview, flags } = scoreFlags(trustScore);
 
   function handleTriggerEnter() {
     if (iconCloseTimer.current) clearTimeout(iconCloseTimer.current);
@@ -273,6 +393,21 @@ export default function DtScoreHoverCard({ carrier, score, onSeeHowItWorks, chil
                 className="min-h-0 flex-1 overflow-y-auto px-[24px] py-[14px]"
                 style={{ scrollbarWidth: "thin", scrollbarColor: "#cbd5e1 transparent" }}
               >
+                {(needsReview || flags.length > 0) && (
+                  <div className="mb-[12px] rounded-[10px] border border-[#f2b632] bg-[#fff8eb] px-[12px] py-[9px]">
+                    {needsReview && (
+                      <p className="m-0 text-[12.5px] font-[800] text-[#7a4a00]">
+                        Needs manual review before booking
+                      </p>
+                    )}
+                    {flags.length > 0 && (
+                      <p className="m-0 mt-[2px] text-[12px] text-[#7a4a00]">
+                        {flags.map(flagLabel).join(" · ")}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <div className="mb-[6px] flex items-baseline justify-between">
                   <p className="m-0 text-[13px] font-[800] text-[#111827]">
                     Findings{" "}
@@ -301,6 +436,8 @@ export default function DtScoreHoverCard({ carrier, score, onSeeHowItWorks, chil
                     </p>
                   )}
                 </div>
+
+                <ScoreHistory dot={carrier?.dot_number} />
               </div>
 
               <div className="flex shrink-0 items-center justify-between border-t border-[#eef1f6] bg-[#f4f6f9] px-[24px] py-[13px]">

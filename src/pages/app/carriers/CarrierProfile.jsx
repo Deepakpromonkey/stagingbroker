@@ -35,7 +35,7 @@ import Skeleton from "@mui/material/Skeleton";
 
 import ReportCarrierModal from "./ReportCarrierModal";
 import ConnectCarrierModal from "./ConnectCarrierModal";
-import DtScoreHoverCard from "./DtScoreHoverCard";
+import DtScoreHoverCard, { DtScoreFlags } from "./DtScoreHoverCard";
 
 import smartwayInactive from "@/assets/certifications/smartway-inactive.png";
 import cert2Inactive from "@/assets/certifications/cert2-inactive.png";
@@ -927,14 +927,17 @@ function AuthorityTypeBadge({ commonStat, contractStat, brokerStat }) {
               {
                 label: "DT SCORE",
                 value: (
-                  <DtScoreHoverCard carrier={carrier}>
-                    <CircularScoreGauge
-                      score={
-                        carrier?.computed?.carrier_trust_score?.overall_score ?? 0
-                      }
-                      maxScore={100}
-                    />
-                  </DtScoreHoverCard>
+                  <div className="flex flex-col items-start">
+                    <DtScoreHoverCard carrier={carrier}>
+                      <CircularScoreGauge
+                        score={
+                          carrier?.computed?.carrier_trust_score?.overall_score ?? 0
+                        }
+                        maxScore={100}
+                      />
+                    </DtScoreHoverCard>
+                    <DtScoreFlags carrier={carrier} />
+                  </div>
                 ),
               },
 

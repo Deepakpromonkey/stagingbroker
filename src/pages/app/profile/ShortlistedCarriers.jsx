@@ -138,7 +138,9 @@ function ShortlistedCarriers() {
                     authority_verified: !!item.authority_verified,
                     insurance_current: !!item.insurance_current,
                     risk_level: item.risk_level || null,
-                    dt_score: item.dt_score ?? null
+                    dt_score: item.dt_score ?? null,
+                    dt_band: item.dt_band ?? null,
+                    dt_needs_manual_review: !!item.dt_needs_manual_review
                 }));
 
                 setCarriers(mappedCarriers);
