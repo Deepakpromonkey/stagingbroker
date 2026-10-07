@@ -12,10 +12,8 @@ import Badge from "@mui/icons-material/Badge";
 import DoneAll from "@mui/icons-material/DoneAll";
 import AccountBalance from "@mui/icons-material/AccountBalance";
 import SensorsOutlined from "@mui/icons-material/SensorsOutlined";
-import Edit from "@mui/icons-material/Edit";
 import Upload from "@mui/icons-material/Upload";
 import HeadsetMic from "@mui/icons-material/HeadsetMic";
-import DragIndicator from "@mui/icons-material/DragIndicator";
 import FileUploadOutlined from "@mui/icons-material/FileUploadOutlined";
 import Close from "@mui/icons-material/Close";
 import DescriptionOutlined from "@mui/icons-material/DescriptionOutlined";
@@ -25,58 +23,51 @@ import { apiFetch, API_BASE } from "../../../lib/api";
 
 import OtpModal from "./OtpModal";
 import ESign from "./ESign";
-import ESignUpload from "./ESignUpload";
 import PdfViewer from "./PdfViewer";
 import BrokerQuestions from "./BrokerQuestions";
 import ThankYou from "./ThankYou";
 
-/*
-| The ELD step is finished and left wired up, but switched off in the wizard for
-| now. Flip this to true to put it back: the step's own screen, its Terminal
-| calls and its return-from-Terminal handling are all still here, and the
-| numbering, the progress bar and Next/Back follow this flag on their own.
-|
-| The API is untouched either way — it still reports eld_connected/eld_skipped,
-| and the broker's profile still tells the two apart.
-*/
-const ELD_STEP_ENABLED = false;
+// Step numbers by name, so reordering the wizard is a change to this map
+// rather than a hunt through every comparison below.
+const STEP = {
+  DETAILS: 1,
+  IDENTITY: 2,
+  DOCUMENTS: 3,
+  ESIGN: 4,
+  QUESTIONS: 5,
+  ELD: 6,
+  BANK: 7,
+};
 
-const ELD_STEP = 4;
-
-const allSteps = [
-  { id: 1, label: "CARRIER DETAILS" },
-  { id: 2, label: "GOVERNMENT ID" },
-  { id: 3, label: "BANK & FACTORING" },
-  { id: ELD_STEP, label: "ELD CONNECTION" },
-  { id: 5, label: "BROKER QUESTIONS" },
-  { id: 6, label: "DOCUMENTS" },
-  { id: 7, label: "E-SIGN & SUBMIT" },
+const steps = [
+  { id: STEP.DETAILS, label: "CARRIER DETAILS" },
+  { id: STEP.IDENTITY, label: "GOVERNMENT ID" },
+  { id: STEP.DOCUMENTS, label: "W-9 & COI" },
+  { id: STEP.ESIGN, label: "E-SIGN" },
+  { id: STEP.QUESTIONS, label: "BROKER QUESTIONS" },
+  { id: STEP.ELD, label: "ELD CONNECTION" },
+  { id: STEP.BANK, label: "BANK & FACTORING" },
 ];
 
-// Step ids stay as they are so every `currentStep === n` below keeps its
-// meaning; only what the carrier is shown, and walked through, is filtered.
-const steps = allSteps.filter((step) => ELD_STEP_ENABLED || step.id !== ELD_STEP);
-
-// Where a step sits in the list the carrier actually sees, so the circles and
-// the "step x of y" count read 1..6 rather than skipping a number.
-const stepPosition = (id) => steps.findIndex((step) => step.id === id) + 1;
-
-// Navigation hops the gap the filter leaves behind.
-const nextVisibleStep = (id) =>
-  steps.find((step) => step.id > id)?.id ?? steps[steps.length - 1].id;
-
-const prevVisibleStep = (id) =>
-  [...steps].reverse().find((step) => step.id < id)?.id ?? steps[0].id;
-
 const stepTitles = {
-  1: "Carrier Details",
-  2: "Government ID",
-  3: "Bank Verification",
-  4: "ELD Connection",
-  5: "Broker Questions",
-  6: "Compliance Documents",
-  7: "E-Sign",
+  [STEP.DETAILS]: "Carrier Details",
+  [STEP.IDENTITY]: "Government ID",
+  [STEP.DOCUMENTS]: "W-9 & Certificate of Insurance",
+  [STEP.ESIGN]: "E-Sign",
+  [STEP.QUESTIONS]: "Broker Questions",
+  [STEP.ELD]: "ELD Connection",
+  [STEP.BANK]: "Bank Verification",
 };
+
+const LAST_STEP = steps.length;
+
+/*
+| Where the signature is stamped: bottom-right of the agreement's last page,
+| as the centre point in percent of the page box. The carrier no longer
+| places it themselves — signing is just drawing and submitting.
+*/
+const SIGNATURE_X_PCT = 78;
+const SIGNATURE_Y_PCT = 92;
 
 /**
  * Carrier onboarding wizard.
@@ -106,7 +97,11 @@ export default function OnboardPage() {
   const [initing, setIniting] = useState(true);
   const [busy, setBusy] = useState(false);
 
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState(STEP.DETAILS);
+
+  // Set once every step is settled, which is what shows the thank-you page.
+  // Signing used to end the wizard; it is now step 4 of 7.
+  const [finished, setFinished] = useState(false);
 
   const [carrier, setCarrier] = useState(null);
   const [broker, setBroker] = useState(null);
@@ -127,10 +122,10 @@ export default function OnboardPage() {
   // Step 5 — compliance documents; holds the type currently uploading
   const [uploadingDoc, setUploadingDoc] = useState(null);
 
-  // Step 6 — signature and where it goes on the agreement
-  const [eSignType, setESignType] = useState("draw");
+  // E-sign — the drawn signature, and the agreement's page count so it can be
+  // stamped on the last page
   const [signature, setSignature] = useState(null);
-  const [placement, setPlacement] = useState(null);
+  const [agreementPages, setAgreementPages] = useState(0);
 
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
@@ -242,7 +237,7 @@ export default function OnboardPage() {
 
   const agreementName = connectRequest?.agreement?.name || "Broker agreement";
 
-  // Object URL for the drag chip and the on-page preview. Revoked on change so
+  // Object URL for the on-page preview. Revoked on change so
   // a carrier redrawing their signature repeatedly does not leak blobs.
   const signatureUrl = useMemo(
     () => (signature ? URL.createObjectURL(signature) : null),
@@ -260,7 +255,7 @@ export default function OnboardPage() {
    * link does not walk them back through completed steps.
    */
   const resumeStep = (request) => {
-    if (!request?.mobile_verified) return 1;
+    if (!request?.mobile_verified) return STEP.DETAILS;
 
     // A skipped step is settled. Sending the carrier back to one they have
     // already declined would be an inescapable loop.
@@ -279,12 +274,15 @@ export default function OnboardPage() {
       request?.eld_settled ??
       (request?.eld_connected || request?.eld_skipped);
 
-    if (!idSettled) return 2;
-    if (!bankSettled || !request?.factoring_answered) return 3;
-    if (ELD_STEP_ENABLED && !eldSettled) return ELD_STEP;
-    if (!request?.questionnaire_completed) return 5;
-    if (!request?.documents_completed) return 6;
-    return 7;
+    if (!idSettled) return STEP.IDENTITY;
+    if (!request?.documents_completed) return STEP.DOCUMENTS;
+    if (!request?.signed) return STEP.ESIGN;
+    if (!request?.questionnaire_completed) return STEP.QUESTIONS;
+    if (!eldSettled) return STEP.ELD;
+    if (!bankSettled || !request?.factoring_answered) return STEP.BANK;
+
+    // Past the last step: everything is settled.
+    return LAST_STEP + 1;
   };
 
   const applyRequest = useCallback((request, { resume = false } = {}) => {
@@ -335,7 +333,14 @@ export default function OnboardPage() {
     }
 
     if (resume) {
-      setCurrentStep(resumeStep(request));
+      const step = resumeStep(request);
+
+      if (step > LAST_STEP) {
+        setFinished(true);
+        setCurrentStep(LAST_STEP);
+      } else {
+        setCurrentStep(step);
+      }
     }
   }, []);
 
@@ -377,7 +382,7 @@ export default function OnboardPage() {
   }, [token, navigate, applyRequest]);
 
   /*
-  | Step 6 is unusable without a document to sign, so treat a missing one as
+  | The e-sign step is unusable without a document to sign, so treat a missing one as
   | worth one retry rather than a verdict.
   |
   | /carrier-connect/load is the endpoint that repairs this: it re-binds an
@@ -392,7 +397,7 @@ export default function OnboardPage() {
   const agreementRefetched = useRef(false);
 
   useEffect(() => {
-    if (initing || currentStep !== 7 || agreementUrl) return;
+    if (initing || currentStep !== STEP.ESIGN || agreementUrl) return;
     if (agreementRefetched.current) return;
 
     agreementRefetched.current = true;
@@ -420,9 +425,9 @@ export default function OnboardPage() {
     };
   }, [initing, currentStep, agreementUrl, token, applyRequest]);
 
-  // Pull the broker's questions once, when the carrier first reaches step 4.
+  // Pull the broker's questions once, when the carrier first reaches them.
   useEffect(() => {
-    if (initing || currentStep !== 5 || questions.length > 0) return;
+    if (initing || currentStep !== STEP.QUESTIONS || questions.length > 0) return;
 
     apiFetch("/carrier-connect/questions", {
       method: "POST",
@@ -490,10 +495,10 @@ export default function OnboardPage() {
       });
 
       applyRequest(res.data);
-      setCurrentStep(3);
+      setCurrentStep(STEP.DOCUMENTS);
       setSuccessMessage(res.message || "Identity verified.");
     } catch (err) {
-      setCurrentStep(2);
+      setCurrentStep(STEP.IDENTITY);
       setErrorMessage(err?.message || "Verification is still pending.");
     } finally {
       setBusy(false);
@@ -520,9 +525,12 @@ export default function OnboardPage() {
 
       applyRequest(res.data);
 
-      // Each skip lands on the step after the one declined — the next one
-      // still shown, so a skipped bank clears the switched-off ELD step too.
-      setCurrentStep(nextVisibleStep({ identity: 2, bank: 3, eld: ELD_STEP }[step] ?? 3));
+      // Each skip lands on the step after the one declined. Bank is the last
+      // step, so skipping it stays put and the carrier presses Finish.
+      setCurrentStep(
+        { identity: STEP.DOCUMENTS, eld: STEP.BANK, bank: STEP.BANK }[step] ??
+          currentStep,
+      );
     } catch (err) {
       setErrorMessage(err?.message || "Could not skip this step.");
     } finally {
@@ -564,7 +572,7 @@ export default function OnboardPage() {
     } catch (err) {
       setErrorMessage(err?.message || "Your bank details are incomplete.");
     } finally {
-      setCurrentStep(3);
+      setCurrentStep(STEP.BANK);
       setBusy(false);
       clearReturnFlag();
     }
@@ -640,7 +648,7 @@ export default function OnboardPage() {
     } catch (err) {
       setErrorMessage(err?.message || "Could not finish connecting your ELD.");
     } finally {
-      setCurrentStep(4);
+      setCurrentStep(STEP.ELD);
       setBusy(false);
       clearReturnFlag();
     }
@@ -763,7 +771,7 @@ export default function OnboardPage() {
 
   const submitAnswers = async () => {
     if (questions.length === 0) {
-      setCurrentStep(6);
+      setCurrentStep(STEP.ELD);
       return;
     }
 
@@ -795,7 +803,7 @@ export default function OnboardPage() {
       });
 
       applyRequest(res.data);
-      setCurrentStep(6);
+      setCurrentStep(STEP.ELD);
       setSuccessMessage(res.message || "Answers saved.");
     } catch (err) {
       // The API reports which question failed, so surface it inline rather than
@@ -873,25 +881,36 @@ export default function OnboardPage() {
     }
   };
 
-  // ── Step 6: e-sign ───────────────────────────────────────────────────────
+  // ── Step 4: e-sign ───────────────────────────────────────────────────────
+
+  /*
+  | The carrier only draws; where the signature goes is fixed. It is stamped
+  | at the bottom of the agreement's last page, and the API writes the signed
+  | PDF and stores it against the connect request.
+  */
+  const signaturePlacement = {
+    page: Math.max(agreementPages, 1),
+    xPct: SIGNATURE_X_PCT,
+    yPct: SIGNATURE_Y_PCT,
+  };
 
   const submitSignature = async () => {
     if (!signature) {
-      setErrorMessage("Please draw or upload your signature first.");
+      setErrorMessage("Please draw your signature first.");
       return;
     }
 
-    if (!placement) {
-      setErrorMessage("Drag your signature onto the agreement to place it.");
+    if (!agreementPages) {
+      setErrorMessage("The agreement is still loading. Try again in a moment.");
       return;
     }
 
     const form = new FormData();
     form.append("token", token);
     form.append("signature", signature);
-    form.append("page", String(placement.page));
-    form.append("x_pct", String(placement.xPct));
-    form.append("y_pct", String(placement.yPct));
+    form.append("page", String(signaturePlacement.page));
+    form.append("x_pct", String(signaturePlacement.xPct));
+    form.append("y_pct", String(signaturePlacement.yPct));
 
     setBusy(true);
 
@@ -903,6 +922,7 @@ export default function OnboardPage() {
       });
 
       applyRequest(res.data);
+      setCurrentStep(STEP.QUESTIONS);
       setSuccessMessage(res.message || "Agreement signed.");
     } catch (err) {
       setErrorMessage(err?.message || "Could not save your signature.");
@@ -931,19 +951,12 @@ export default function OnboardPage() {
     }
 
     if (searchParams.get("eld")) {
-      // A return URL from before the step was switched off would otherwise
-      // drop the carrier on a screen that no longer renders.
-      if (!ELD_STEP_ENABLED) {
-        clearReturnFlag();
-        return;
-      }
-
       // "exit" means they closed Terminal without linking anything. Nothing to
       // verify, and nothing went wrong — just drop them back on the step.
       if (searchParams.get("result") === "success") {
         verifyEld(searchParams.get("token"), searchParams.get("state"));
       } else {
-        setCurrentStep(4);
+        setCurrentStep(STEP.ELD);
         clearReturnFlag();
       }
     }
@@ -953,27 +966,72 @@ export default function OnboardPage() {
   // ── Navigation ───────────────────────────────────────────────────────────
 
   const goNext = () => {
-    if (currentStep === 1) {
+    if (currentStep === STEP.DETAILS) {
       if (!isPhoneVerified) {
         setErrorMessage("Please verify your phone number first.");
         return;
       }
-      setCurrentStep(2);
+      setCurrentStep(STEP.IDENTITY);
       return;
     }
 
-    if (currentStep === 2) {
+    if (currentStep === STEP.IDENTITY) {
       if (!isIdSettled) {
         setErrorMessage(
           "Please verify your government ID, or skip this step to continue.",
         );
         return;
       }
-      setCurrentStep(3);
+      setCurrentStep(STEP.DOCUMENTS);
       return;
     }
 
-    if (currentStep === 3) {
+    // Mandatory: there is no skip for the W-9 or the COI. Checked per slot as
+    // well as against the server flag, so neither can be bypassed alone.
+    if (currentStep === STEP.DOCUMENTS) {
+      const missing = documentSlots.filter((slot) => !slot.uploaded);
+
+      if (!isDocumentsDone || missing.length > 0) {
+        setErrorMessage(
+          missing.length > 0
+            ? `Please upload your ${missing.map((slot) => slot.label).join(" and ")} to continue.`
+            : "Please upload both your W-9 and your certificate of insurance.",
+        );
+        return;
+      }
+
+      setCurrentStep(STEP.ESIGN);
+      return;
+    }
+
+    if (currentStep === STEP.ESIGN) {
+      if (!isSigned) {
+        setErrorMessage("Please sign the agreement to continue.");
+        return;
+      }
+
+      setCurrentStep(STEP.QUESTIONS);
+      return;
+    }
+
+    if (currentStep === STEP.QUESTIONS) {
+      submitAnswers();
+      return;
+    }
+
+    if (currentStep === STEP.ELD) {
+      if (!isEldSettled) {
+        setErrorMessage(
+          "Please connect your ELD, or skip this step to continue.",
+        );
+        return;
+      }
+
+      setCurrentStep(STEP.BANK);
+      return;
+    }
+
+    if (currentStep === STEP.BANK) {
       if (usesFactoring && !factoringName.trim()) {
         setErrorMessage("Please enter your factoring company name.");
         return;
@@ -1008,7 +1066,7 @@ export default function OnboardPage() {
           return;
         }
 
-        setCurrentStep(nextVisibleStep(3));
+        setFinished(true);
       };
 
       // Already stored and unchanged — re-posting it would only earn a 422 for
@@ -1031,55 +1089,29 @@ export default function OnboardPage() {
 
       return;
     }
-
-    if (currentStep === 4) {
-      if (!isEldSettled) {
-        setErrorMessage(
-          "Please connect your ELD, or skip this step to continue.",
-        );
-        return;
-      }
-
-      setCurrentStep(5);
-      return;
-    }
-
-    if (currentStep === 5) {
-      submitAnswers();
-      return;
-    }
-
-    if (currentStep === 6) {
-      if (!isDocumentsDone) {
-        setErrorMessage(
-          "Please upload both your W-9 and your certificate of insurance.",
-        );
-        return;
-      }
-
-      setCurrentStep(7);
-    }
   };
 
-  const goBack = () => setCurrentStep((step) => prevVisibleStep(step));
+  const goBack = () =>
+    setCurrentStep((step) => Math.max(step - 1, STEP.DETAILS));
 
   // ── Render ───────────────────────────────────────────────────────────────
 
-  if (!initing && isSigned) {
+  if (!initing && finished) {
     return (
       <ThankYou
         brokerName={broker?.company_name}
         carrierName={carrier?.legal_name}
         completedSteps={[
           "Phone number verified",
-          "Government ID verified",
-          "Bank account connected",
+          isIdVerified ? "Government ID verified" : null,
+          "W-9 and certificate of insurance provided",
+          "Broker agreement signed",
+          isQuestionnaireDone ? "Broker questions answered" : null,
+          isEldConnected ? "ELD connected" : null,
+          isBankVerified ? "Bank account connected" : null,
           isFactoringAnswered && usesFactoring
             ? "Factoring details provided"
             : "Factoring details confirmed",
-          isQuestionnaireDone ? "Broker questions answered" : null,
-          "W-9 and certificate of insurance provided",
-          "Broker agreement signed",
         ].filter(Boolean)}
       />
     );
@@ -1124,7 +1156,7 @@ export default function OnboardPage() {
             <div
               className="h-full bg-[#1D4ED8] transition-all duration-300 ease-in-out"
               style={{
-                width: `${((stepPosition(currentStep) - 1) / (steps.length - 1)) * 100}%`,
+                width: `${((currentStep - 1) / (steps.length - 1)) * 100}%`,
               }}
             />
           </div>
@@ -1147,7 +1179,7 @@ export default function OnboardPage() {
                           : "border-2 border-[#E5E7EB] bg-white text-[#9CA3AF]"
                       }`}
                     >
-                      {stepPosition(step.id)}
+                      {step.id}
                     </div>
 
                     <span
@@ -1166,7 +1198,7 @@ export default function OnboardPage() {
       </div>
 
       <div className="mb-4 rounded-full bg-[#EFF6FF] px-4 py-1.5 text-[11px] font-bold tracking-widest text-[#1E40AF] uppercase">
-        Step {stepPosition(currentStep)} of {steps.length}
+        Step {currentStep} of {steps.length}
       </div>
 
       <h1 className="mb-2 text-4xl font-bold tracking-tight text-[#111827]">
@@ -1192,11 +1224,11 @@ export default function OnboardPage() {
       ) : (
         <div
           className={`flex w-full flex-col ${
-            currentStep === 7 ? "max-w-6xl" : "max-w-3xl"
+            currentStep === STEP.ESIGN ? "max-w-6xl" : "max-w-3xl"
           }`}
         >
-          {/* Step 1 — carrier details + phone */}
-          {currentStep === 1 && (
+          {/* Carrier details + phone */}
+          {currentStep === STEP.DETAILS && (
             <div className="mb-8 grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-2">
               {detailRows.map((row) => (
                 <div key={row.label} className="flex flex-col space-y-2">
@@ -1239,8 +1271,8 @@ export default function OnboardPage() {
             </div>
           )}
 
-          {/* Step 2 — government ID */}
-          {currentStep === 2 && (
+          {/* Government ID */}
+          {currentStep === STEP.IDENTITY && (
             <div className="mb-8 flex w-full flex-col items-center">
               <label className="mb-3 text-xs font-bold tracking-wider text-[#9CA3AF] uppercase">
                 National ID card, passport, driver's licence or residence permit
@@ -1254,7 +1286,9 @@ export default function OnboardPage() {
                       ? "border-gray-300 bg-gray-50"
                       : "border-gray-300 bg-[#FAFBFD] hover:border-blue-500"
                 }`}
-                onClick={() => (isIdVerified ? setCurrentStep(3) : startIdentity())}
+                onClick={() =>
+                  isIdVerified ? setCurrentStep(STEP.DOCUMENTS) : startIdentity()
+                }
               >
                 <Badge
                   style={{ fontSize: 100 }}
@@ -1302,8 +1336,8 @@ export default function OnboardPage() {
             </div>
           )}
 
-          {/* Step 3 — bank + factoring */}
-          {currentStep === 3 && (
+          {/* Bank + factoring */}
+          {currentStep === STEP.BANK && (
             <div className="mb-8 flex w-full flex-col items-center">
               {/*
                 Factoring is asked first because the answer decides whether the
@@ -1551,8 +1585,8 @@ export default function OnboardPage() {
             </div>
           )}
 
-          {/* Step 4 — ELD / telematics, connected through Terminal */}
-          {currentStep === 4 && (
+          {/* ELD / telematics, connected through Terminal */}
+          {currentStep === STEP.ELD && (
             <div className="mb-8 flex w-full flex-col items-center">
               <p className="mb-6 max-w-xl text-center text-sm text-[#4B5563]">
                 Connect your ELD so {broker?.company_name || "this broker"} can
@@ -1685,8 +1719,8 @@ export default function OnboardPage() {
             </div>
           )}
 
-          {/* Step 5 — the broker's questions */}
-          {currentStep === 5 && (
+          {/* The broker's questions */}
+          {currentStep === STEP.QUESTIONS && (
             <div className="mb-8 w-full">
               <p className="mb-6 text-sm text-[#4B5563]">
                 {broker?.company_name || "This broker"} asks every carrier the
@@ -1703,8 +1737,8 @@ export default function OnboardPage() {
             </div>
           )}
 
-          {/* Step 5 — compliance documents */}
-          {currentStep === 6 && (
+          {/* W-9 and COI — both mandatory, no skip */}
+          {currentStep === STEP.DOCUMENTS && (
             <div className="mb-8 w-full">
               <p className="mb-6 text-sm text-[#4B5563]">
                 {broker?.company_name || "This broker"} needs these on file
@@ -1818,18 +1852,17 @@ export default function OnboardPage() {
             </div>
           )}
 
-          {/* Step 6 — e-sign */}
-          {currentStep === 7 && (
+          {/* E-sign — draw and submit; placement is automatic */}
+          {currentStep === STEP.ESIGN && (
             <div className="w-full">
               <div className="grid grid-cols-12 gap-8">
                 <div className="col-span-12 lg:col-span-7">
                   <PdfViewer
                     pdfUrl={agreementUrl}
                     title={agreementName}
-                    signatureUrl={signatureUrl}
-                    placement={placement}
-                    onPlace={setPlacement}
-                    onClear={() => setPlacement(null)}
+                    signatureUrl={isSigned ? null : signatureUrl}
+                    placement={signaturePlacement}
+                    onLoad={setAgreementPages}
                   />
                 </div>
 
@@ -1838,158 +1871,62 @@ export default function OnboardPage() {
                     Digital signature
                   </strong>
 
-                  <div className="mt-2 mb-5 flex items-center justify-between rounded-lg bg-[#F1F5F9CC] p-2">
-                    <button
-                      type="button"
-                      className={`flex flex-1 cursor-pointer items-center justify-center rounded-lg py-1 ${
-                        eSignType === "draw" ? "bg-white" : ""
-                      }`}
-                      onClick={() => {
-                        setESignType("draw");
-                        setSignature(null);
-                        setPlacement(null);
-                      }}
-                    >
-                      <Edit
-                        style={{ fontSize: 14 }}
-                        className={
-                          eSignType === "draw"
-                            ? "text-[#006C49]"
-                            : "text-gray-500"
-                        }
+                  {isSigned ? (
+                    <div className="mt-2 flex items-start gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50/40 px-4 py-3.5">
+                      <DoneAll
+                        style={{ fontSize: 18 }}
+                        className="mt-0.5 shrink-0 text-emerald-600"
                       />
-                      <span
-                        className={`ml-1 text-xs font-semibold ${
-                          eSignType === "draw"
-                            ? "text-[#006C49]"
-                            : "text-gray-500"
-                        }`}
-                      >
-                        Sign
-                      </span>
-                    </button>
 
-                    <button
-                      type="button"
-                      className={`flex flex-1 cursor-pointer items-center justify-center rounded-lg py-1 ${
-                        eSignType === "upload" ? "bg-white" : ""
-                      }`}
-                      onClick={() => {
-                        setESignType("upload");
-                        setSignature(null);
-                        setPlacement(null);
-                      }}
-                    >
-                      <Upload
-                        style={{ fontSize: 14 }}
-                        className={
-                          eSignType === "upload"
-                            ? "text-[#006C49]"
-                            : "text-gray-500"
-                        }
-                      />
-                      <span
-                        className={`ml-1 text-xs font-semibold ${
-                          eSignType === "upload"
-                            ? "text-[#006C49]"
-                            : "text-gray-500"
-                        }`}
-                      >
-                        Upload
-                      </span>
-                    </button>
-                  </div>
+                      <div>
+                        <p className="text-sm font-semibold text-emerald-800">
+                          Agreement signed
+                        </p>
 
-                  {eSignType === "draw" ? (
-                    <ESign
-                      onChange={(file) => {
-                        setSignature(file);
-                        setPlacement(null);
-                      }}
-                      disabled={busy}
-                    />
-                  ) : (
-                    <ESignUpload
-                      onChange={(file) => {
-                        setSignature(file);
-                        setPlacement(null);
-                      }}
-                      disabled={busy}
-                    />
-                  )}
-
-                  {/* Drag chip — drop this onto the agreement to place it. */}
-                  {signatureUrl && (
-                    <div className="mt-5">
-                      {placement ? (
-                        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/40 px-3 py-2.5">
-                          <DoneAll
-                            style={{ fontSize: 18 }}
-                            className="text-emerald-600"
-                          />
-
-                          <span className="flex-1 text-xs text-emerald-800">
-                            Placed on page {placement.page}. Drag again to move
-                            it.
-                          </span>
-
-                          <button
-                            type="button"
-                            onClick={() => setPlacement(null)}
-                            className="text-xs font-semibold text-[#1D4ED8] hover:underline"
-                          >
-                            Reset
-                          </button>
-                        </div>
-                      ) : (
-                        <div
-                          draggable
-                          onDragStart={(event) => {
-                            event.dataTransfer.setData(
-                              "application/x-signature",
-                              "1",
-                            );
-                            event.dataTransfer.effectAllowed = "copy";
-
-                            const ghost = new Image();
-                            ghost.src = signatureUrl;
-                            event.dataTransfer.setDragImage(ghost, 20, 10);
-                          }}
-                          title="Drag onto the agreement to place your signature"
-                          className="flex cursor-grab items-center gap-2 rounded-xl border-2 border-dashed border-[#1D4ED8] bg-blue-50/40 px-3 py-2.5 active:cursor-grabbing"
-                        >
-                          <img
-                            src={signatureUrl}
-                            alt="Your signature"
-                            className="h-7 max-w-[90px] object-contain"
-                          />
-
-                          <span className="flex-1 text-xs font-semibold text-[#1E40AF]">
-                            Drag me onto the signature line
-                          </span>
-
-                          <DragIndicator
-                            style={{ fontSize: 18 }}
-                            className="text-[#93C5FD]"
-                          />
-                        </div>
-                      )}
+                        <p className="mt-0.5 text-xs leading-relaxed text-emerald-700">
+                          Your signed copy has been saved. Continue to the
+                          broker's questions.
+                        </p>
+                      </div>
                     </div>
-                  )}
+                  ) : (
+                    <>
+                      <div className="mt-2">
+                        <ESign onChange={setSignature} disabled={busy} />
+                      </div>
 
-                  <button
-                    type="button"
-                    onClick={submitSignature}
-                    disabled={!signature || !placement || busy}
-                    className="mt-6 w-full rounded-xl bg-[#1D4ED8] py-3.5 text-sm font-semibold tracking-wide text-white shadow-md transition-all hover:bg-[#1E40AF] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
-                  >
-                    Sign and submit
-                  </button>
+                      <p className="mt-4 text-xs leading-relaxed text-[#6B7280]">
+                        Your signature is added to the bottom of the last page
+                        of the agreement when you submit, and the signed copy
+                        is saved for you and{" "}
+                        {broker?.company_name || "the broker"}.
+                      </p>
 
-                  {!agreementUrl && (
-                    <p className="mt-3 text-center text-xs text-[#B45309]">
-                      The broker has not uploaded an agreement yet.
-                    </p>
+                      <button
+                        type="button"
+                        onClick={submitSignature}
+                        disabled={
+                          !signature || !agreementUrl || !agreementPages || busy
+                        }
+                        className="mt-6 w-full rounded-xl bg-[#1D4ED8] py-3.5 text-sm font-semibold tracking-wide text-white shadow-md transition-all hover:bg-[#1E40AF] disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
+                      >
+                        Sign and submit
+                      </button>
+
+                      {!agreementUrl && (
+                        <p className="mt-3 text-center text-xs text-[#B45309]">
+                          The broker has not uploaded an agreement yet.
+                        </p>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={goBack}
+                        className="mt-4 w-full text-sm font-semibold text-[#4B5563] transition-colors hover:text-black"
+                      >
+                        Back
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -1998,9 +1935,9 @@ export default function OnboardPage() {
 
           <div className="my-6 h-[1px] w-full bg-[#E5E7EB]" />
 
-          {currentStep !== 7 && (
+          {(currentStep !== STEP.ESIGN || isSigned) && (
             <div className="mt-2 flex items-center justify-between">
-              {currentStep === 1 ? (
+              {currentStep === STEP.DETAILS ? (
                 <span className="flex items-center space-x-2 text-sm font-semibold text-[#4B5563]">
                   <HeadsetMic style={{ fontSize: 16 }} />
                   <span>
@@ -2024,7 +1961,9 @@ export default function OnboardPage() {
                 disabled={busy}
                 className="rounded-xl bg-[#1D4ED8] px-10 py-3.5 text-sm font-semibold tracking-wide text-white shadow-md transition-all hover:bg-[#1E40AF] hover:shadow-lg disabled:cursor-not-allowed disabled:bg-gray-300"
               >
-                Continue to step {stepPosition(currentStep) + 1}
+                {currentStep === LAST_STEP
+                  ? "Finish"
+                  : `Continue to step ${currentStep + 1}`}
               </button>
             </div>
           )}
