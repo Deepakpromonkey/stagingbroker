@@ -44,6 +44,8 @@ import cert3Inactive from "@/assets/certifications/cert3-inactive.png";
 import smartwayActive from "@/assets/certifications/smartway-active.png";
 import cert2Active from "@/assets/certifications/cert2-active.png";
 
+
+
 import { apiFetch } from "../../../lib/api";
 
 
@@ -214,37 +216,6 @@ function CarrierProfile() {
           // answer to be wrong.
           setIsShortlisted(!!carrierData.shortlisted);
 
-          // fetch(
-          //     `${import.meta.env.VITE_ROOT_PROD}/app/profile/carriers/shortlisted/listv2`,
-          //     {
-          //         method: 'POST',
-          //         headers: {
-          //             'Content-Type': 'application/json',
-          //             Authorization: `Bearer ${accountToken}`
-          //         },
-          //         body: JSON.stringify({
-          //             account_token: accountToken
-          //         })
-          //     }
-          // )
-          //     .then(res => res.json())
-          //     .then(shortlistData => {
-          //
-          //         const records = shortlistData?.records || [];
-          //
-          //         const matchedRecord = records.find(function (item) {
-          //             return (
-          //                 item?.carrier_id?.toString() === row_id?.toString()
-          //             );
-          //         });
-          //
-          //         setIsShortlisted(!!matchedRecord);
-          //
-          //     })
-          //     .catch(function (err) {
-          //         console.log('Shortlist status check failed', err);
-          //     });
-
           // Onboarding requests belong to the company, so this picks up a
           // request a teammate sent as well as one this user sent.
           apiFetch("/carrier-connect", { method: "GET" })
@@ -367,80 +338,6 @@ function CarrierProfile() {
       .finally(function () {
         setShortlisting(false);
       });
-
-    // if (!row_id) return;
-    //
-    // setShortlisting(true);
-    //
-    // setSuccessMessage('');
-    // setErrorMessage('');
-    //
-    // fetch(
-    //     `${import.meta.env.VITE_ROOT_PROD}/app/profile/carriers/shortlisted/save`,
-    //     {
-    //         method: 'POST',
-    //         headers: {
-    //             'Content-Type': 'application/json',
-    //             Authorization: `Bearer ${accountToken}`,
-    //         },
-    //         body: JSON.stringify({
-    //             carrier_id: row_id
-    //         })
-    //     }
-    // )
-    //
-    //     .then(function (res) {
-    //
-    //         if (!res.ok) {
-    //
-    //             throw new Error('Failed to shortlist');
-    //
-    //         }
-    //
-    //         return res.json();
-    //
-    //     })
-    //
-    //     .then(function (data) {
-    //
-    //         console.log('Shortlist response:', data);
-    //
-    //         setIsShortlisted(true);
-    //
-    //         setSuccessMessage(
-    //             data?.message ||
-    //             'Carrier added to preferred successfully.'
-    //         );
-    //
-    //         setErrorMessage('');
-    //
-    //     })
-    //
-    //     .catch(function (err) {
-    //
-    //         console.error('Shortlist error:', err);
-    //
-    //         setErrorMessage(
-    //             err?.message ||
-    //             'Failed to add carrier to preferred.'
-    //         );
-    //
-    //         setSuccessMessage('');
-    //
-    //     })
-    //
-    //     .finally(function () {
-    //
-    //         setShortlisting(false);
-    //         setTimeout(function () {
-    //
-    //             setSuccessMessage('');
-    //             setErrorMessage('');
-    //
-    //         }, 4000);
-    //
-    //
-    //     });
   }
 
   function removeFromShortlist() {
@@ -461,67 +358,6 @@ function CarrierProfile() {
       .finally(function () {
         setRemovingShortlist(false);
       });
-
-    // setRemovingShortlist(true);
-    // setSuccessMessage('');
-    // setErrorMessage('');
-    //
-    // fetch(
-    //     `${import.meta.env.VITE_ROOT_PROD}/app/profile/carriers/removev2`,
-    //     {
-    //         method: 'POST',
-    //         headers: {
-    //             'Content-Type': 'application/json',
-    //             Authorization: `Bearer ${accountToken}`,
-    //         },
-    //         body: JSON.stringify({
-    //             carrier_id: row_id
-    //         })
-    //     }
-    // )
-    //     .then(function (res) {
-    //         return res.json();
-    //     })
-    //     .then(function (data) {
-    //
-    //         if (data?.status === false) {
-    //
-    //             setErrorMessage(
-    //                 data?.message ||
-    //                 'Failed to remove carrier from preferred.'
-    //             );
-    //
-    //             return;
-    //         }
-    //
-    //         setIsShortlisted(false);
-    //
-    //         setSuccessMessage(
-    //             data?.message ||
-    //             'Carrier removed from preferred successfully.'
-    //         );
-    //
-    //     })
-    //     .catch(function (err) {
-    //
-    //         console.error('Remove shortlist error:', err);
-    //
-    //         setErrorMessage(
-    //             err?.message ||
-    //             'Failed to remove carrier from preferred.'
-    //         );
-    //
-    //     })
-    //     .finally(function () {
-    //
-    //         setRemovingShortlist(false);
-    //
-    //         setTimeout(function () {
-    //             setSuccessMessage('');
-    //             setErrorMessage('');
-    //         }, 4000);
-    //
-    //     });
   }
 
   // The report is already saved by the time this runs — a failed email is
@@ -1126,7 +962,7 @@ function AuthorityTypeBadge({ commonStat, contractStat, brokerStat }) {
             actions={[
               !isShortlisted
                 ? {
-                    label: "Add to Preferred",
+                    label: "Monitoring",
                     icon: <Add />,
                     variant: "secondary",
                     onClick: addToPreferred,
@@ -1134,7 +970,7 @@ function AuthorityTypeBadge({ commonStat, contractStat, brokerStat }) {
                     loading: shortlisting,
                   }
                 : {
-                    label: "Remove from Shortlisted",
+                    label: "Unmonitor",
                     icon: <DeleteOutline />,
                     variant: "danger",
                     onClick: removeFromShortlist,
@@ -1143,7 +979,7 @@ function AuthorityTypeBadge({ commonStat, contractStat, brokerStat }) {
                   },
               !isBlocked
                 ? {
-                    label: "Block Carrier",
+                    label: "Block",
                     icon: <BlockOutlined className="!text-[18px]" />,
                     variant: "danger",
                     onClick: blockCarrier,
@@ -1151,7 +987,7 @@ function AuthorityTypeBadge({ commonStat, contractStat, brokerStat }) {
                     loading: blocking,
                   }
                 : {
-                    label: "Unblock Carrier",
+                    label: "Unblock",
                     icon: <CheckCircleOutlined className="!text-[18px]" />,
                     variant: "secondary",
                     onClick: unblockCarrier,
@@ -1159,7 +995,7 @@ function AuthorityTypeBadge({ commonStat, contractStat, brokerStat }) {
                     loading: unblocking,
                   },
               {
-                label: "Report Carrier",
+                label: "Report ",
                 icon: <ReportProblemOutlined className="!text-[18px]" />,
                 variant: "danger",
                 onClick: () => setReportModalOpen(true),
@@ -1435,22 +1271,6 @@ function AuthorityTypeBadge({ commonStat, contractStat, brokerStat }) {
                       <EquipmentInsightsView dotNumber={carrier?.dot_number} />
                     </div>
                   )}
-                  {/* 
-                                {activeTab === 'INDUSTRY BENCHMARKS' && (
-
-                                    <div
-                                        ref={sectionRefs['INDUSTRY BENCHMARKS']}
-                                        data-section='INDUSTRY BENCHMARKS'
-                                        className='space-y-[24px] xl:space-y-[32px]'
-                                    >
-
-                                        <IndustryBenchMarksView
-                                            data={carrier}
-                                        />
-
-                                    </div>
-
-                                )} */}
 
                   {activeTab === "CONTACT HISTORY" && (
                     <div

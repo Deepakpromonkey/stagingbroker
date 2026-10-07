@@ -30,3 +30,6 @@ pnpm-debug.log*
 *.njsproj
 *.sln
 *.sw?
+
+# Releases the staging pipeline uploads (deploy/staging/release.sh)
+/releases

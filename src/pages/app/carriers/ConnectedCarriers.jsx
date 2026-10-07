@@ -156,18 +156,25 @@ export default function ConnectedCarriers() {
   const [expanded, setExpanded] = useState(null);
   const [downloading, setDownloading] = useState(null);
 
-  // Import / Export modals — UI only for now, no API wired up yet.
+  // Import / Export
   const [importOpen, setImportOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [importFile, setImportFile] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const [exportScope, setExportScope] = useState("filtered");
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState("");
+  const [importResult, setImportResult] = useState(null);
   const fileInputRef = useRef(null);
 
   const closeImportModal = () => {
+    if (importing) return;
+
     setImportOpen(false);
     setImportFile(null);
     setDragActive(false);
+    setImportError("");
+    setImportResult(null);
   };
 
   const closeExportModal = () => {
@@ -179,12 +186,50 @@ export default function ConnectedCarriers() {
     const file = fileList?.[0];
     if (!file) return;
 
-    if (!file.name.toLowerCase().endsWith(".csv")) {
-      setErrorMessage("Please choose a .csv file.");
+    const name = file.name.toLowerCase();
+    if (!name.endsWith(".csv") && !name.endsWith(".txt")) {
+      setImportError("Please choose a .csv file.");
       return;
     }
 
+    // Mirrors the API's own file|mimes:csv,txt|max:10240 rule - catching an
+    // oversized file here saves the upload only to have it rejected.
+    if (file.size > 10 * 1024 * 1024) {
+      setImportError("That file is larger than 10MB.");
+      return;
+    }
+
+    setImportError("");
     setImportFile(file);
+  };
+
+  const submitImport = async () => {
+    if (!importFile || importing) return;
+
+    setImporting(true);
+    setImportError("");
+
+    const formData = new FormData();
+    formData.append("file", importFile);
+
+    try {
+      const res = await apiFetch("/carrier-connect/bulk-import", {
+        method: "POST",
+        body: formData,
+      });
+
+      setImportResult(res?.data || null);
+      setImportFile(null);
+
+      // The list now has whatever this just invited, so the count and
+      // stage tabs behind the modal should not still show the old numbers
+      // once the broker closes it.
+      load(true);
+    } catch (err) {
+      setImportError(err?.message || "The import failed. Please try again.");
+    } finally {
+      setImporting(false);
+    }
   };
 
   const downloadCarrierFile = async (uuid, file) => {
@@ -243,6 +288,56 @@ export default function ConnectedCarriers() {
         .some((field) => String(field).toLowerCase().includes(term));
     });
   }, [requests, stage, search]);
+
+  /**
+   * Turns whatever's already loaded client-side into a CSV download - no
+   * API call needed, since the data behind both export choices (the
+   * current filtered view, or every request) is already sitting in state.
+   */
+  const runExport = () => {
+    const rows = exportScope === "filtered" ? visible : requests;
+
+    const escape = (value) => {
+      const str = String(value ?? "");
+      return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+    };
+
+    const header = [
+      "Legal Name",
+      "DOT Number",
+      "Email",
+      "Status",
+      "Invited By",
+      "Sent On",
+    ];
+
+    const lines = rows.map((item) => [
+      item.carrier?.legal_name || "",
+      item.carrier?.dot_number || "",
+      item.carrier?.email || "",
+      item.stage_label || stageMeta(item.stage).label,
+      item.invited_by || "",
+      formatDate(item.sent_on),
+    ]);
+
+    const csv = [header, ...lines]
+      .map((row) => row.map(escape).join(","))
+      .join("\r\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `connected-carriers-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    URL.revokeObjectURL(url);
+
+    closeExportModal();
+  };
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-5 sm:py-6 md:px-8 md:py-8">
@@ -614,99 +709,155 @@ export default function ConnectedCarriers() {
         </p>
       )}
 
-      {/* Import modal — UI shell only, no API call wired up yet */}
+      {/* Import modal */}
       {importOpen && (
         <Modal
           title="Import carriers"
-          subtitle="Upload a CSV to bulk-invite carriers."
+          subtitle="Upload a CSV of DOT numbers to bulk-invite carriers."
           onClose={closeImportModal}
           footer={
-            <>
+            importResult ? (
               <button
                 type="button"
                 onClick={closeImportModal}
-                className="h-9 rounded-lg border border-[#E5E7EB] bg-white px-3.5 text-sm font-semibold text-[#4B5563] transition-colors hover:bg-gray-50"
+                className="h-9 rounded-lg bg-[#1D4ED8] px-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#1E40AF]"
               >
-                Cancel
+                Done
               </button>
-
-              <button
-                type="button"
-                disabled={!importFile}
-                onClick={() => {
-                  // TODO: wire up to the import API once it exists.
-                  closeImportModal();
-                }}
-                className="h-9 rounded-lg bg-[#1D4ED8] px-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#1E40AF] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
-              >
-                Import
-              </button>
-            </>
-          }
-        >
-          <div
-            onDragOver={(event) => {
-              event.preventDefault();
-              setDragActive(true);
-            }}
-            onDragLeave={() => setDragActive(false)}
-            onDrop={(event) => {
-              event.preventDefault();
-              setDragActive(false);
-              handleFileChosen(event.dataTransfer.files);
-            }}
-            onClick={() => fileInputRef.current?.click()}
-            className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-10 text-center transition-colors ${
-              dragActive
-                ? "border-[#1D4ED8] bg-[#EFF6FF]"
-                : "border-[#E5E7EB] bg-[#FAFBFD] hover:border-[#CBD5E1]"
-            }`}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv"
-              hidden
-              onChange={(event) => handleFileChosen(event.target.files)}
-            />
-
-            {importFile ? (
-              <>
-                <InsertDriveFileOutlined
-                  sx={{ fontSize: 32 }}
-                  className="text-[#1D4ED8]"
-                />
-                <p className="text-sm font-semibold text-[#1F2937]">
-                  {importFile.name}
-                </p>
-                <p className="text-xs text-[#9CA3AF]">
-                  {(importFile.size / 1024).toFixed(1)} KB — click to choose a
-                  different file
-                </p>
-              </>
             ) : (
               <>
-                <CloudUploadOutlined
-                  sx={{ fontSize: 32 }}
-                  className="text-gray-400"
-                />
-                <p className="text-sm font-semibold text-[#1F2937]">
-                  Drag and drop a CSV, or click to browse
-                </p>
-                <p className="text-xs text-[#9CA3AF]">
-                  Columns: legal_name, dot_number, email
-                </p>
-              </>
-            )}
-          </div>
+                <button
+                  type="button"
+                  disabled={importing}
+                  onClick={closeImportModal}
+                  className="h-9 rounded-lg border border-[#E5E7EB] bg-white px-3.5 text-sm font-semibold text-[#4B5563] transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Cancel
+                </button>
 
-          <p className="mt-3 text-xs text-[#9CA3AF]">
-            Import isn't connected yet — this is a preview of the flow.
-          </p>
+                <button
+                  type="button"
+                  disabled={!importFile || importing}
+                  onClick={submitImport}
+                  className="h-9 rounded-lg bg-[#1D4ED8] px-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#1E40AF] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+                >
+                  {importing ? "Importing…" : "Import"}
+                </button>
+              </>
+            )
+          }
+        >
+          {importResult ? (
+            <div>
+              <p className="text-sm font-semibold text-[#1F2937]">
+                {importResult.total_invited} of{" "}
+                {importResult.total_invited + importResult.total_skipped}{" "}
+                carrier
+                {importResult.total_invited + importResult.total_skipped === 1
+                  ? ""
+                  : "s"}{" "}
+                invited.
+              </p>
+
+              {importResult.skipped?.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-xs font-bold tracking-wider text-[#9CA3AF] uppercase">
+                    Skipped ({importResult.skipped.length})
+                  </p>
+
+                  <div className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-[#E5E7EB]">
+                    {importResult.skipped.map((row, i) => (
+                      <div
+                        key={`${row.dot_number}-${i}`}
+                        className="flex items-center justify-between gap-3 border-b border-[#F1F5F9] px-3 py-2 text-xs last:border-0"
+                      >
+                        <span className="font-semibold text-[#4B5563]">
+                          {row.legal_name || row.dot_number}
+                        </span>
+                        <span className="text-right text-[#9CA3AF]">
+                          {row.reason}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              <div
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  setDragActive(true);
+                }}
+                onDragLeave={() => setDragActive(false)}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  setDragActive(false);
+                  handleFileChosen(event.dataTransfer.files);
+                }}
+                onClick={() => fileInputRef.current?.click()}
+                className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-10 text-center transition-colors ${
+                  dragActive
+                    ? "border-[#1D4ED8] bg-[#EFF6FF]"
+                    : "border-[#E5E7EB] bg-[#FAFBFD] hover:border-[#CBD5E1]"
+                }`}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv,.txt"
+                  hidden
+                  onChange={(event) => handleFileChosen(event.target.files)}
+                />
+
+                {importFile ? (
+                  <>
+                    <InsertDriveFileOutlined
+                      sx={{ fontSize: 32 }}
+                      className="text-[#1D4ED8]"
+                    />
+                    <p className="text-sm font-semibold text-[#1F2937]">
+                      {importFile.name}
+                    </p>
+                    <p className="text-xs text-[#9CA3AF]">
+                      {(importFile.size / 1024).toFixed(1)} KB — click to choose
+                      a different file
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <CloudUploadOutlined
+                      sx={{ fontSize: 32 }}
+                      className="text-gray-400"
+                    />
+                    <p className="text-sm font-semibold text-[#1F2937]">
+                      Drag and drop a CSV, or click to browse
+                    </p>
+                    <p className="text-xs text-[#9CA3AF]">
+                      Needs a column headed DOT, DOT Number, dot_number or
+                      USDOT
+                    </p>
+                  </>
+                )}
+              </div>
+
+              {importError && (
+                <p className="mt-3 rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs font-medium text-red-700">
+                  {importError}
+                </p>
+              )}
+
+              <p className="mt-3 text-xs text-[#9CA3AF]">
+                Each carrier is emailed at the address on their FMCSA record.
+                Up to 200 at a time.
+              </p>
+            </>
+          )}
         </Modal>
       )}
 
-      {/* Export modal — UI shell only, no API call wired up yet */}
+      {/* Export modal */}
       {exportOpen && (
         <Modal
           title="Export carriers"
@@ -724,11 +875,11 @@ export default function ConnectedCarriers() {
 
               <button
                 type="button"
-                onClick={() => {
-                  // TODO: wire up to the export API once it exists.
-                  closeExportModal();
-                }}
-                className="flex h-9 items-center gap-1.5 rounded-lg bg-[#1D4ED8] px-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#1E40AF]"
+                onClick={runExport}
+                disabled={
+                  (exportScope === "filtered" ? visible : requests).length === 0
+                }
+                className="flex h-9 items-center gap-1.5 rounded-lg bg-[#1D4ED8] px-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#1E40AF] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
               >
                 <FileDownloadOutlined sx={{ fontSize: 16 }} />
                 Export CSV
@@ -787,10 +938,6 @@ export default function ConnectedCarriers() {
               </span>
             </label>
           </div>
-
-          <p className="mt-3 text-xs text-[#9CA3AF]">
-            Export isn't connected yet — this is a preview of the flow.
-          </p>
         </Modal>
       )}
     </div>

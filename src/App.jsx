@@ -5,6 +5,9 @@ const Signup = lazy(() => import('./pages/auth/Signup'))
 const Dashboard = lazy(() => import('./pages/app/Dashboard'))
 const TrackShipmentStep1 = lazy(() => import('./pages/app/trackshipment/Step1'))
 const TrackShipmentStep2 = lazy(() => import('./pages/app/trackshipment/Step2'))
+const TrackShipmentEld = lazy(() => import('./pages/app/trackshipment-eld/EldShipmentForm'))
+const EldShipmentDetail = lazy(() => import('./pages/app/trackshipment-eld/EldShipmentDetail'))
+const PublicTracking = lazy(() => import('./pages/app/PublicTracking/PublicTracking'))
 const SearchVet = lazy(() => import('./pages/app/SearchVet/SearchVet'))
 const RiskAlerts = lazy(() => import('./pages/app/riskalert/RiskAlerts'))
 const LoadSearch = lazy(() => import('./pages/app/loadsearch/LoadSearch'))
@@ -12,7 +15,6 @@ const CarrierSearch = lazy(() => import('./pages/app/carriers/CarrierSearch'))
 const CarrierProfile = lazy(() => import('./pages/app/carriers/CarrierProfile'))
 const DtScoreHowItWorks = lazy(() => import('./pages/app/carriers/DtScoreHowItWorks'))
 const ConnectedCarriers = lazy(() => import('./pages/app/carriers/ConnectedCarriers'))
-const NewPartnerCard = lazy(() => import('./pages/app/new-partner/Card'))
 
 const UsersList = lazy(() => import('./pages/app/users/UsersList'))
 
@@ -64,6 +66,9 @@ DTPay Guest Pay
 */
 const DtPayGuestPay = lazy(() => import('./pages/app/DtPayGuestPay'))
 
+
+const NewPartnerCard = lazy(() => import('./pages/app/new-partner/Card'))
+
 const CoiRequest = lazy(() => import('./pages/app/coi-request/CoiRequest'))
 
 
@@ -71,7 +76,10 @@ const CoiRequest = lazy(() => import('./pages/app/coi-request/CoiRequest'))
 // /subscribe is one of these: it's shown as a forced, standalone step
 // (right after signup, or when RouteGuard redirects here for not having
 // a plan yet) and shouldn't look like a page nested inside the app shell.
+// /track/:token is the customer-facing public tracking page — whoever opens
+// it has no broker session and shouldn't see this app's internal nav at all.
 const NO_HEADER_PATHS = ['/subscribe', '/accept-invitation'];
+const NO_HEADER_PREFIXES = ['/track/'];
 
 // Shown for the moment a page's chunk is loading. Plain markup rather than MUI,
 // so it costs nothing in the initial bundle.
@@ -88,12 +96,13 @@ function PageLoading() {
 // context yet and can't read the current path directly.
 function AppShell() {
   const location = useLocation();
-  const hideHeader = NO_HEADER_PATHS.includes(location.pathname);
+  const hideHeader =
+    NO_HEADER_PATHS.includes(location.pathname) ||
+    NO_HEADER_PREFIXES.some((prefix) => location.pathname.startsWith(prefix));
 
-  // A new page opens at its top, not wherever the last one was scrolled to.
   useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [location.pathname]);
+  window.scrollTo(0, 0);
+}, [location.pathname]);
 
   return (
     <RouteGuard>
@@ -130,10 +139,11 @@ function AppShell() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/trackshipment/step1" element={<TrackShipmentStep1 />} />
           <Route path="/trackshipment/step2" element={<TrackShipmentStep2 />} />
+          <Route path="/trackshipment/eld" element={<TrackShipmentEld />} />
           <Route path="/load-search" element={<LoadSearch />} />
           <Route path="/search-vet" element={<SearchVet />} />
-          <Route path="/risk-alerts" element={<RiskAlerts />} />
-          <Route path="/coi-request" element={<CoiRequest />} />
+        <Route path="/risk-alerts" element={<RiskAlerts />} />
+        <Route path="/coi-request" element={<CoiRequest />} />
           <Route path="/users" element={<UsersList />} />
           <Route path="/profile" element={<ProfileUpdate />} />
           <Route path="/settings/carrier" element={<CarrierSettings />} />
@@ -154,14 +164,20 @@ function AppShell() {
 
           <Route path="/control-tower" element={<ControlTowerList />} />
           <Route path="/shipment/:row_id" element={<ControlTowerShipment />} />
+          <Route path="/shipment/eld/:uuid" element={<EldShipmentDetail />} />
+
+          {/* Public — the customer opens this with nothing but a link, no
+              account here at all. Authorised by the token in the URL. */}
+          <Route path="/track/:token" element={<PublicTracking />} />
           <Route path="/profile/carriers/shortlisted" element={<ShortlistedCarriers />} />
           <Route path="/profile/carriers/blocked" element={<BlockedCarriers />} />
+
+          <Route path="/carriers/new-partner" element={<NewPartnerCard />} />
 
           {/* The header's Carriers link points here; before this it fell
               through to the catch-all and bounced back to login. */}
           <Route path="/carriers" element={<ConnectedCarriers />} />
           <Route path="/carriers/search" element={<CarrierSearch />} />
-          <Route path="/carriers/new-partner" element={<NewPartnerCard />} />
           <Route path="/carriers/:row_id" element={<CarrierProfile />} />
 
           <Route path="/profile/scoring-weights" element={<ScoringWeights />} />
