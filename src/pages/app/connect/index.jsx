@@ -26,6 +26,7 @@ import ESign from "./ESign";
 import PdfViewer from "./PdfViewer";
 import BrokerQuestions from "./BrokerQuestions";
 import ThankYou from "./ThankYou";
+import stampAgreement from "./stampAgreement";
 
 // Step numbers by name, so reordering the wizard is a change to this map
 // rather than a hunt through every comparison below.
@@ -770,8 +771,26 @@ export default function OnboardPage() {
   };
 
   const submitAnswers = async () => {
+    // Nothing to answer, but the step is still recorded so the onboarding can
+    // finish. Sent as JSON because FormData cannot carry an empty `answers`.
     if (questions.length === 0) {
-      setCurrentStep(STEP.ELD);
+      setBusy(true);
+
+      try {
+        const res = await apiFetch("/carrier-connect/answers", {
+          method: "POST",
+          skipAuth: true,
+          body: JSON.stringify({ token, answers: [] }),
+        });
+
+        applyRequest(res.data);
+        setCurrentStep(STEP.ELD);
+      } catch (err) {
+        setErrorMessage(err?.message || "Could not continue.");
+      } finally {
+        setBusy(false);
+      }
+
       return;
     }
 
@@ -913,6 +932,23 @@ export default function OnboardPage() {
     form.append("y_pct", String(signaturePlacement.yPct));
 
     setBusy(true);
+
+    // The API stamps the original itself when it can and falls back to this
+    // copy when it cannot read the PDF. Best effort: if the browser cannot
+    // build it, the signature is still submitted.
+    try {
+      form.append(
+        "signed_agreement",
+        await stampAgreement({
+          pdfUrl: agreementUrl,
+          signature,
+          ...signaturePlacement,
+          signerName: carrier?.legal_name,
+        }),
+      );
+    } catch (err) {
+      console.warn("Could not stamp the agreement in the browser", err);
+    }
 
     try {
       const res = await apiFetch("/carrier-connect/esign", {
