@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Document, Page } from "react-pdf";
 
 import { ensurePdfWorker, PDF_OPTIONS } from "../../../lib/pdfWorker";
@@ -9,30 +9,29 @@ import "react-pdf/dist/Page/TextLayer.css";
 import Assignment from "@mui/icons-material/Assignment";
 import ZoomIn from "@mui/icons-material/ZoomIn";
 import ZoomOut from "@mui/icons-material/ZoomOut";
-import Close from "@mui/icons-material/Close";
 import OpenInNew from "@mui/icons-material/OpenInNew";
 
 /**
- * The broker's own uploaded agreement, with a drop target on every page.
+ * The broker's own uploaded agreement, read-only.
  *
  * `placement` is `{ page, xPct, yPct }` where the percentages are relative to
- * the page box, so the position the carrier picks survives any zoom level and
- * matches what the API stores.
+ * the page box, so the preview matches what the API stamps at any zoom level.
+ * The carrier does not choose it — the parent fixes it to the bottom of the
+ * last page and this only previews the signature there.
+ *
+ * `onLoad` receives the page count, which the parent needs to target the last
+ * page.
  */
 export default function PdfViewer({
   pdfUrl,
   title = "Broker agreement",
   signatureUrl = null,
   placement = null,
-  onPlace,
-  onClear,
+  onLoad,
 }) {
   const [numPages, setNumPages] = useState(0);
   const [scale, setScale] = useState(0.9);
   const [loadError, setLoadError] = useState(false);
-  const [dragOverPage, setDragOverPage] = useState(null);
-
-  const pageRefs = useRef({});
 
   if (!pdfUrl) {
     return (
@@ -48,24 +47,6 @@ export default function PdfViewer({
   }
 
   ensurePdfWorker();
-
-  const placeAt = (pageNumber, clientX, clientY) => {
-    const pageEl = pageRefs.current[pageNumber];
-    if (!pageEl || !onPlace) return;
-
-    const rect = pageEl.getBoundingClientRect();
-
-    // Clamped so a drop that lands slightly outside the page still resolves to
-    // a valid position rather than being silently discarded.
-    const xPct = Math.min(100, Math.max(0, ((clientX - rect.left) / rect.width) * 100));
-    const yPct = Math.min(100, Math.max(0, ((clientY - rect.top) / rect.height) * 100));
-
-    onPlace({
-      page: pageNumber,
-      xPct: Number(xPct.toFixed(2)),
-      yPct: Number(yPct.toFixed(2)),
-    });
-  };
 
   return (
     <div>
@@ -124,7 +105,10 @@ export default function PdfViewer({
           <Document
             file={pdfUrl}
             options={PDF_OPTIONS}
-            onLoadSuccess={({ numPages: count }) => setNumPages(count)}
+            onLoadSuccess={({ numPages: count }) => {
+              setNumPages(count);
+              onLoad?.(count);
+            }}
             onLoadError={() => setLoadError(true)}
             loading={
               <div className="flex h-[480px] items-center justify-center text-sm text-gray-400">
@@ -134,46 +118,10 @@ export default function PdfViewer({
           >
             {Array.from({ length: numPages }, (_, index) => {
               const pageNumber = index + 1;
-              const isTarget = dragOverPage === pageNumber;
               const hasSignature = placement?.page === pageNumber && signatureUrl;
 
               return (
-                <div
-                  key={`page_${pageNumber}`}
-                  ref={(el) => {
-                    pageRefs.current[pageNumber] = el;
-                  }}
-                  className="relative mb-2 bg-white"
-                  style={{
-                    outline: isTarget ? "2px dashed #1D4ED8" : "none",
-                    outlineOffset: -2,
-                  }}
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    event.dataTransfer.dropEffect = "copy";
-                    setDragOverPage(pageNumber);
-                  }}
-                  onDragLeave={() =>
-                    setDragOverPage((current) =>
-                      current === pageNumber ? null : current,
-                    )
-                  }
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    setDragOverPage(null);
-
-                    if (!event.dataTransfer.getData("application/x-signature")) {
-                      return;
-                    }
-
-                    placeAt(pageNumber, event.clientX, event.clientY);
-                  }}
-                  // Tapping also places it, so this works without a mouse.
-                  onClick={(event) => {
-                    if (!signatureUrl || placement) return;
-                    placeAt(pageNumber, event.clientX, event.clientY);
-                  }}
-                >
+                <div key={`page_${pageNumber}`} className="relative mb-2 bg-white">
                   <Page
                     pageNumber={pageNumber}
                     scale={scale}
@@ -183,7 +131,7 @@ export default function PdfViewer({
 
                   {hasSignature && (
                     <div
-                      className="group absolute"
+                      className="pointer-events-none absolute"
                       style={{
                         left: `${placement.xPct}%`,
                         top: `${placement.yPct}%`,
@@ -197,18 +145,6 @@ export default function PdfViewer({
                         draggable={false}
                         className="pointer-events-none h-auto w-full select-none"
                       />
-
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onClear?.();
-                        }}
-                        title="Remove signature"
-                        className="absolute -top-2 -right-2 hidden h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white group-hover:flex"
-                      >
-                        <Close style={{ fontSize: 10 }} />
-                      </button>
                     </div>
                   )}
 
