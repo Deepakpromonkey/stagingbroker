@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "./components/ui/Toaster";
+import DataUpdateNotice, { shouldShowDataUpdateNotice } from "./pages/app/data-update/DataUpdateNotice";
 import { apiFetch } from "./lib/api";
 
 const LOGIN_PATH = "/";
@@ -72,7 +73,11 @@ const PUBLIC_PATH_PREFIXES = [
   "/carrier/connect/",
   "/carrier/invalid-access",
   "/carrier/email-approval",
-  '/guest-pay'
+  '/guest-pay',
+
+  // The customer-facing tracking link — opened with no session at all,
+  // authorised only by the token in the URL.
+  '/track/',
 ];
 
 function isPublicPath(pathname) {
@@ -180,7 +185,14 @@ export default function RouteGuard({ children }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const token = getToken();
+
+  console.log("RouteGuard rendered:", pathname);
+  
   const [planAccess, setPlanAccess] = useState(cachedPlanAccess);
+  const [needsDataUpdateAck, setNeedsDataUpdateAck] = useState(() =>
+    shouldShowDataUpdateNotice(getUser()?.email)
+  );
+
 
   // Re-run the check whenever refreshPlanAccess() clears the cache.
   const [planAccessNonce, setPlanAccessNonce] = useState(0);
@@ -190,6 +202,10 @@ export default function RouteGuard({ children }) {
     planAccessListeners.add(notify);
     return () => planAccessListeners.delete(notify);
   }, []);
+
+    useEffect(() => {
+    setNeedsDataUpdateAck(shouldShowDataUpdateNotice(getUser()?.email));
+  }, [token]);
 
   // Ask the API once whether this account is subscribed, and keep the
   // localStorage flag in step with the answer so the rest of the app (which
@@ -298,6 +314,17 @@ export default function RouteGuard({ children }) {
       navigate("/dashboard?unauthorized=1", { replace: true });
     }
   }, [pathname, token, navigate, planAccess]);
+
+ const isPublic = isPublicPath(pathname);
+
+  if (token && !isPublic && needsDataUpdateAck) {
+    return (
+      <DataUpdateNotice
+        userKey={getUser()?.email}
+        onAcknowledge={() => setNeedsDataUpdateAck(false)}
+      />
+    );
+  }
 
   return children;
 }

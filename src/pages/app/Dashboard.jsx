@@ -34,6 +34,15 @@ const DRIVER_TYPE_LABELS = {
 
 const INACTIVE_STATUSES = ['draft', 'delivered', 'cancelled', 'canceled'];
 
+// Two different detail pages live behind two different routes (see App.jsx):
+// /shipment/:row_id for a manually/driver-phone-tracked load, and the more
+// specific /shipment/eld/:uuid for an ELD one. Every "click this shipment
+// row" handler needs to pick the right one, so it lives here once rather
+// than being re-decided (and re-forgotten) at each call site.
+function shipmentDetailPath(row) {
+    return row?.tracking_method === 'eld' ? `/shipment/eld/${row.uuid}` : `/shipment/${row.uuid}`;
+}
+
 function statusChipColor(status) {
     const k = (status || '').toLowerCase();
     if (k.includes('delivered')) return 'success';
@@ -523,6 +532,7 @@ class Dashboard extends Component {
             ai_modal_open: false,
             ai_seed_query: '',
 
+            show_data_update_notice: false,
             // shipment totals — from /shipments/summary (see loadShipmentTotals)
             all_shipment: 0,
             active_shipment: 0,
@@ -972,14 +982,14 @@ class Dashboard extends Component {
                     </div>
 
                     <div className="bg-[#005EA4] rounded-2xl p-5 sm:p-6 text-white flex flex-col justify-between relative min-h-[240px] sm:min-h-[280px]">
-                        <button
-                            type="button"
-                            onClick={() => this.props.navigate?.('/subscribe')}
-                            className="absolute top-4 right-4 z-50 rounded-lg w-8 h-8 flex items-center justify-center cursor-pointer"
-                            style={{ backgroundColor: "rgba(255, 255, 255, 0.1)" }}
-                        >
-                            <SettingsOutlined sx={{ fontSize: 18, color: "#fff" }} />
-                        </button>
+                       <button
+  type="button"
+  onClick={() => this.setState({ redirect: "/billing" })}
+  className="absolute top-4 right-4 z-50 rounded-lg w-8 h-8 flex items-center justify-center cursor-pointer"
+  style={{ backgroundColor: "rgba(255, 255, 255, 0.1)" }}
+>
+  <SettingsOutlined sx={{ fontSize: 18, color: "#fff" }} />
+</button>
 
                         <div>
                             <div className="text-[10px] font-semibold tracking-wider uppercase opacity-60 mb-1.5">
@@ -1107,7 +1117,7 @@ class Dashboard extends Component {
                                                 e.currentTarget.style.background = '#fff';
                                                 e.currentTarget.style.borderLeft = '3px solid transparent';
                                             }}
-                                            onClick={() => this.setState({ redirect: `/shipment/${row.uuid}` })}
+                                            onClick={() => this.setState({ redirect: shipmentDetailPath(row) })}
                                         >
                                             {/* Shipment Number */}
                                             <td style={{ ...td, color: '#003178', fontWeight: 700 }}>
