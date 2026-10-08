@@ -43,9 +43,9 @@ const stageMeta = (key) => STAGES.find((s) => s.key === key) || STAGES[0];
 /**
  * Everything the carrier handed over, flattened into one list.
  *
- * The W-9 and COI live in `documents`; the factoring notice and the signature
- * are columns on the request itself, so they are folded in here rather than
- * being rendered as three separate special cases in the table.
+ * The W-9 and COI live in `documents`; the factoring notice and the signed
+ * agreement are columns on the request itself, so they are folded in here
+ * rather than being rendered as three separate special cases in the table.
  */
 function carrierFiles(item) {
   const files = (item.documents || []).map((document) => ({
@@ -64,7 +64,17 @@ function carrierFiles(item) {
     });
   }
 
-  if (item.signature_url) {
+  // The agreement with the signature stamped on it is what was signed, so
+  // that is what the broker gets. The bare signature image is only offered
+  // when no signed copy exists.
+  if (item.signed_agreement_url) {
+    files.push({
+      type: "signed_agreement",
+      label: "Signed agreement",
+      name: "signed-agreement.pdf",
+      icon: <DrawOutlined sx={{ fontSize: 18 }} />,
+    });
+  } else if (item.signature_url) {
     files.push({
       type: "signature",
       label: "E-signature",
