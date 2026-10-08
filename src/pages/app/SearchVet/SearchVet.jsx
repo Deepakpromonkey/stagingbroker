@@ -496,9 +496,7 @@ export default function SearchVet() {
         setVetting(true);
         setSearchError('');
 
-        window.setTimeout(() => {
-            navigate(`/carriers/search?q=${encodeURIComponent(searchQuery.trim())}&searched_by=${searchType}`);
-        }, 400);
+        navigate(`/carriers/search?q=${encodeURIComponent(searchQuery.trim())}&searched_by=${searchType}`);
     };
 
     const handleSearchQueryChange = (value) => {
