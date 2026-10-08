@@ -22,6 +22,7 @@
     "@syncfusion/ej2-react-calendars": "^34.1.29",
     "@tailwindcss/vite": "^4.3.2",
     "@tanstack/react-table": "^8.21.3",
+    "@tanstack/react-virtual": "^3.14.13",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "dayjs": "^1.11.21",

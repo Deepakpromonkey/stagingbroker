@@ -16,7 +16,11 @@ export const SOCKET_BASE = API_BASE.replace(/^http/, "ws");
  
 export function getToken() {
     if (typeof window === "undefined") return "";
-    return localStorage.getItem("crm_auth_token") ?? "";
+    const fromStorage = localStorage.getItem("crm_auth_token");
+    if (fromStorage) return fromStorage;
+
+    const match = document.cookie.match(/(?:^|;\s*)crm_auth_token=([^;]*)/);
+    return match ? match[1] : "";
 }
  
 export function authHeaders(isFormData = false, skipAuth = false) {

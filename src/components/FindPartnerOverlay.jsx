@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import Box from '@mui/material/Box';
 import Select from '@mui/material/Select';
@@ -24,10 +25,10 @@ const locationSchema = z
     .string()
     .trim()
     .min(MIN_LOCATION_LENGTH, `Please enter at least ${MIN_LOCATION_LENGTH} characters`)
-    .max(MAX_LOCATION_LENGTH, `Please enter no more than ${MAX_LOCATION_LENGTH} characters`)
-    .or(z.literal(''));
+    .max(MAX_LOCATION_LENGTH, `Please enter no more than ${MAX_LOCATION_LENGTH} characters`);
 
-export default function FindPartnerOverlay({ open, onClose, onSearch }) {
+export default function FindPartnerOverlay({ open, onClose, onSearch, onFindDrayageCarrier }) {
+    const navigate = useNavigate();
     const [type, setType] = useState(DEFAULT_TYPE);
     const [location, setLocation] = useState('');
     const [locationError, setLocationError] = useState('');
@@ -75,6 +76,18 @@ export default function FindPartnerOverlay({ open, onClose, onSearch }) {
     const handleSubmit = (e) => {
         e.preventDefault();
         handleSearch();
+    };
+
+    const handleFindDrayageCarrier = (e) => {
+        e.preventDefault();
+        // Let a parent-supplied handler take over if one was passed in;
+        // otherwise this overlay owns the navigation itself.
+        if (onFindDrayageCarrier) {
+            onFindDrayageCarrier();
+        } else {
+            navigate('/carriers/drayage-finder');
+        }
+        handleClose();
     };
 
     return (
@@ -147,98 +160,131 @@ export default function FindPartnerOverlay({ open, onClose, onSearch }) {
                     </Box>
 
                     <Box component="form" onSubmit={handleSubmit} noValidate>
-                    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1.5 }}>
-                        <Box sx={{ flex: '0 0 auto', width: { xs: '100%', sm: 190 } }}>
-                            <Box sx={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', mb: 0.75 }}>
-                                I'm looking for
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                flexDirection: { xs: 'column', sm: 'row' },
+                                gap: 1.5,
+                                alignItems: { xs: 'stretch', sm: 'flex-start' },
+                            }}
+                        >
+                            <Box sx={{ flex: '0 0 auto', width: { xs: '100%', sm: 170 } }}>
+                                <Box sx={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', mb: 0.75 }}>
+                                    I'm looking for
+                                </Box>
+                                <Select
+                                    value={type}
+                                    onChange={(e) => setType(e.target.value)}
+                                    fullWidth
+                                    sx={{
+                                        height: FIELD_HEIGHT,
+                                        bgcolor: '#ffffff',
+                                        borderRadius: '999px',
+                                        fontSize: 13.5,
+                                        fontWeight: 600,
+                                        color: '#0f172a',
+                                        '& .MuiOutlinedInput-notchedOutline': { border: 'none' },
+                                        '& .MuiSelect-select': {
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            height: `${FIELD_HEIGHT}px !important`,
+                                            boxSizing: 'border-box',
+                                            py: 0,
+                                            pl: 2.5,
+                                        },
+                                    }}
+                                >
+                                    {PARTNER_TYPES.map((t) => (
+                                        <MenuItem key={t} value={t}>{t}</MenuItem>
+                                    ))}
+                                </Select>
                             </Box>
-                            <Select
-                                value={type}
-                                onChange={(e) => setType(e.target.value)}
-                                fullWidth
-                                sx={{
-                                    height: FIELD_HEIGHT,
-                                    bgcolor: '#ffffff',
-                                    borderRadius: '999px',
-                                    fontSize: 13.5,
-                                    fontWeight: 600,
-                                    color: '#0f172a',
-                                    '& .MuiOutlinedInput-notchedOutline': { border: 'none' },
-                                    '& .MuiSelect-select': {
+
+                            <Box sx={{ flex: 1 }}>
+                                <Box sx={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', mb: 0.75 }}>
+                                    Located in
+                                </Box>
+                                <Box
+                                    sx={{
+                                        height: FIELD_HEIGHT,
+                                        boxSizing: 'border-box',
                                         display: 'flex',
                                         alignItems: 'center',
-                                        height: `${FIELD_HEIGHT}px !important`,
-                                        boxSizing: 'border-box',
-                                        py: 0,
+                                        bgcolor: '#ffffff',
+                                        borderRadius: '999px',
                                         pl: 2.5,
-                                    },
-                                }}
-                            >
-                                {PARTNER_TYPES.map((t) => (
-                                    <MenuItem key={t} value={t}>{t}</MenuItem>
-                                ))}
-                            </Select>
-                        </Box>
-
-                        <Box sx={{ flex: 1 }}>
-                            <Box sx={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', mb: 0.75 }}>
-                                Located in
-                            </Box>
-                            <Box
-                                sx={{
-                                    height: FIELD_HEIGHT,
-                                    boxSizing: 'border-box',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    bgcolor: '#ffffff',
-                                    borderRadius: '999px',
-                                    pl: 2.5,
-                                    border: locationError ? '1.5px solid #ef4444' : '1.5px solid transparent',
-                                }}
-                            >
-                                <PlaceOutlinedIcon sx={{ fontSize: 18, color: '#94a3b8', flexShrink: 0 }} />
-                                <InputBase
-                                    value={location}
-                                    onChange={handleLocationChange}
-                                    onBlur={() => setLocationError(validateLocation(location))}
-                                    placeholder="Enter City, State, or Zip"
-                                    inputProps={{ maxLength: MAX_LOCATION_LENGTH }}
-                                    sx={{
-                                        fontSize: 13.5,
-                                        color: '#0f172a',
-                                        width: '100%',
-                                        height: '100%',
-                                        px: 1.25,
-                                        '& .MuiInputBase-input': { height: '100%', py: 0 },
+                                        border: locationError ? '1.5px solid #ef4444' : '1.5px solid transparent',
                                     }}
-                                />
-                            </Box>
-                            {locationError && (
-                                <Box sx={{ fontSize: 11.5, fontWeight: 600, color: '#f87171', mt: 0.6, pl: 0.5 }}>
-                                    {locationError}
+                                >
+                                    <PlaceOutlinedIcon sx={{ fontSize: 18, color: '#94a3b8', flexShrink: 0 }} />
+                                    <InputBase
+                                        value={location}
+                                        onChange={handleLocationChange}
+                                        onBlur={() => setLocationError(validateLocation(location))}
+                                        placeholder="Enter City, State, or Zip"
+                                        inputProps={{ maxLength: MAX_LOCATION_LENGTH }}
+                                        sx={{
+                                            fontSize: 13.5,
+                                            color: '#0f172a',
+                                            width: '100%',
+                                            height: '100%',
+                                            px: 1.25,
+                                            '& .MuiInputBase-input': { height: '100%', py: 0 },
+                                        }}
+                                    />
                                 </Box>
-                            )}
-                        </Box>
-                    </Box>
+                                {locationError && (
+                                    <Box sx={{ fontSize: 11.5, fontWeight: 600, color: '#f87171', mt: 0.6, pl: 0.5 }}>
+                                        {locationError}
+                                    </Box>
+                                )}
+                            </Box>
 
-                    <Button
-                        type="submit"
-                        fullWidth
-                        startIcon={<SearchIcon sx={{ fontSize: 18 }} />}
-                        sx={{
-                            mt: 3,
-                            bgcolor: '#2563eb',
-                            color: '#fff',
-                            textTransform: 'none',
-                            borderRadius: '999px',
-                            py: 1.25,
-                            fontWeight: 700,
-                            fontSize: 14,
-                            '&:hover': { bgcolor: '#1d4ed8' },
-                        }}
-                    >
-                        Search
-                    </Button>
+                            <Box sx={{ flex: '0 0 auto', width: { xs: '100%', sm: 130 } }}>
+                                <Button
+                                    type="submit"
+                                    fullWidth
+                                    startIcon={<SearchIcon sx={{ fontSize: 18 }} />}
+                                    sx={{
+                                        height: FIELD_HEIGHT,
+                                        bgcolor: '#2563eb',
+                                        color: '#fff',
+                                        textTransform: 'none',
+                                        borderRadius: '999px',
+                                        px: 2,
+                                        fontWeight: 700,
+                                        fontSize: 14,
+                                        whiteSpace: 'nowrap',
+                                        mt: { xs: 0, sm: '21px' },
+                                        '&:hover': { bgcolor: '#1d4ed8' },
+                                    }}
+                                >
+                                    Search
+                                </Button>
+                            </Box>
+                        </Box>
+
+                        <Button
+                            fullWidth
+                            onClick={handleFindDrayageCarrier}
+                            sx={{
+                                mt: 2,
+                                bgcolor: 'transparent',
+                                color: '#93c5fd',
+                                textTransform: 'none',
+                                borderRadius: '999px',
+                                py: 1.25,
+                                fontWeight: 700,
+                                fontSize: 14,
+                                border: '1.5px solid rgba(147,197,253,0.4)',
+                                '&:hover': {
+                                    bgcolor: 'rgba(147,197,253,0.08)',
+                                    borderColor: '#93c5fd',
+                                },
+                            }}
+                        >
+                            Find a drayage carrier
+                        </Button>
                     </Box>
                 </Box>
             </Fade>

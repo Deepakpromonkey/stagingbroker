@@ -13,6 +13,7 @@ const RiskAlerts = lazy(() => import('./pages/app/riskalert/RiskAlerts'))
 const LoadSearch = lazy(() => import('./pages/app/loadsearch/LoadSearch'))
 const CarrierSearch = lazy(() => import('./pages/app/carriers/CarrierSearch'))
 const CarrierProfile = lazy(() => import('./pages/app/carriers/CarrierProfile'))
+const DrayageCarrierFinder = lazy(() => import('./pages/app/drayage-carriers/DrayageCarrierFinder'))
 const DtScoreHowItWorks = lazy(() => import('./pages/app/carriers/DtScoreHowItWorks'))
 const ConnectedCarriers = lazy(() => import('./pages/app/carriers/ConnectedCarriers'))
 
@@ -179,6 +180,8 @@ function AppShell() {
           <Route path="/carriers" element={<ConnectedCarriers />} />
           <Route path="/carriers/search" element={<CarrierSearch />} />
           <Route path="/carriers/:row_id" element={<CarrierProfile />} />
+
+          <Route path="/carriers/drayage-finder" element={<DrayageCarrierFinder />} />
 
           <Route path="/profile/scoring-weights" element={<ScoringWeights />} />
 
