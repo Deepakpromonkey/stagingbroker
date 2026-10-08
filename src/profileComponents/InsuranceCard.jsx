@@ -117,11 +117,10 @@ function CoiPage({ pageNumber, width }) {
  * certificate is not shown at all: the browser's own viewer would put the
  * holder straight back on screen.
  *
- * The exception is `fallbackUrl`, for the carrier's own uploaded certificate.
- * Production has no /coi-files/ proxy in front of the bucket, so that file is
- * read straight off S3, and when the bucket refuses this origin it opens in
- * the browser's viewer instead - uncovered, but a broker who cannot see the
- * COI at all is worse off than one who can see who else it was issued to.
+ * The exception is `fallbackUrl`, for the carrier's own uploaded certificate:
+ * if pdf.js still cannot read it, it opens in the browser's viewer instead -
+ * uncovered, but a broker who cannot see the COI at all is worse off than one
+ * who can see who else it was issued to.
  *
  * Sized to its container, so the same component serves the full-height modal
  * and the preview inside the insurance thread.
@@ -1402,16 +1401,15 @@ function InsuranceCard(props) {
 
     }, [dotNumber]);
 /*
- * Read straight off the bucket. Staging fetches this through a /coi-files/
- * proxy so pdf.js can always cover the holder block, but production's web
- * server has no such location yet; until it does, CoiDocumentModal falls back
- * to the browser's viewer when the bucket refuses this origin.
+ * Read through the /coi-files/ location on this site's own web server, which
+ * forwards to the bucket. The bucket sends no CORS headers, so read off S3
+ * directly pdf.js cannot load it, and the fallback iframe downloads the file
+ * instead of showing it (S3 serves it as binary/octet-stream).
  */
 const coiUrl = coiDocument?.document_url
-    ? coiDocument.document_url.replace(
-        's3://dollartraq/',
-        'https://dollartraq.s3.us-east-2.amazonaws.com/'
-      )
+    ? coiDocument.document_url
+        .replace('s3://dollartraq/', '/coi-files/')
+        .replace('https://dollartraq.s3.us-east-2.amazonaws.com/', '/coi-files/')
     : null;
     const coverageRows = useMemo(function () {
 
