@@ -12,6 +12,9 @@ import SearchVet from './pages/app/SearchVet/SearchVet'
 import LoadSearch from './pages/app/loadsearch/LoadSearch'
 import CarrierSearch from './pages/app/carriers/CarrierSearch'
 import CarrierProfile from './pages/app/carriers/CarrierProfile'
+
+import DrayageCarrierFinder from './pages/app/drayage-carriers/DrayageCarrierFinder'
+
 import DtScoreHowItWorks from './pages/app/carriers/DtScoreHowItWorks'
 import ConnectedCarriers from './pages/app/carriers/ConnectedCarriers'
 
@@ -161,6 +164,8 @@ function AppShell() {
           <Route path="/carriers" element={<ConnectedCarriers />} />
           <Route path="/carriers/search" element={<CarrierSearch />} />
           <Route path="/carriers/:row_id" element={<CarrierProfile />} />
+
+          <Route path="/carriers/drayage-finder" element={<DrayageCarrierFinder />} />
 
           <Route path="/profile/scoring-weights" element={<ScoringWeights />} />
 
