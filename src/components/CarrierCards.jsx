@@ -76,6 +76,7 @@ function isUnratedValue(value) {
 function DTScorePanel(props) {
 
     const score = props.score;
+    const needsReview = !!props.needsReview;
     const tier = getScoreTier(score);
 
     if (!tier) {
@@ -149,6 +150,17 @@ function DTScorePanel(props) {
             >
                 {tier.label}
             </span>
+
+            {needsReview && (
+                <span
+                    title='The engine flagged this carrier for manual review. Check the score details before booking.'
+                    className='inline-flex items-center gap-[4px] text-[9.5px] font-[800] tracking-[0.05em] uppercase px-[8px] py-[2px] rounded-full'
+                    style={{ color: '#7A4A00', background: '#FFF4E0', border: '1px solid #F2B632' }}
+                >
+                    <span className='inline-block w-[6px] h-[6px] rounded-full' style={{ background: '#E07A1F' }} />
+                    Needs review
+                </span>
+            )}
 
         </div>
     );
@@ -487,7 +499,7 @@ function CarrierCard(props) {
                     }}
                 >
 
-                    <DTScorePanel score={carrier.dt_score} />
+                    <DTScorePanel score={carrier.dt_score} needsReview={carrier.dt_needs_manual_review} />
 
                     <div className='w-full h-px' style={{ background: BORDER }} />
 

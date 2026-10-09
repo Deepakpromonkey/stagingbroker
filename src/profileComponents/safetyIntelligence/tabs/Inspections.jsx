@@ -193,15 +193,27 @@ class Inspection extends React.Component {
         let indexOfFirstItem = indexOfLastItem - this.state.itemsPerPage;
         let currentRecords = filteredTable.slice(indexOfFirstItem, indexOfLastItem);
 
-        let vehicleOosRate = "N/A";
-        if (inspection.sms_measures && inspection.sms_measures.vehicle_oos_insp_total !== undefined) {
-            vehicleOosRate = inspection.sms_measures.vehicle_oos_insp_total;
-        }
+        // A rate is shown with its denominator, and below FMCSA's
+        // 5-inspection floor it is marked not ranked: "1" alone reads as a
+        // verdict when it is one inspection.
+        const OOS_FLOOR = 5;
+        const oosRate = (oos, total) => {
+            if (oos === undefined || oos === null || total === undefined || total === null) {
+                return { value: "N/A", notRanked: false };
+            }
+            const t = Number(total) || 0;
+            const o = Number(oos) || 0;
+            const pct = t > 0 ? Math.round((o / t) * 100) : 0;
+            return { value: t > 0 ? `${o} of ${t} (${pct}%)` : "0 inspections", notRanked: t < OOS_FLOOR };
+        };
 
-        let driverOosRate = "N/A";
-        if (inspection.sms_measures && inspection.sms_measures.driver_oos_insp_total !== undefined) {
-            driverOosRate = inspection.sms_measures.driver_oos_insp_total;
-        }
+        const sms = inspection.sms_measures || {};
+        const vehicleOos = oosRate(sms.vehicle_oos_insp_total, sms.vehicle_insp_total);
+        const driverOos = oosRate(sms.driver_oos_insp_total, sms.driver_insp_total);
+
+        let vehicleOosRate = vehicleOos.value;
+
+        let driverOosRate = driverOos.value;
 
          let verifiedInspections = inspection.inspections || [];
 
@@ -329,6 +341,11 @@ if (totalPages <= 5) {
                         <p className="mt-2.5 md:mt-3 text-[9px] md:text-[10px] font-[800] tracking-[0.08em] uppercase text-[#94a3b8]">
                             VEHICLE OOS RATE
                         </p>
+                        {vehicleOos.notRanked && (
+                            <p className="mt-1 text-[10px] md:text-[11px] font-[600] text-[#94a3b8]">
+                                below the {OOS_FLOOR}-inspection floor, not ranked
+                            </p>
+                        )}
                     </div>
 
                     <div className="bg-white border border-[#dbe3ef] rounded-[20px] md:rounded-[26px] px-4 sm:px-5 md:px-6 py-4 sm:py-5 md:py-6">
@@ -348,6 +365,11 @@ if (totalPages <= 5) {
                         <p className="mt-2.5 md:mt-3 text-[9px] md:text-[10px] font-[800] tracking-[0.08em] uppercase text-[#94a3b8]">
                             DRIVER OOS RATE
                         </p>
+                        {driverOos.notRanked && (
+                            <p className="mt-1 text-[10px] md:text-[11px] font-[600] text-[#94a3b8]">
+                                below the {OOS_FLOOR}-inspection floor, not ranked
+                            </p>
+                        )}
                     </div>
 
                     <div className="bg-white border border-[#dbe3ef] rounded-[20px] md:rounded-[26px] px-4 sm:px-5 md:px-6 py-4 sm:py-5 md:py-6">
