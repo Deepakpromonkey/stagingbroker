@@ -15,6 +15,21 @@ import {
     ArrowForward
 } from '@mui/icons-material';
 
+import {
+    StatusCluster,
+    VerdictChip,
+    PercentileGauge,
+    NotRankedPanel,
+    GroupCaption,
+    PolicyGuideModal,
+} from './BasicPercentile';
+
+import {
+    basicView,
+    VERDICT_STYLES,
+    PERCENTILE_FOOTNOTE,
+} from './basicPercentileModel';
+
 const CATEGORY_COLORS = {
     'UNSAFE DRIVING': {
         text: '#2563eb',
@@ -238,7 +253,13 @@ function Basics({ data }) {
 
     const tableRef = useRef(null);
 
+    const [policyOpen, setPolicyOpen] = useState(false);
+
     const basics = data || {};
+
+    const smsMeasures = basics?.sms_measures || {};
+
+    const vintage = smsMeasures?.benchmark_vintage || null;
 
     const violationData =
         basics?.violation_details || [];
@@ -328,7 +349,16 @@ function Basics({ data }) {
 
     const hasMore = visibleCount < totalCount;
 
-    const selectedValue = getMetricValue(selectedConfig, basics);
+    const selectedView = basicView(smsMeasures, selectedConfig.key);
+
+    const selectedValue = selectedView
+        ? (selectedView.measure === null ? '—' : Number(selectedView.measure).toFixed(2))
+        : getMetricValue(selectedConfig, basics);
+
+    // The measure takes its colour from the verdict, never the card theme.
+    const selectedStyle = selectedView
+        ? (VERDICT_STYLES[selectedView.verdict] || VERDICT_STYLES.not_ranked)
+        : null;
 
     const SelectedIcon = selectedConfig.icon;
 
@@ -457,6 +487,19 @@ function Basics({ data }) {
 
                             </p>
 
+                            {basicView(smsMeasures, config.key) && (
+
+                                <div className='mt-2 flex w-full justify-end'>
+
+                                    <StatusCluster
+                                        view={basicView(smsMeasures, config.key)}
+                                        onDark={isSelected}
+                                    />
+
+                                </div>
+
+                            )}
+
                         </button>
 
                     );
@@ -503,24 +546,62 @@ function Basics({ data }) {
                 </div>
 
                 <div
-                    className='flex items-center justify-center sm:justify-start gap-3 rounded-2xl px-5 sm:px-6 py-3 w-full sm:w-auto'
+                    className='flex flex-col items-center sm:items-end gap-2 rounded-2xl px-5 sm:px-6 py-3 w-full sm:w-auto'
                     style={{
-                        backgroundColor: `${selectedConfig.color}12`
+                        backgroundColor: selectedStyle ? selectedStyle.bg : `${selectedConfig.color}12`
                     }}
                 >
 
                     <span
                         className='text-[24px] sm:text-[26px] md:text-[28px] font-[900] leading-none'
-                        style={{ color: selectedConfig.color }}
+                        style={{ color: selectedStyle ? selectedStyle.color : selectedConfig.color }}
                     >
 
                         {selectedValue}
 
                     </span>
 
+                    {selectedView && selectedView.verdict === 'not_ranked' && (
+
+                        <span className='text-[10.5px] font-[700] text-slate-400'>for reference only</span>
+
+                    )}
+
+                    {selectedView && <VerdictChip view={selectedView} />}
+
                 </div>
 
             </div>
+
+            {/* PEER-GROUP PERCENTILE */}
+
+            {selectedView && (
+
+                <div className='rounded-2xl border border-[#e2e8f0] bg-white p-4 sm:p-5 md:p-6 shadow-sm'>
+
+                    {selectedView.verdict === 'not_ranked'
+                        ? <NotRankedPanel view={selectedView} />
+                        : <PercentileGauge view={selectedView} />}
+
+                    <div className='mt-3'>
+
+                        <GroupCaption
+                            view={selectedView}
+                            basicLabel={selectedConfig.label}
+                            vintage={vintage}
+                        />
+
+                    </div>
+
+                    <p className='mt-2 mb-0 text-[11px] text-slate-400'>
+
+                        {PERCENTILE_FOOTNOTE}
+
+                    </p>
+
+                </div>
+
+            )}
 
             {/* VIOLATION HISTORY */}
 
@@ -552,7 +633,14 @@ function Basics({ data }) {
 
                     </div>
 
-                    <button className='flex items-center gap-2 text-[12px] font-black text-[#001b3d] hover:text-blue-600'>
+                    <button
+                        onClick={function () {
+
+                            setPolicyOpen(true);
+
+                        }}
+                        className='flex items-center gap-2 text-[12px] font-black text-[#001b3d] hover:text-blue-600'
+                    >
 
                         <FilterList
                             sx={{
@@ -774,6 +862,18 @@ function Basics({ data }) {
                 )}
 
             </div>
+
+            <PolicyGuideModal
+                open={policyOpen}
+                onClose={function () {
+
+                    setPolicyOpen(false);
+
+                }}
+                smsMeasures={smsMeasures}
+                metrics={METRIC_CONFIG}
+                vintage={vintage}
+            />
 
         </div>
 
