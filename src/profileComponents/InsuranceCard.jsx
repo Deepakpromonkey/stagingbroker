@@ -117,10 +117,15 @@ function CoiPage({ pageNumber, width }) {
  * certificate is not shown at all: the browser's own viewer would put the
  * holder straight back on screen.
  *
+ * The exception is `fallbackUrl`, for the carrier's own uploaded certificate:
+ * if pdf.js still cannot read it, it opens in the browser's viewer instead -
+ * uncovered, but a broker who cannot see the COI at all is worse off than one
+ * who can see who else it was issued to.
+ *
  * Sized to its container, so the same component serves the full-height modal
  * and the preview inside the insurance thread.
  */
-function MaskedCertificate({ file, maxWidth = 860 }) {
+function MaskedCertificate({ file, maxWidth = 860, fallbackUrl = null }) {
     const bodyRef = useRef(null);
     const [numPages, setNumPages] = useState(0);
     const [width, setWidth] = useState(0);
@@ -147,7 +152,13 @@ function MaskedCertificate({ file, maxWidth = 860 }) {
 
     return (
         <div ref={bodyRef} className='h-full w-full'>
-            {loadFailed ? (
+            {loadFailed && fallbackUrl ? (
+                <iframe
+                    src={fallbackUrl}
+                    title='Certificate of Insurance'
+                    className='h-full w-full border-0'
+                />
+            ) : loadFailed ? (
                 <p className='p-[16px] text-[13px] font-[500] text-[#991b1b]'>
                     The certificate could not be displayed.
                 </p>
@@ -207,7 +218,7 @@ function CoiDocumentModal({ url, onClose }) {
                 </div>
 
                 <div className='flex-1 overflow-auto bg-[#f8fafc]'>
-                    <MaskedCertificate file={url} />
+                    <MaskedCertificate file={url} fallbackUrl={url} />
                 </div>
             </div>
         </div>
@@ -1390,17 +1401,15 @@ function InsuranceCard(props) {
 
     }, [dotNumber]);
 /*
- * Fetched through this site's own /coi-files/ path, which the web server (and
- * the Vite dev server) proxies to the bucket. The bucket sends no CORS
- * headers, and pdf.js has to read the file itself to cover the holder block.
+ * Read through the /coi-files/ location on this site's own web server, which
+ * forwards to the bucket. The bucket sends no CORS headers, so read off S3
+ * directly pdf.js cannot load it, and the fallback iframe downloads the file
+ * instead of showing it (S3 serves it as binary/octet-stream).
  */
 const coiUrl = coiDocument?.document_url
-    ? `/coi-files${new URL(
-        coiDocument.document_url.replace(
-          's3://dollartraq/',
-          'https://dollartraq.s3.us-east-2.amazonaws.com/'
-        )
-      ).pathname}`
+    ? coiDocument.document_url
+        .replace('s3://dollartraq/', '/coi-files/')
+        .replace('https://dollartraq.s3.us-east-2.amazonaws.com/', '/coi-files/')
     : null;
     const coverageRows = useMemo(function () {
 

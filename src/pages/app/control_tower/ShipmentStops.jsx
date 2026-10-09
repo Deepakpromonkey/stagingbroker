@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
     useReactTable,
     getCoreRowModel,
@@ -54,6 +54,48 @@ function getStopStatus(stop) {
         dot: 'bg-[#94A3B8]',
         pill: 'bg-[#F1F5F9] text-[#475569]',
     };
+}
+
+/*
+| The code the stop's contact gives the driver on arrival. Shown to the broker
+| so they can pass it on when the contact cannot be reached; the driver app
+| records the moment it was entered as otp_verified_at.
+*/
+function StopOtp({ stop }) {
+    const [copied, setCopied] = useState(false);
+
+    if (!stop.requires_otp) {
+        return <span className="text-sm text-[#94A3B8]">—</span>;
+    }
+
+    const verifiedAt = stop.otp_verified_at || stop.progress?.otp_verified_at;
+
+    const copy = () => {
+        if (!stop.otp_code || !navigator.clipboard) return;
+        navigator.clipboard.writeText(String(stop.otp_code));
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 1500);
+    };
+
+    return (
+        <div className="flex flex-col gap-1">
+            {stop.otp_code ? (
+                <button
+                    type="button"
+                    onClick={copy}
+                    title="Click to copy"
+                    className="w-fit rounded-md border border-[#E2E8F0] bg-[#F8FAFC] px-2.5 py-1 font-mono text-sm font-bold tracking-[0.2em] text-[#0F172A] hover:border-[#2563EB] hover:text-[#2563EB]"
+                >
+                    {copied ? 'Copied!' : stop.otp_code}
+                </button>
+            ) : (
+                <span className="text-sm text-[#94A3B8]">Not generated</span>
+            )}
+            <span className={`text-[11px] font-medium ${verifiedAt ? 'text-[#15803D]' : 'text-[#94A3B8]'}`}>
+                {verifiedAt ? `Verified ${verifiedAt}` : 'Not verified yet'}
+            </span>
+        </div>
+    );
 }
 
 function ShipmentStops({ shipment }) {
@@ -170,9 +212,25 @@ function ShipmentStops({ shipment }) {
         }),
     ]), []);
 
+    // The OTP column only appears on loads where a stop asks for one.
+    const hasOtp = sortedStops.some((stop) => stop.requires_otp);
+
+    const visibleColumns = useMemo(() => {
+        if (!hasOtp) return columns;
+
+        const otpColumn = columnHelper.display({
+            id: 'otp',
+            header: 'OTP',
+            cell: (info) => <StopOtp stop={info.row.original} />,
+        });
+
+        // Just before Status, which it explains.
+        return [...columns.slice(0, -1), otpColumn, columns[columns.length - 1]];
+    }, [columns, hasOtp]);
+
     const table = useReactTable({
         data: sortedStops,
-        columns,
+        columns: visibleColumns,
         getCoreRowModel: getCoreRowModel(),
     });
 
@@ -197,7 +255,7 @@ function ShipmentStops({ shipment }) {
                     <tbody>
                         {sortedStops.length === 0 ? (
                             <tr className="bg-white">
-                                {columns.map((col) => (
+                                {visibleColumns.map((col) => (
                                     <td key={col.id} className="px-3 sm:px-4 py-6 text-sm text-[#64748B]">—</td>
                                 ))}
                             </tr>

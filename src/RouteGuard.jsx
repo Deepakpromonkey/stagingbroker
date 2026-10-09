@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "./components/ui/Toaster";
 import DataUpdateNotice, { shouldShowDataUpdateNotice } from "./pages/app/data-update/DataUpdateNotice";
-import { apiFetch } from "./lib/api";
-
+import { apiFetch, getToken as getAuthToken } from "./lib/api";
 const LOGIN_PATH = "/";
 // /accept-invitation is reached from the team invitation email by someone
 // who has no session yet — the 64-character token in the query string is what
@@ -156,10 +155,6 @@ const STEP_PREREQUISITES = [
   },
 ];
 
-function getToken() {
-  const match = document.cookie.match(/(?:^|;\s*)crm_auth_token=([^;]*)/);
-  return match ? match[1] : null;
-}
 
 function getUser() {
   const stored = localStorage.getItem(AUTH_USER_KEY);
@@ -184,9 +179,8 @@ function hasPermission(permission, user) {
 export default function RouteGuard({ children }) {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const token = getToken();
+const token = getAuthToken();
 
-  console.log("RouteGuard rendered:", pathname);
   
   const [planAccess, setPlanAccess] = useState(cachedPlanAccess);
   const [needsDataUpdateAck, setNeedsDataUpdateAck] = useState(() =>
@@ -315,7 +309,7 @@ export default function RouteGuard({ children }) {
     }
   }, [pathname, token, navigate, planAccess]);
 
- const isPublic = isPublicPath(pathname);
+  const isPublic = isPublicPath(pathname);
 
   if (token && !isPublic && needsDataUpdateAck) {
     return (

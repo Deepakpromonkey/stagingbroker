@@ -9,9 +9,11 @@ const TrackShipmentEld = lazy(() => import('./pages/app/trackshipment-eld/EldShi
 const EldShipmentDetail = lazy(() => import('./pages/app/trackshipment-eld/EldShipmentDetail'))
 const PublicTracking = lazy(() => import('./pages/app/PublicTracking/PublicTracking'))
 const SearchVet = lazy(() => import('./pages/app/SearchVet/SearchVet'))
+const RiskAlerts = lazy(() => import('./pages/app/riskalert/RiskAlerts'))
 const LoadSearch = lazy(() => import('./pages/app/loadsearch/LoadSearch'))
 const CarrierSearch = lazy(() => import('./pages/app/carriers/CarrierSearch'))
 const CarrierProfile = lazy(() => import('./pages/app/carriers/CarrierProfile'))
+const DrayageCarrierFinder = lazy(() => import('./pages/app/drayage-carriers/DrayageCarrierFinder'))
 const DtScoreHowItWorks = lazy(() => import('./pages/app/carriers/DtScoreHowItWorks'))
 const ConnectedCarriers = lazy(() => import('./pages/app/carriers/ConnectedCarriers'))
 
@@ -141,6 +143,7 @@ function AppShell() {
           <Route path="/trackshipment/eld" element={<TrackShipmentEld />} />
           <Route path="/load-search" element={<LoadSearch />} />
           <Route path="/search-vet" element={<SearchVet />} />
+        <Route path="/risk-alerts" element={<RiskAlerts />} />
         <Route path="/coi-request" element={<CoiRequest />} />
           <Route path="/users" element={<UsersList />} />
           <Route path="/profile" element={<ProfileUpdate />} />
@@ -177,6 +180,8 @@ function AppShell() {
           <Route path="/carriers" element={<ConnectedCarriers />} />
           <Route path="/carriers/search" element={<CarrierSearch />} />
           <Route path="/carriers/:row_id" element={<CarrierProfile />} />
+
+          <Route path="/carriers/drayage-finder" element={<DrayageCarrierFinder />} />
 
           <Route path="/profile/scoring-weights" element={<ScoringWeights />} />
 

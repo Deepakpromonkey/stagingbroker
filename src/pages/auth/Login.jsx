@@ -15,7 +15,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
 
 import { toast } from '../../components/ui/Toaster';
-import { apiFetch } from '../../lib/api';
+import { apiFetch, getToken } from '../../lib/api';
 import { getDeviceUUID } from '../../utils/DeviceUuid';
 
 import logo from '../../assets/images/logo.webp';
@@ -735,7 +735,7 @@ const Login  = () => {
     const navigate = useNavigate();
 
     const [loading, setLoading] = useState(false);
-    const [loggedIn] = useState(!!localStorage.getItem('crm_auth_token'));
+    const [loggedIn] = useState(!!getToken());
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');

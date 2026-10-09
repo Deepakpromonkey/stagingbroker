@@ -46,7 +46,7 @@ import fs from 'fs'
  * version.
  */
 const PDFJS_ASSET_DIRS = ['wasm', 'iccs', 'standard_fonts', 'cmaps']
-const pdfjsDist = path.resolve(import.meta.dirname, 'node_modules/pdfjs-dist')
+const pdfjsDist = path.resolve(__dirname, 'node_modules/pdfjs-dist')
 
 function pdfjsAssets() {
   let outDir
@@ -86,18 +86,12 @@ export default defineConfig({
   server: {
     host: true,
     // This allows VS Code's forwarded URL to access your local server
-    allowedHosts: true, 
-    // Mirrors the /coi-files/ location on the web server: the COI bucket
-    // sends no CORS headers, and pdf.js must read the certificate itself.
+    allowedHosts: true,
     proxy: {
-      '/coi-files': {
-        target: 'https://dollartraq.s3.us-east-2.amazonaws.com',
-        changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/coi-files/, ''),
-      },
-    },
-  },
-    proxy: {
+      // Fleetra (the chat API) runs as a separate service. Forwarding it here
+      // keeps the browser on ONE origin in development: no CORS, and the
+      // requests work the same through a VS Code forwarded URL or from another
+      // device on the LAN. A deployed build calls VITE_FLEETRA_URL instead.
       "/fleetra": {
         target: process.env.FLEETRA_URL || "http://127.0.0.1:8088",
         changeOrigin: true,
@@ -109,17 +103,25 @@ export default defineConfig({
           });
         },
       },
+      // Mirrors the /coi-files/ location on the staging web server: the COI
+      // bucket sends no CORS headers, and pdf.js must read the certificate itself.
+      '/coi-files': {
+        target: 'https://dollartraq.s3.us-east-2.amazonaws.com',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/coi-files/, ''),
+      },
     },
+  },
   resolve: {
         alias: {
-            "@": path.resolve(import.meta.dirname, "./src"),
-            "actions": path.resolve(import.meta.dirname, "./src/actions"),
-            "api": path.resolve(import.meta.dirname, "./src/api"),
-            "pages": path.resolve(import.meta.dirname, "./src/pages"),
-            "assets": path.resolve(import.meta.dirname, "./src/assets"),
-            "components": path.resolve(import.meta.dirname, "./src/components"),
-            "helpers": path.resolve(import.meta.dirname, "./src/helpers"),
-            "lib": path.resolve(import.meta.dirname, "./src/lib"),
+            "@": path.resolve(__dirname, "./src"),
+            "actions": path.resolve(__dirname, "./src/actions"),
+            "api": path.resolve(__dirname, "./src/api"),
+            "pages": path.resolve(__dirname, "./src/pages"),
+            "assets": path.resolve(__dirname, "./src/assets"),
+            "components": path.resolve(__dirname, "./src/components"),
+            "helpers": path.resolve(__dirname, "./src/helpers"),
+            "lib": path.resolve(__dirname, "./src/lib"),
         }
     },
 })

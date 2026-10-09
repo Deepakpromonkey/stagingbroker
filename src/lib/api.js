@@ -9,16 +9,18 @@ export const STRIPE_PUBLIC_KEY = 'pk_live_51TP2bME8lGA6s4DI1Qrd3hBPKD6jZEZFP43NN
 | halves together -- previously this meant editing the line below and
 | remembering not to commit it.
 */
-export const API_BASE = import.meta.env.VITE_API_BASE;
-
-
-
-
+export const API_BASE =
+    import.meta.env.VITE_API_BASE || "https://brokerapi.dollartraq.com/api/v1";
+ 
 export const SOCKET_BASE = API_BASE.replace(/^http/, "ws");
  
 export function getToken() {
     if (typeof window === "undefined") return "";
-    return localStorage.getItem("crm_auth_token") ?? "";
+    const fromStorage = localStorage.getItem("crm_auth_token");
+    if (fromStorage) return fromStorage;
+
+    const match = document.cookie.match(/(?:^|;\s*)crm_auth_token=([^;]*)/);
+    return match ? match[1] : "";
 }
  
 export function authHeaders(isFormData = false, skipAuth = false) {
