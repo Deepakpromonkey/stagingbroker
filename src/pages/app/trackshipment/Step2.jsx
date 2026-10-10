@@ -11,6 +11,14 @@ import { toast } from "../../../components/ui/Toaster";
 import StepSidebar from "./StepSidebar";
 import { useShipmentDraftStore, CustomDropdown } from "./Step1";
 import {
+  NOT_ON_THE_MAP,
+  PICK_FROM_SUGGESTIONS,
+  hasLocation,
+  newSaveAttempt,
+  placeLocation,
+  saveTripSheet,
+} from "./tripSheet";
+import {
   COUNTRY_CODES,
   PHONE_VALIDATION,
   validatePhoneForCountry,
@@ -182,6 +190,18 @@ const stopSchema = z.object({
 const step2Schema = z.object({ stops: z.array(stopSchema) }).superRefine((data, ctx) => {
   data.stops.forEach((stop, idx) => {
     const isPickup = stop.stopType === "pickup";
+
+    // Every stop needs a pin on the map - the driver app draws it, and the
+    // driver can't mark the stop arrived without it. Only picking a Google
+    // suggestion sets one (AddressAutocomplete); a typed or pasted address
+    // has none. An empty address already has its own "required" message.
+    if (stop.address?.trim() && !hasLocation(stop)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["stops", idx, "address"],
+        message: PICK_FROM_SUGGESTIONS,
+      });
+    }
 
     // Contact name / phone only matter when this stop asks the driver for an
     // OTP — the code is texted to that number, so both become mandatory.
@@ -484,7 +504,7 @@ const StopTypeBadge = ({ label }) => (
   </span>
 );
 
-function AddressAutocomplete({ index, value, onChange, setValue, error, hasError }) {
+function AddressAutocomplete({ index, value, onChange, setValue, setError, clearErrors, error, hasError }) {
   const inputRef = useRef(null);
 
   useEffect(() => {
@@ -499,14 +519,20 @@ function AddressAutocomplete({ index, value, onChange, setValue, error, hasError
 
     const listener = autocomplete.addListener("place_changed", () => {
       const place = autocomplete.getPlace();
+      const location = placeLocation(place);
 
-      if (!place.geometry) return;
-
-      const lat = place.geometry.location.lat();
-      const lng = place.geometry.location.lng();
+      if (!location) {
+        // Enter on typed text with no suggestion highlighted, or a place
+        // Google has no pin for. Say so now rather than at Save, and leave
+        // no older pin behind.
+        setValue(`stops.${index}.latitude`, null);
+        setValue(`stops.${index}.longitude`, null);
+        setError(`stops.${index}.address`, { type: "manual", message: NOT_ON_THE_MAP });
+        return;
+      }
 
       let city = "", state = "", zip = "", country = "";
-      place.address_components.forEach((component) => {
+      (place.address_components || []).forEach((component) => {
         const types = component.types;
         if (types.includes("locality") || types.includes("sublocality_level_1")) city = component.long_name;
         if (types.includes("administrative_area_level_1")) state = component.short_name;
@@ -514,9 +540,12 @@ function AddressAutocomplete({ index, value, onChange, setValue, error, hasError
         if (types.includes("country")) country = component.long_name;
       });
 
+      // The pin before the address: after a first Save the address is
+      // re-checked as it changes, and it must have its pin by then.
+      setValue(`stops.${index}.latitude`, location.latitude);
+      setValue(`stops.${index}.longitude`, location.longitude);
       onChange(place.formatted_address);
-      setValue(`stops.${index}.latitude`, lat);
-      setValue(`stops.${index}.longitude`, lng);
+      clearErrors(`stops.${index}.address`);
       if (city) setValue(`stops.${index}.city`, city);
       if (state) setValue(`stops.${index}.state`, state);
       if (zip) setValue(`stops.${index}.zipcode`, zip);
@@ -526,7 +555,7 @@ function AddressAutocomplete({ index, value, onChange, setValue, error, hasError
     return () => {
       if (window.google) window.google.maps.event.removeListener(listener);
     };
-  }, [index, setValue, onChange]);
+  }, [index, setValue, onChange, setError, clearErrors]);
 
   return (
     <div>
@@ -535,7 +564,14 @@ function AddressAutocomplete({ index, value, onChange, setValue, error, hasError
         className={inputClass + (hasError ? " border-red-400 focus:border-red-400 focus:ring-red-100" : "")}
         placeholder="Search and select address..."
         value={value || ""}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          // A pin belongs to the suggestion it came from. Once the text is
+          // edited it's a different address, with no pin until a suggestion
+          // is picked again - otherwise the stop keeps the old spot's pin.
+          setValue(`stops.${index}.latitude`, null);
+          setValue(`stops.${index}.longitude`, null);
+          onChange(e.target.value);
+        }}
       />
       <ErrorText>{error}</ErrorText>
     </div>
@@ -633,7 +669,7 @@ function CustomEventRow({ stopIndex, ceIndex, control, register, remove }) {
   );
 }
 
-function StopCard({ index, total, control, register, errors, setValue, trigger, remove, canRemove }) {
+function StopCard({ index, total, control, register, errors, setValue, setError, clearErrors, trigger, remove, canRemove }) {
   const [collapsed, setCollapsed] = useState(false);
 
   const {
@@ -652,6 +688,18 @@ function StopCard({ index, total, control, register, errors, setValue, trigger, 
     useWatch({ control, name: `stops.${index}.contactCountryCode` }) || DEFAULT_COUNTRY_CODE;
 
   const toggleCollapsed = () => setCollapsed((v) => !v);
+
+  // A collapsed stop hides its fields, and with them the message saying what
+  // to fix - so a stop opens itself when it gets a problem. Set while
+  // rendering, not in an effect: React's pattern for state that follows a
+  // changing value.
+  const hasErrors = !!errors?.stops?.[index];
+  const [hadErrors, setHadErrors] = useState(hasErrors);
+
+  if (hasErrors !== hadErrors) {
+    setHadErrors(hasErrors);
+    if (hasErrors) setCollapsed(false);
+  }
 
   const stopAccent =
     stopTypeValue === "pickup" ? "#1D4ED8" : stopTypeValue === "delivery" ? "#12B76A" : "#7C6EF2";
@@ -842,6 +890,8 @@ function StopCard({ index, total, control, register, errors, setValue, trigger, 
                     value={value}
                     onChange={onChange}
                     setValue={setValue}
+                    setError={setError}
+                    clearErrors={clearErrors}
                     error={fieldState.error?.message}
                     hasError={!!fieldState.error}
                   />
@@ -1066,6 +1116,8 @@ export default function TrackShipmentStep2() {
     handleSubmit,
     watch,
     setValue,
+    setError,
+    clearErrors,
     trigger,
     formState: { isSubmitting, errors },
   } = useForm({
@@ -1075,6 +1127,9 @@ export default function TrackShipmentStep2() {
   });
 
   const { fields, append, insert, remove } = useFieldArray({ control, name: "stops" });
+
+  // What an earlier Save on this page got done - see saveTripSheet().
+  const saveAttempt = useRef(newSaveAttempt());
 
   useEffect(() => {
     fields.forEach((_, idx) => {
@@ -1103,35 +1158,29 @@ export default function TrackShipmentStep2() {
       return;
     }
 
-    const stopsPayload = buildTripSheetPayload(data.stops);
-
-    const formData = new FormData();
-    formData.append("stops_data", JSON.stringify(stopsPayload));
-
     try {
-      const shipmentRes = await apiFetch("/shipments", {
-        method: "POST",
-        body: JSON.stringify(step1Payload),
+      // Shared with every retry from this page, so a save that failed after
+      // creating the load finishes that load instead of making another.
+      const result = await saveTripSheet({
+        apiFetch,
+        step1Payload,
+        stopsPayload: buildTripSheetPayload(data.stops),
+        attempt: saveAttempt.current,
       });
 
-      if (!shipmentRes) {
-        toast.error({
-          title: "Could not create shipment",
-          message: shipmentRes?.message || "Please check the form and try again.",
-          duration: 6000,
+      sessionStorage.setItem("current_shipment_uuid", result.uuid);
+
+      if (result.stopsChanged) {
+        toast.warning({
+          title: "Shipment saved",
+          message: "Its stops were saved by your earlier attempt, before your last changes. Open the load to check them.",
+          duration: 8000,
         });
-        return;
+      } else {
+        toast.success({ title: "Shipment and Stops saved successfully!", duration: 2500 });
       }
 
-      const shipmentUuid = shipmentRes.data?.uuid || shipmentRes.uuid;
-      sessionStorage.setItem("current_shipment_uuid", shipmentUuid);
-
-      await apiFetch(`/shipments/${shipmentUuid}/stops`, {
-        method: "POST",
-        body: formData,
-      });
-
-      toast.success({ title: "Shipment and Stops saved successfully!", duration: 2500 });
+      saveAttempt.current = newSaveAttempt();
       resetStep2Draft();
       resetStep1Draft();
       navigate("/dashboard");
@@ -1168,6 +1217,8 @@ export default function TrackShipmentStep2() {
                 register={register}
                 errors={errors}
                 setValue={setValue}
+                setError={setError}
+                clearErrors={clearErrors}
                 trigger={trigger}
                 remove={remove}
                 canRemove={index !== 0 && index !== fields.length - 1}
