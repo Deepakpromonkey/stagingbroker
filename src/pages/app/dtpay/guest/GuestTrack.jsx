@@ -88,7 +88,7 @@ export default function GuestTrack() {
                 <div className='grid grid-cols-1 gap-8 px-7 py-7 lg:grid-cols-[1fr_300px] lg:items-center'>
                     <div>
                         <div className='flex flex-wrap items-center gap-3'>
-                            <Amount value={p.amount.formatted} className='text-[40px] font-extrabold leading-none tracking-[-0.03em] text-[#101828]' />
+                            <Amount value={p.amount.formatted} className='text-[40px] font-extrabold leading-none tracking-[-0.03em] text-[#1a1a1a]' />
                             <StatusBadge status={p.status} onHold={p.on_hold} large />
                         </div>
                         <div className='mt-9'>
@@ -102,8 +102,8 @@ export default function GuestTrack() {
                         </div>
                     </div>
 
-                    <div className='rounded-[14px] bg-[#F9FAFB] p-5'>
-                        <p className='m-0 text-[14px] leading-6 text-[#344054]'>{next || 'Nothing to do.'}</p>
+                    <div className='rounded-xl bg-[#F9FAFB] p-5'>
+                        <p className='m-0 text-[14px] leading-6 text-[#334155]'>{next || 'Nothing to do.'}</p>
                         <div className='mt-4 flex flex-col gap-2'>
                             {p.can.pay && <Link to={`/guest-pay/pay/${token}`}><Button className='w-full'>{p.status === 'failed' ? 'Try again' : 'Finish paying'}</Button></Link>}
                             {p.status === 'funded' && <Button variant='release' className='w-full' disabled={!p.can.release || !p.payout.ready} onClick={() => setConfirm(true)}>Release {p.amount.formatted}</Button>}
@@ -131,7 +131,7 @@ export default function GuestTrack() {
 
             <Modal open={confirm} title={`Pay ${p.amount.formatted} to ${carrier}?`} onClose={() => setConfirm(false)}
                 footer={<><Button variant='secondary' onClick={() => setConfirm(false)}>Not yet</Button><Button variant='release' loading={busy} onClick={release}>Release {p.amount.formatted}</Button></>}>
-                <p className='m-0 text-[14px] leading-6 text-[#344054]'>The money leaves DollarTraq and goes to the carrier's bank. Release only after the load was delivered.</p>
+                <p className='m-0 text-[14px] leading-6 text-[#334155]'>The money leaves DollarTraq and goes to the carrier's bank. Release only after the load was delivered.</p>
             </Modal>
 
             <DisputeModal open={disputeOpen} onClose={() => setDisputeOpen(false)}

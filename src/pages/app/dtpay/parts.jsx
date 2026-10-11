@@ -30,10 +30,10 @@ export function CarrierPicker({ value, onChange, search }) {
     if (value?.dot && !manual) {
         return (
             <Field label='Carrier' required>
-                <div className='flex items-center justify-between gap-3 rounded-[14px] border-2 border-[#2953E4] bg-[#F5F8FF] px-4 py-3.5'>
+                <div className='flex items-center justify-between gap-3 rounded-xl border-2 border-[#185FA5] bg-[#EFF6FF] px-4 py-3.5'>
                     <div>
-                        <p className='m-0 text-[14.5px] font-semibold text-[#101828]'>{value.name || 'Carrier'}</p>
-                        <p className='m-0 text-[12.5px] text-[#475467]'>DOT {value.dot}{value.mc ? `, MC ${value.mc}` : ''}{value.location ? `, ${value.location}` : ''}</p>
+                        <p className='m-0 text-[14.5px] font-semibold text-[#1a1a1a]'>{value.name || 'Carrier'}</p>
+                        <p className='m-0 text-[12.5px] text-[#475569]'>DOT {value.dot}{value.mc ? `, MC ${value.mc}` : ''}{value.location ? `, ${value.location}` : ''}</p>
                     </div>
                     <Button variant='ghost' size='sm' onClick={() => { onChange(null); setQ(''); }}>Change</Button>
                 </div>
@@ -50,7 +50,7 @@ export function CarrierPicker({ value, onChange, search }) {
                 <Field label='Carrier DOT #' required><input className={inputClass} value={v.dot} onChange={set('dot')} inputMode='numeric' /></Field>
                 <Field label='Carrier name'><input className={inputClass} value={v.name} onChange={set('name')} /></Field>
                 <Field label='MC #'><input className={inputClass} value={v.mc} onChange={set('mc')} /></Field>
-                <button type='button' className='text-left text-[12.5px] font-semibold text-[#2953E4] sm:col-span-3' onClick={() => { setManual(false); onChange(null); }}>
+                <button type='button' className='text-left text-[12.5px] font-semibold text-[#185FA5] sm:col-span-3' onClick={() => { setManual(false); onChange(null); }}>
                     Search the carrier directory instead
                 </button>
             </div>
@@ -64,21 +64,21 @@ export function CarrierPicker({ value, onChange, search }) {
                 {loading && <span className='absolute right-3 top-1/2 -translate-y-1/2'><Spinner small /></span>}
             </div>
             {results.length > 0 && (
-                <ul className='m-0 mt-2 max-h-[260px] list-none overflow-auto rounded-[12px] border border-[#EAECF0] bg-white p-0 shadow-[0_8px_20px_rgba(16,24,40,0.08)]'>
+                <ul className='m-0 mt-2 max-h-[260px] list-none overflow-auto rounded-[12px] border border-[#e5e7eb] bg-white p-0 shadow-[0_8px_20px_rgba(16,24,40,0.08)]'>
                     {results.map((c) => (
                         <li key={c.dot}>
-                            <button type='button' onClick={() => onChange(c)} className='w-full border-b border-[#F2F4F7] px-4 py-2.5 text-left last:border-0 hover:bg-[#F9FAFB]'>
-                                <span className='block text-[13.5px] font-semibold text-[#101828]'>{c.name}{c.dba ? ` (${c.dba})` : ''}</span>
-                                <span className='block text-[12px] text-[#667085]'>DOT {c.dot}{c.mc ? `, MC ${c.mc}` : ''}{c.location ? `, ${c.location}` : ''}</span>
+                            <button type='button' onClick={() => onChange(c)} className='w-full border-b border-[#f1f5f9] px-4 py-2.5 text-left last:border-0 hover:bg-[#F9FAFB]'>
+                                <span className='block text-[13.5px] font-semibold text-[#1a1a1a]'>{c.name}{c.dba ? ` (${c.dba})` : ''}</span>
+                                <span className='block text-[12px] text-[#6b7280]'>DOT {c.dot}{c.mc ? `, MC ${c.mc}` : ''}{c.location ? `, ${c.location}` : ''}</span>
                             </button>
                         </li>
                     ))}
                 </ul>
             )}
             {searching && !loading && results.length === 0 && (
-                <p className='m-0 mt-2 text-[12.5px] text-[#667085]'>No carrier found.</p>
+                <p className='m-0 mt-2 text-[12.5px] text-[#6b7280]'>No carrier found.</p>
             )}
-            <button type='button' className='mt-2 text-[12.5px] font-semibold text-[#2953E4]' onClick={() => { setManual(true); onChange({ dot: /^\d+$/.test(q.trim()) ? q.trim() : '', name: /^\d+$/.test(q.trim()) ? '' : q.trim(), mc: '' }); }}>
+            <button type='button' className='mt-2 text-[12.5px] font-semibold text-[#185FA5]' onClick={() => { setManual(true); onChange({ dot: /^\d+$/.test(q.trim()) ? q.trim() : '', name: /^\d+$/.test(q.trim()) ? '' : q.trim(), mc: '' }); }}>
                 Not listed? Enter the carrier manually
             </button>
         </Field>
@@ -121,7 +121,7 @@ export function PayoutStatus({ dot, name, compact = false }) {
 
     const body = (
         <>
-            {!state && !error && <p className='m-0 flex items-center gap-2 text-[13px] text-[#667085]'><Spinner small /> Checking the carrier's payout setup</p>}
+            {!state && !error && <p className='m-0 flex items-center gap-2 text-[13px] text-[#6b7280]'><Spinner small /> Checking the carrier's payout setup</p>}
             {error && <p className='m-0 text-[13px] text-[#B42318]'>{error}</p>}
             {state?.ready && <Notice tone='success'>{name || 'The carrier'} can receive payouts. Release sends the money straight to their bank.</Notice>}
             {state && !state.ready && (
@@ -137,7 +137,7 @@ export function PayoutStatus({ dot, name, compact = false }) {
                         </div>
                     ) : (
                         <div className='mt-3'>
-                            <p className='m-0 mb-1 text-[12.5px] text-[#475467]'>Send this link to the carrier. It opens Stripe's secure payout setup.</p>
+                            <p className='m-0 mb-1 text-[12.5px] text-[#475569]'>Send this link to the carrier. It opens Stripe's secure payout setup.</p>
                             <div className='flex gap-2'>
                                 <input readOnly className={inputClass} value={link} onFocus={(e) => e.target.select()} />
                                 <Button variant='secondary' onClick={copy} className='shrink-0'>{copied ? 'Copied' : 'Copy'}</Button>

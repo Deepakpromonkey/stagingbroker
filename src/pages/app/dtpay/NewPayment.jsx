@@ -115,9 +115,10 @@ export default function NewPayment() {
 
     return (
         <Page
-            title={existing ? `Pay ${existing.reference}` : 'Pay a carrier'}
+            title={existing ? 'Pay' : 'Pay a'}
+            accent={existing ? existing.reference : 'carrier'}
             intro='The carrier receives the full amount. Your money is held by DollarTraq until you release it.'
-            back={{ to: existing ? `/dt-pay/transactions/view/${existing.id}` : '/dt-pay', label: existing ? existing.reference : 'DT Pay' }}
+            back={{ to: existing ? `/dt-pay/transactions/view/${existing.id}` : '/dt-pay', label: existing ? existing.reference : 'Overview' }}
             testMode={config && !config.livemode}
         >
             <ErrorBanner>{error}</ErrorBanner>
@@ -146,7 +147,7 @@ export default function NewPayment() {
                             <Panel title='How much'>
                                 <Field label='Amount the carrier receives' required>
                                     <div className='relative max-w-[320px]'>
-                                        <span className='pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[18px] font-semibold text-[#667085]'>$</span>
+                                        <span className='pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[18px] font-semibold text-[#6b7280]'>$</span>
                                         <input
                                             className={`${inputClass} py-3 pl-9 text-[20px] font-bold`}
                                             style={{ fontFeatureSettings: '"tnum" 1' }}
@@ -190,15 +191,15 @@ export default function NewPayment() {
 
                     {step === 3 && (
                         <Panel title='Before you pay'>
-                            <ul className='m-0 flex list-none flex-col gap-3 p-0 text-[14px] leading-6 text-[#344054]'>
+                            <ul className='m-0 flex list-none flex-col gap-3 p-0 text-[14px] leading-6 text-[#334155]'>
                                 <li className='flex gap-3'><Dot />{isAch ? `Your bank is debited ${quote?.total?.formatted || ''}. It clears in 1 to 2 business days.` : `Your card is charged ${quote?.total?.formatted || ''} now.`}</li>
                                 <li className='flex gap-3'><Dot />DollarTraq holds the money. The carrier is not paid until you release it.</li>
                                 <li className='flex gap-3'><Dot />Until then you can put it on hold, raise a dispute, or refund it.</li>
                             </ul>
 
                             {isAch && (
-                                <label className='mt-5 flex items-start gap-3 rounded-[12px] border border-[#E4E7EC] bg-[#F9FAFB] px-4 py-3 text-[13.5px] leading-[1.5] text-[#344054]'>
-                                    <input type='checkbox' className='mt-[3px] h-[16px] w-[16px] accent-[#2953E4]' checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+                                <label className='mt-5 flex items-start gap-3 rounded-[12px] border border-[#e5e7eb] bg-[#F9FAFB] px-4 py-3 text-[13.5px] leading-[1.5] text-[#334155]'>
+                                    <input type='checkbox' className='mt-[3px] h-[16px] w-[16px] accent-[#185FA5]' checked={agree} onChange={(e) => setAgree(e.target.checked)} />
                                     <span>I authorise DollarTraq to debit {method.label} for {quote?.total?.formatted || 'the total'} for this payment.</span>
                                 </label>
                             )}
@@ -232,26 +233,26 @@ export default function NewPayment() {
 }
 
 function Dot() {
-    return <span className='mt-[9px] h-[6px] w-[6px] shrink-0 rounded-full bg-[#2953E4]' aria-hidden='true' />;
+    return <span className='mt-[9px] h-[6px] w-[6px] shrink-0 rounded-full bg-[#185FA5]' aria-hidden='true' />;
 }
 
 /* The order, filled in as you go: a payment receipt in waiting. */
 function PaymentOrder({ carrier, load, amount, method, quote, step, canPay, busy, onPay }) {
     const line = (label, value, placeholder) => (
         <div className='flex items-baseline justify-between gap-4 py-2'>
-            <span className='shrink-0 text-[13px] text-[#667085]'>{label}</span>
-            <span className={`truncate text-right text-[14px] ${value ? 'font-medium text-[#101828]' : 'text-[#98A2B3]'}`}>{value || placeholder}</span>
+            <span className='shrink-0 text-[13px] text-[#6b7280]'>{label}</span>
+            <span className={`truncate text-right text-[14px] ${value ? 'font-medium text-[#1a1a1a]' : 'text-[#9ca3af]'}`}>{value || placeholder}</span>
         </div>
     );
 
     return (
         <aside className='lg:sticky lg:top-6'>
-            <div className='overflow-hidden rounded-[18px] border border-[#E9EAEC] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]'>
-                <div className='h-[5px] bg-[#2953E4]' />
+            <div className='overflow-hidden rounded-2xl border border-[#e8e8e8] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]'>
+                <div className='h-[4px] bg-[#005EA4]' />
                 <div className='px-6 pb-6 pt-5'>
-                    <h2 className='m-0 text-[16px] font-bold text-[#101828]'>Payment order</h2>
+                    <div className='text-[11px] font-bold uppercase tracking-[1.6px] text-[#404752]'>Payment order</div>
 
-                    <div className='mt-3 divide-y divide-dashed divide-[#EAECF0]'>
+                    <div className='mt-3 divide-y divide-dashed divide-[#e5e7eb]'>
                         {line('Carrier', carrier?.dot ? (carrier.name || `DOT ${carrier.dot}`) : null, 'Choose a carrier')}
                         {line('DOT', carrier?.dot, '—')}
                         {line('Load', load?.number, '—')}
@@ -259,11 +260,11 @@ function PaymentOrder({ carrier, load, amount, method, quote, step, canPay, busy
                         {line('Pay with', method?.label, step >= 2 ? 'Choose a method' : '—')}
                     </div>
 
-                    <div className='mt-4 rounded-[14px] bg-[#F9FAFB] px-4 py-4'>
+                    <div className='mt-4 rounded-xl bg-[#F9FAFB] px-4 py-4'>
                         {quote ? <Breakdown b={quote} compact /> : (
                             <div className='flex items-baseline justify-between'>
-                                <span className='text-[14px] text-[#667085]'>Carrier receives</span>
-                                <Amount value={amount > 0 ? usd(Math.round(amount * 100)) : '$0.00'} className='text-[22px] font-extrabold text-[#101828]' />
+                                <span className='text-[14px] text-[#6b7280]'>Carrier receives</span>
+                                <Amount value={amount > 0 ? usd(Math.round(amount * 100)) : '$0.00'} className='text-[22px] font-extrabold text-[#1a1a1a]' />
                             </div>
                         )}
                     </div>
@@ -273,7 +274,7 @@ function PaymentOrder({ carrier, load, amount, method, quote, step, canPay, busy
                             Pay {quote?.total?.formatted || ''}
                         </Button>
                     )}
-                    <p className='m-0 mt-4 text-center text-[12px] text-[#98A2B3]'>Processed securely by Stripe</p>
+                    <p className='m-0 mt-4 text-center text-[12px] text-[#9ca3af]'>Processed securely by Stripe</p>
                 </div>
             </div>
         </aside>
@@ -297,12 +298,12 @@ function Steps({ step, existing, onJump }) {
                             type='button'
                             disabled={state !== 'done'}
                             onClick={() => onJump(target)}
-                            className={`flex items-center gap-2 rounded-full py-1 pl-1 pr-3 text-[13.5px] font-semibold ${state === 'now' ? 'bg-white text-[#101828] shadow-[0_1px_2px_rgba(16,24,40,0.08)]' : state === 'done' ? 'text-[#2953E4] hover:bg-white' : 'text-[#98A2B3]'}`}
+                            className={`flex items-center gap-2 rounded-full py-1 pl-1 pr-3 text-[13.5px] font-semibold ${state === 'now' ? 'bg-white text-[#1a1a1a] shadow-[0_1px_2px_rgba(16,24,40,0.08)]' : state === 'done' ? 'text-[#185FA5] hover:bg-white' : 'text-[#9ca3af]'}`}
                         >
-                            <span className={`flex h-[24px] w-[24px] items-center justify-center rounded-full text-[12px] ${state === 'next' ? 'bg-[#F2F4F7] text-[#98A2B3]' : 'bg-[#2953E4] text-white'}`}>{state === 'done' ? '✓' : n}</span>
+                            <span className={`flex h-[24px] w-[24px] items-center justify-center rounded-full text-[12px] ${state === 'next' ? 'bg-[#f1f5f9] text-[#9ca3af]' : 'bg-[#185FA5] text-white'}`}>{state === 'done' ? '✓' : n}</span>
                             {l}
                         </button>
-                        {n < labels.length && <span className='h-px w-5 bg-[#D0D5DD]' aria-hidden='true' />}
+                        {n < labels.length && <span className='h-px w-5 bg-[#dbe4ee]' aria-hidden='true' />}
                     </li>
                 );
             })}
@@ -312,13 +313,13 @@ function Steps({ step, existing, onJump }) {
 
 function Segmented({ value, onChange, options }) {
     return (
-        <div className='inline-flex rounded-[12px] bg-[#F2F4F7] p-1'>
+        <div className='inline-flex rounded-[12px] bg-[#f1f5f9] p-1'>
             {options.map(([key, label]) => (
                 <button
                     key={key}
                     type='button'
                     onClick={() => onChange(key)}
-                    className={`rounded-[9px] px-4 py-2 text-[13.5px] font-semibold transition-colors ${value === key ? 'bg-white text-[#101828] shadow-[0_1px_2px_rgba(16,24,40,0.1)]' : 'text-[#667085] hover:text-[#344054]'}`}
+                    className={`rounded-[9px] px-4 py-2 text-[13.5px] font-semibold transition-colors ${value === key ? 'bg-white text-[#1a1a1a] shadow-[0_1px_2px_rgba(16,24,40,0.1)]' : 'text-[#6b7280] hover:text-[#334155]'}`}
                 >
                     {label}
                 </button>
@@ -334,14 +335,14 @@ export function MethodTile({ m, selected, onSelect }) {
         <button
             type='button'
             onClick={onSelect}
-            className={`flex items-center gap-3.5 rounded-[14px] border-2 px-4 py-3.5 text-left transition-colors ${selected ? 'border-[#2953E4] bg-[#F5F8FF]' : 'border-[#EAECF0] bg-white hover:border-[#D0D5DD]'}`}
+            className={`flex items-center gap-3.5 rounded-xl border-2 px-4 py-3.5 text-left transition-colors ${selected ? 'border-[#185FA5] bg-[#EFF6FF]' : 'border-[#e5e7eb] bg-white hover:border-[#dbe4ee]'}`}
         >
-            <span className={`flex h-[40px] w-[52px] shrink-0 items-center justify-center rounded-[8px] text-[11px] font-extrabold tracking-[0.02em] ${bank ? 'bg-[#ECFDF3] text-[#067647]' : 'bg-[#101828] text-white'}`}>
+            <span className={`flex h-[40px] w-[52px] shrink-0 items-center justify-center rounded-[8px] text-[11px] font-extrabold tracking-[0.02em] ${bank ? 'bg-[#ECFDF3] text-[#067647]' : 'bg-[#1a1a1a] text-white'}`}>
                 {bank ? 'BANK' : (m.brand || 'CARD').slice(0, 4)}
             </span>
             <span className='min-w-0'>
-                <span className='block truncate text-[14.5px] font-semibold text-[#101828]'>{bank ? (m.bank || 'Bank account') : `Card ending ${m.last4}`}</span>
-                <span className='block text-[12.5px] text-[#667085]'>{bank ? `Account ending ${m.last4}, no fee` : `Expires ${m.exp || '—'}, 2.9% surcharge`}</span>
+                <span className='block truncate text-[14.5px] font-semibold text-[#1a1a1a]'>{bank ? (m.bank || 'Bank account') : `Card ending ${m.last4}`}</span>
+                <span className='block text-[12.5px] text-[#6b7280]'>{bank ? `Account ending ${m.last4}, no fee` : `Expires ${m.exp || '—'}, 2.9% surcharge`}</span>
             </span>
         </button>
     );
@@ -377,14 +378,14 @@ function ShipmentPicker({ value, onChange }) {
                                 <button
                                     type='button'
                                     onClick={() => onChange(s)}
-                                    className={`flex w-full items-center justify-between gap-4 rounded-[14px] border-2 px-4 py-3.5 text-left transition-colors ${selected ? 'border-[#2953E4] bg-[#F5F8FF]' : 'border-[#EAECF0] bg-white hover:border-[#D0D5DD]'}`}
+                                    className={`flex w-full items-center justify-between gap-4 rounded-xl border-2 px-4 py-3.5 text-left transition-colors ${selected ? 'border-[#185FA5] bg-[#EFF6FF]' : 'border-[#e5e7eb] bg-white hover:border-[#dbe4ee]'}`}
                                 >
                                     <div className='min-w-0'>
-                                        <p className='m-0 text-[14.5px] font-semibold text-[#101828]'>{s.origin || '?'} to {s.destination || '?'}</p>
-                                        <p className='m-0 mt-0.5 text-[13px] text-[#475467]'>{s.carrier.name || 'Carrier'}, DOT {s.carrier.dot}</p>
-                                        <p className='m-0 mt-0.5 text-[12.5px] text-[#98A2B3]'>{s.shipment_no}{s.pro_number ? `, PRO ${s.pro_number}` : ''}{s.delivery_date ? `, delivers ${date(s.delivery_date)}` : ''}</p>
+                                        <p className='m-0 text-[14.5px] font-semibold text-[#1a1a1a]'>{s.origin || '?'} to {s.destination || '?'}</p>
+                                        <p className='m-0 mt-0.5 text-[13px] text-[#475569]'>{s.carrier.name || 'Carrier'}, DOT {s.carrier.dot}</p>
+                                        <p className='m-0 mt-0.5 text-[12.5px] text-[#9ca3af]'>{s.shipment_no}{s.pro_number ? `, PRO ${s.pro_number}` : ''}{s.delivery_date ? `, delivers ${date(s.delivery_date)}` : ''}</p>
                                     </div>
-                                    <span className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border-2 ${selected ? 'border-[#2953E4] bg-[#2953E4] text-white' : 'border-[#D0D5DD]'}`}>
+                                    <span className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border-2 ${selected ? 'border-[#185FA5] bg-[#185FA5] text-white' : 'border-[#dbe4ee]'}`}>
                                         {selected && <span className='text-[12px] leading-none'>✓</span>}
                                     </span>
                                 </button>
@@ -407,7 +408,7 @@ function ManualLoad({ value, onChange }) {
             </div>
             <Field label='Load or reference number'><input className={inputClass} value={value.load_number} onChange={set('load_number')} placeholder='LD-5521' /></Field>
             <Field label='Rate confirmation' hint='PDF, image or Word document, up to 10 MB'>
-                <input type='file' accept='.pdf,.jpg,.jpeg,.png,.doc,.docx' className={`${inputClass} py-2 file:mr-3 file:rounded-[8px] file:border-0 file:bg-[#F2F4F7] file:px-3 file:py-1 file:text-[13px] file:font-semibold file:text-[#344054]`} onChange={set('rate_confirmation')} />
+                <input type='file' accept='.pdf,.jpg,.jpeg,.png,.doc,.docx' className={`${inputClass} py-2 file:mr-3 file:rounded-[8px] file:border-0 file:bg-[#f1f5f9] file:px-3 file:py-1 file:text-[13px] file:font-semibold file:text-[#334155]`} onChange={set('rate_confirmation')} />
             </Field>
             <Field label='Picked up in'><input className={inputClass} value={value.origin} onChange={set('origin')} placeholder='Dallas, TX' /></Field>
             <Field label='Delivered to'><input className={inputClass} value={value.destination} onChange={set('destination')} placeholder='Memphis, TN' /></Field>

@@ -38,9 +38,10 @@ export default function FundingMethods() {
 
     return (
         <Page
-            title='Funding methods'
+            title='Funding'
+            accent='methods'
             intro='How your company funds carrier payments. Bank accounts have no fee. Cards add a 2.9% surcharge but fund at once.'
-            back={{ to: '/dt-pay', label: 'DT Pay' }}
+            back={{ to: '/dt-pay', label: 'Overview' }}
             testMode={config && !config.livemode}
         >
             <ErrorBanner onRetry={load}>{error}</ErrorBanner>
@@ -90,8 +91,8 @@ function MethodGroup({ title, note, items, removing, onRemove, addLabel, addNote
     return (
         <section>
             <div className='mb-3 flex items-baseline gap-3'>
-                <h2 className='m-0 text-[17px] font-bold text-[#101828]'>{title}</h2>
-                <p className='m-0 text-[13.5px] text-[#667085]'>{note}</p>
+                <h2 className='m-0 text-base font-bold text-[#1a1a1a] sm:text-lg'>{title}</h2>
+                <p className='m-0 text-[13.5px] text-[#6b7280]'>{note}</p>
             </div>
             <ul className='m-0 grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-2 xl:grid-cols-3'>
                 {items.map((m) => (
@@ -102,11 +103,11 @@ function MethodGroup({ title, note, items, removing, onRemove, addLabel, addNote
                         type='button'
                         onClick={onAdd}
                         disabled={!canAdd}
-                        className='flex h-full min-h-[148px] w-full flex-col items-center justify-center rounded-[16px] border-2 border-dashed border-[#D0D5DD] bg-white/60 px-5 text-center transition-colors hover:border-[#2953E4] hover:bg-white disabled:cursor-not-allowed disabled:opacity-50'
+                        className='flex h-full min-h-[148px] w-full flex-col items-center justify-center rounded-[16px] border-2 border-dashed border-[#dbe4ee] bg-white/60 px-5 text-center transition-colors hover:border-[#185FA5] hover:bg-white disabled:cursor-not-allowed disabled:opacity-50'
                     >
-                        <span className='flex h-[32px] w-[32px] items-center justify-center rounded-full bg-[#EEF2FF] text-[20px] leading-none text-[#2953E4]' aria-hidden='true'>+</span>
-                        <span className='mt-2 text-[14px] font-semibold text-[#101828]'>{addLabel}</span>
-                        {items.length === 0 && <span className='mt-0.5 text-[12.5px] text-[#667085]'>{addNote}</span>}
+                        <span className='flex h-[32px] w-[32px] items-center justify-center rounded-full bg-[#EEF2FF] text-[20px] leading-none text-[#185FA5]' aria-hidden='true'>+</span>
+                        <span className='mt-2 text-[14px] font-semibold text-[#1a1a1a]'>{addLabel}</span>
+                        {items.length === 0 && <span className='mt-0.5 text-[12.5px] text-[#6b7280]'>{addNote}</span>}
                     </button>
                 </li>
             </ul>
@@ -120,8 +121,8 @@ function Instrument({ m, removing, onRemove }) {
 
     return (
         <div
-            className={`relative flex min-h-[148px] flex-col justify-between overflow-hidden rounded-[16px] p-5 ${bank ? 'border border-[#E9EAEC] bg-white' : 'text-white'}`}
-            style={bank ? { boxShadow: '0 1px 2px rgba(16,24,40,0.04)' } : { background: 'linear-gradient(150deg, #1D2939 0%, #101828 100%)', boxShadow: '0 8px 20px rgba(16,24,40,0.18)' }}
+            className={`relative flex min-h-[148px] flex-col justify-between overflow-hidden rounded-[16px] p-5 ${bank ? 'border border-[#e8e8e8] bg-white' : 'text-white'}`}
+            style={bank ? { boxShadow: '0 1px 2px rgba(16,24,40,0.04)' } : { background: 'linear-gradient(150deg, #1D2939 0%, #1a1a1a 100%)', boxShadow: '0 8px 20px rgba(16,24,40,0.18)' }}
         >
             <div className='flex items-start justify-between gap-3'>
                 <span className={`text-[13px] font-bold ${bank ? 'text-[#067647]' : 'text-white/90'}`}>{bank ? (m.bank || 'Bank account') : (m.brand ? m.brand[0].toUpperCase() + m.brand.slice(1) : 'Card')}</span>
@@ -129,16 +130,16 @@ function Instrument({ m, removing, onRemove }) {
                     type='button'
                     onClick={onRemove}
                     disabled={removing}
-                    className={`rounded-[8px] px-2 py-1 text-[12.5px] font-semibold transition-colors disabled:opacity-50 ${bank ? 'text-[#667085] hover:bg-[#FEF3F2] hover:text-[#B42318]' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+                    className={`rounded-[8px] px-2 py-1 text-[12.5px] font-semibold transition-colors disabled:opacity-50 ${bank ? 'text-[#6b7280] hover:bg-[#FEF3F2] hover:text-[#B42318]' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
                 >
                     {removing ? 'Removing' : 'Remove'}
                 </button>
             </div>
             <div>
-                <p className={`m-0 text-[19px] font-semibold tracking-[0.08em] ${bank ? 'text-[#101828]' : 'text-white'}`} style={{ fontFeatureSettings: '"tnum" 1' }}>
+                <p className={`m-0 text-[19px] font-semibold tracking-[0.08em] ${bank ? 'text-[#1a1a1a]' : 'text-white'}`} style={{ fontFeatureSettings: '"tnum" 1' }}>
                     <span aria-hidden='true'>{bank ? '••••' : '•••• ••••'} </span>{m.last4}
                 </p>
-                <p className={`m-0 mt-1 text-[12.5px] ${bank ? 'text-[#667085]' : 'text-white/65'}`}>
+                <p className={`m-0 mt-1 text-[12.5px] ${bank ? 'text-[#6b7280]' : 'text-white/65'}`}>
                     {bank ? 'Verified bank account' : `Expires ${m.exp || '—'}`}
                 </p>
             </div>
@@ -159,7 +160,7 @@ export function AddMethodModal({ type, publishableKey, onClose, onSaved }) {
             <ErrorBanner>{error}</ErrorBanner>
             {!secret && !error && <Loading label='Opening the secure form' />}
             {secret && (
-                <Elements stripe={stripeFor(publishableKey)} options={{ clientSecret: secret, appearance: { theme: 'stripe', variables: { colorPrimary: '#2953E4', colorText: '#101828', borderRadius: '10px' } } }}>
+                <Elements stripe={stripeFor(publishableKey)} options={{ clientSecret: secret, appearance: { theme: 'stripe', variables: { colorPrimary: '#185FA5', colorText: '#1a1a1a', borderRadius: '10px' } } }}>
                     <SetupForm type={type} onSaved={onSaved} onCancel={onClose} />
                 </Elements>
             )}
@@ -205,7 +206,7 @@ function SetupForm({ type, onSaved, onCancel }) {
         <form onSubmit={submit}>
             <PaymentElement options={{ layout: 'tabs' }} />
             <ErrorBanner>{error}</ErrorBanner>
-            <p className='mt-3 text-[12px] text-[#667085]'>
+            <p className='mt-3 text-[12px] text-[#6b7280]'>
                 Secured by Stripe. {type === 'us_bank_account' ? 'By saving, you authorise DollarTraq to debit this account for payments you approve.' : 'Card details never reach DollarTraq servers.'}
             </p>
             <div className='mt-4 flex justify-end gap-2'>

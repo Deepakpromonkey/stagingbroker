@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { dtpay } from './api';
 import { STATUS_FILTERS } from './format';
-import { Button, Empty, ErrorBanner, Loading, Page, Panel, inputClass } from './ui';
-import { PaymentRows } from './Dashboard';
+import { Button, Empty, ErrorBanner, Page, Tabs, inputClass } from './ui';
+import PaymentsTable from './PaymentsTable';
 
 /* /dt-pay/transactions — every payment, filtered and searched. */
 export default function Payments() {
@@ -49,50 +49,40 @@ export default function Payments() {
 
     return (
         <Page
-            title='Payments'
+            title='DT Pay'
+            accent='Payments'
             intro='Every payment your company has made through DT Pay.'
-            back={{ to: '/dt-pay', label: 'DT Pay' }}
+            back={{ to: '/dt-pay', label: 'Overview' }}
             testMode={testMode}
             actions={<Button onClick={() => navigate('/dt-pay/new')}>Pay a carrier</Button>}
         >
             <ErrorBanner onRetry={load}>{error}</ErrorBanner>
 
-            <Panel padded={false}>
-                <div className='flex flex-col gap-4 px-6 py-5'>
-                    <div className='-mx-1 flex gap-1 overflow-x-auto pb-1'>
-                        {STATUS_FILTERS.map((f) => (
-                            <button
-                                key={f.key || 'all'}
-                                type='button'
-                                onClick={() => set({ status: f.key })}
-                                aria-pressed={status === f.key}
-                                className={`shrink-0 rounded-[9px] px-3 py-1.5 text-[13.5px] font-semibold transition-colors ${status === f.key ? 'bg-[#EEF2FF] text-[#2953E4]' : 'text-[#667085] hover:bg-[#F9FAFB] hover:text-[#344054]'}`}
-                            >
-                                {f.label}
-                            </button>
-                        ))}
-                    </div>
-                    <div className='grid grid-cols-1 gap-3 sm:grid-cols-[1fr_160px_160px]'>
-                        <input className={inputClass} placeholder='Search reference, load, carrier or DOT' value={search} onChange={(e) => setSearch(e.target.value)} aria-label='Search payments' />
-                        <input type='date' className={inputClass} value={from} onChange={(e) => set({ from: e.target.value })} aria-label='Created from' />
-                        <input type='date' className={inputClass} value={to} onChange={(e) => set({ to: e.target.value })} aria-label='Created to' />
-                    </div>
-                </div>
+            <div className='mb-4'>
+                <Tabs items={STATUS_FILTERS} value={status} onChange={(key) => set({ status: key })} counts={result?.counts} />
+            </div>
 
-                {!current && !error && <Loading />}
-                {current && current.data.length === 0 && (
-                    <Empty title='No payments match'>Try another status or search.</Empty>
-                )}
-                {current && current.data.length > 0 && <PaymentRows rows={current.data} />}
-            </Panel>
+            <div className='mb-4 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_170px_170px]'>
+                <input className={inputClass} placeholder='Search reference, load, carrier or DOT' value={search} onChange={(e) => setSearch(e.target.value)} aria-label='Search payments' />
+                <input type='date' className={inputClass} value={from} onChange={(e) => set({ from: e.target.value })} aria-label='Created from' />
+                <input type='date' className={inputClass} value={to} onChange={(e) => set({ to: e.target.value })} aria-label='Created to' />
+            </div>
 
-            {result && result.meta.last_page > 1 && (
-                <div className='mt-4 flex items-center justify-between gap-3 text-[13px] text-[#475467]'>
-                    <span>Page {result.meta.current_page} of {result.meta.last_page}, {result.meta.total} payments</span>
-                    <div className='flex gap-2'>
-                        <Button variant='secondary' size='sm' disabled={page <= 1} onClick={() => set({ page: String(page - 1) })}>Previous</Button>
-                        <Button variant='secondary' size='sm' disabled={page >= result.meta.last_page} onClick={() => set({ page: String(page + 1) })}>Next</Button>
-                    </div>
+            <PaymentsTable
+                rows={current?.data}
+                loading={!current && !error}
+                empty={<Empty title='No payments match'>Try another status or search.</Empty>}
+            />
+
+            {result && (
+                <div className='mt-4 flex items-center justify-between gap-3 text-xs text-[#6b7280]'>
+                    <span>{result.meta.total} payment{result.meta.total === 1 ? '' : 's'}{result.meta.last_page > 1 ? `, page ${result.meta.current_page} of ${result.meta.last_page}` : ''}</span>
+                    {result.meta.last_page > 1 && (
+                        <div className='flex gap-2'>
+                            <Button variant='secondary' size='sm' disabled={page <= 1} onClick={() => set({ page: String(page - 1) })}>Previous</Button>
+                            <Button variant='secondary' size='sm' disabled={page >= result.meta.last_page} onClick={() => set({ page: String(page + 1) })}>Next</Button>
+                        </div>
+                    )}
                 </div>
             )}
         </Page>

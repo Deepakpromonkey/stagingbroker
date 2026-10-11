@@ -75,11 +75,11 @@ function Details({ config }) {
 
                     return (
                         <li key={t} className='flex items-center gap-2'>
-                            <span className={`flex items-center gap-2 rounded-full py-1 pl-1 pr-3 text-[13.5px] font-semibold ${state === 'now' ? 'bg-white text-[#101828] shadow-[0_1px_2px_rgba(16,24,40,0.08)]' : state === 'done' ? 'text-[#2953E4]' : 'text-[#98A2B3]'}`}>
-                                <span className={`flex h-[24px] w-[24px] items-center justify-center rounded-full text-[12px] ${state === 'next' ? 'bg-[#F2F4F7] text-[#98A2B3]' : 'bg-[#2953E4] text-white'}`}>{state === 'done' ? '✓' : n}</span>
+                            <span className={`flex items-center gap-2 rounded-full py-1 pl-1 pr-3 text-[13.5px] font-semibold ${state === 'now' ? 'bg-white text-[#1a1a1a] shadow-[0_1px_2px_rgba(16,24,40,0.08)]' : state === 'done' ? 'text-[#185FA5]' : 'text-[#9ca3af]'}`}>
+                                <span className={`flex h-[24px] w-[24px] items-center justify-center rounded-full text-[12px] ${state === 'next' ? 'bg-[#f1f5f9] text-[#9ca3af]' : 'bg-[#185FA5] text-white'}`}>{state === 'done' ? '✓' : n}</span>
                                 {t}
                             </span>
-                            {n < tabs.length && <span className='h-px w-4 bg-[#D0D5DD]' aria-hidden='true' />}
+                            {n < tabs.length && <span className='h-px w-4 bg-[#dbe4ee]' aria-hidden='true' />}
                         </li>
                     );
                 })}
@@ -101,13 +101,13 @@ function Details({ config }) {
                             <div className='sm:col-span-2'>
                                 <Field label='Amount the carrier receives' required hint={`A ${config.fees.platform_pct}% fee is added on top. Cards add ${config.fees.card_pct}%.`}>
                                     <div className='relative max-w-[280px]'>
-                                        <span className='pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[18px] font-semibold text-[#667085]'>$</span>
+                                        <span className='pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[18px] font-semibold text-[#6b7280]'>$</span>
                                         <input className={`${inputClass} py-3 pl-9 text-[20px] font-bold`} style={{ fontFeatureSettings: '"tnum" 1' }} inputMode='decimal' value={load.amount} onChange={setL('amount')} placeholder='0.00' />
                                     </div>
                                 </Field>
                             </div>
                             <Field label='Load or BOL number'><input className={inputClass} value={load.load_number} onChange={setL('load_number')} /></Field>
-                            <Field label='Rate confirmation' hint='Optional. PDF, image or Word document.'><input type='file' accept='.pdf,.jpg,.jpeg,.png,.doc,.docx' className={`${inputClass} py-2 file:mr-3 file:rounded-[8px] file:border-0 file:bg-[#F2F4F7] file:px-3 file:py-1 file:text-[13px] file:font-semibold file:text-[#344054]`} onChange={setL('rate_confirmation')} /></Field>
+                            <Field label='Rate confirmation' hint='Optional. PDF, image or Word document.'><input type='file' accept='.pdf,.jpg,.jpeg,.png,.doc,.docx' className={`${inputClass} py-2 file:mr-3 file:rounded-[8px] file:border-0 file:bg-[#f1f5f9] file:px-3 file:py-1 file:text-[13px] file:font-semibold file:text-[#334155]`} onChange={setL('rate_confirmation')} /></Field>
                             <Field label='Picked up in'><input className={inputClass} value={load.origin} onChange={setL('origin')} placeholder='City, ST' /></Field>
                             <Field label='Delivered to'><input className={inputClass} value={load.destination} onChange={setL('destination')} placeholder='City, ST' /></Field>
                             <Field label='Pickup date'><input type='date' className={inputClass} value={load.pickup_date} onChange={setL('pickup_date')} /></Field>
@@ -168,12 +168,12 @@ function PayStep({ token, config }) {
             <Panel>
                 <div className='flex flex-wrap items-baseline justify-between gap-3'>
                     <div className='min-w-0'>
-                        <p className='m-0 text-[13px] text-[#667085]'>Paying</p>
-                        <p className='m-0 mt-0.5 text-[17px] font-bold text-[#101828]'>{payment.carrier.name || 'Carrier'}</p>
-                        <p className='m-0 mt-0.5 text-[13px] text-[#667085]'>DOT {payment.carrier.dot}{payment.load_number ? `, load ${payment.load_number}` : ''}</p>
+                        <p className='m-0 text-[13px] text-[#6b7280]'>Paying</p>
+                        <p className='m-0 mt-0.5 text-[17px] font-bold text-[#1a1a1a]'>{payment.carrier.name || 'Carrier'}</p>
+                        <p className='m-0 mt-0.5 text-[13px] text-[#6b7280]'>DOT {payment.carrier.dot}{payment.load_number ? `, load ${payment.load_number}` : ''}</p>
                     </div>
                 </div>
-                <div className='mt-4 rounded-[14px] bg-[#F9FAFB] px-4 py-4'>
+                <div className='mt-4 rounded-xl bg-[#F9FAFB] px-4 py-4'>
                     <Breakdown b={payment.breakdown} guest compact />
                 </div>
             </Panel>
@@ -182,9 +182,9 @@ function PayStep({ token, config }) {
                 <div className='mb-5 grid grid-cols-2 gap-3'>
                     {[['us_bank_account', 'Bank account', 'No extra fee'], ['card', 'Card', `${config.fees.card_pct}% surcharge`]].map(([key, label, sub]) => (
                         <button key={key} type='button' onClick={() => setType(key)} aria-pressed={type === key}
-                            className={`rounded-[14px] border-2 px-4 py-3 text-left transition-colors ${type === key ? 'border-[#2953E4] bg-[#F5F8FF]' : 'border-[#EAECF0] bg-white hover:border-[#D0D5DD]'}`}>
-                            <span className='block text-[14.5px] font-semibold text-[#101828]'>{label}</span>
-                            <span className='block text-[12.5px] text-[#667085]'>{sub}</span>
+                            className={`rounded-xl border-2 px-4 py-3 text-left transition-colors ${type === key ? 'border-[#185FA5] bg-[#EFF6FF]' : 'border-[#e5e7eb] bg-white hover:border-[#dbe4ee]'}`}>
+                            <span className='block text-[14.5px] font-semibold text-[#1a1a1a]'>{label}</span>
+                            <span className='block text-[12.5px] text-[#6b7280]'>{sub}</span>
                         </button>
                     ))}
                 </div>
@@ -203,7 +203,7 @@ function PayStep({ token, config }) {
 
 const STRIPE_APPEARANCE = {
     theme: 'stripe',
-    variables: { colorPrimary: '#2953E4', colorText: '#101828', borderRadius: '10px', fontFamily: 'Inter, system-ui, sans-serif' },
+    variables: { colorPrimary: '#185FA5', colorText: '#1a1a1a', borderRadius: '10px', fontFamily: 'Inter, system-ui, sans-serif' },
 };
 
 function PayForm({ token, total, onDone }) {

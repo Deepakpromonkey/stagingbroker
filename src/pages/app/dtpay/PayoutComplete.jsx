@@ -10,7 +10,7 @@ export default function PayoutComplete() {
     return (
         <GuestShell title={refresh ? 'Setup link expired' : 'Payout setup received'}>
             <Panel>
-                <p className='m-0 text-[14.5px] leading-6 text-[#344054]'>
+                <p className='m-0 text-[14.5px] leading-6 text-[#334155]'>
                     {refresh
                         ? 'This setup link has expired. Ask the broker who is paying you to send a new one.'
                         : 'Stripe has your payout details. Once they are verified, payments released to you on DollarTraq go straight to your bank account. You can close this page.'}

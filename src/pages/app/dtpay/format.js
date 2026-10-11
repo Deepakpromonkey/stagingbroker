@@ -23,28 +23,36 @@ export function routeStage(status) {
 export const routeStopped = (status) => ['refunded', 'refunding', 'failed', 'cancelled'].includes(status);
 
 export const STATUS_STYLES = {
-    draft: { color: '#475467', bg: '#F2F4F7', border: '#E4E7EC' },
-    processing: { color: '#B54708', bg: '#FFFAEB', border: '#FEDF89' },
-    funded: { color: '#2953E4', bg: '#EEF4FF', border: '#C7D7FE' },
-    releasing: { color: '#2953E4', bg: '#EEF4FF', border: '#C7D7FE' },
-    released: { color: '#067647', bg: '#ECFDF3', border: '#ABEFC6' },
-    refunding: { color: '#5925DC', bg: '#F4F3FF', border: '#D9D6FE' },
-    refunded: { color: '#5925DC', bg: '#F4F3FF', border: '#D9D6FE' },
-    failed: { color: '#B42318', bg: '#FEF3F2', border: '#FECDCA' },
-    cancelled: { color: '#667085', bg: '#F9FAFB', border: '#EAECF0' },
+    draft: { color: '#475569', bg: '#f1f5f9', border: '#e2e8f0' },
+    processing: { color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
+    funded: { color: '#1d4ed8', bg: '#EFF6FF', border: '#BFDBFE' },
+    releasing: { color: '#1d4ed8', bg: '#EFF6FF', border: '#BFDBFE' },
+    released: { color: '#15803d', bg: '#f0fdf4', border: '#bbf7d0' },
+    refunding: { color: '#6d28d9', bg: '#f5f3ff', border: '#ddd6fe' },
+    refunded: { color: '#6d28d9', bg: '#f5f3ff', border: '#ddd6fe' },
+    failed: { color: '#b91c1c', bg: '#fef2f2', border: '#fecaca' },
+    cancelled: { color: '#64748b', bg: '#f8fafc', border: '#e2e8f0' },
 };
 
 export const STATUS_FILTERS = [
     { key: '', label: 'All' },
-    { key: 'draft', label: 'Not paid yet' },
-    { key: 'processing', label: 'Clearing' },
     { key: 'held', label: 'Held' },
+    { key: 'processing', label: 'Clearing' },
+    { key: 'draft', label: 'Not paid' },
     { key: 'disputed', label: 'Disputed' },
-    { key: 'released', label: 'Paid to carrier' },
+    { key: 'released', label: 'Paid' },
     { key: 'refunded', label: 'Refunded' },
     { key: 'failed', label: 'Failed' },
     { key: 'cancelled', label: 'Cancelled' },
 ];
+
+/* Compact dollars for chart axes: $0, $950, $12.5k, $1.2m. */
+export function shortUsd(cents) {
+    const d = (Number(cents) || 0) / 100;
+    if (d >= 1e6) return `$${(d / 1e6).toFixed(d >= 1e7 ? 0 : 1)}m`;
+    if (d >= 1e3) return `$${(d / 1e3).toFixed(d >= 1e4 ? 0 : 1)}k`;
+    return `$${Math.round(d)}`;
+}
 
 export const DISPUTE_REASONS = [
     { key: 'not_delivered', label: 'Load not delivered' },
