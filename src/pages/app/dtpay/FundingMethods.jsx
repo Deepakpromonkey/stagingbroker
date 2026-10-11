@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
 import { dtpay } from './api';
 import { stripeFor } from './stripe';
-import { Button, Card, Empty, ErrorBanner, Loading, Modal, Notice, Page } from './ui';
+import { Button, ErrorBanner, Loading, Modal, Notice, Page } from './ui';
 
 /* /dt-pay/funding-controls — the company's saved cards and bank accounts. */
 export default function FundingMethods() {
@@ -39,24 +39,38 @@ export default function FundingMethods() {
     return (
         <Page
             title='Funding methods'
-            subtitle='How your company pays carriers. Bank (ACH) has no extra fee; cards add a 2.9% surcharge.'
+            intro='How your company funds carrier payments. Bank accounts have no fee. Cards add a 2.9% surcharge but fund at once.'
             back={{ to: '/dt-pay', label: 'DT Pay' }}
             testMode={config && !config.livemode}
-            actions={<>
-                <Button variant='secondary' onClick={() => setAdding('card')} disabled={!config?.configured}>Add card</Button>
-                <Button onClick={() => setAdding('us_bank_account')} disabled={!config?.configured}>Add bank account</Button>
-            </>}
         >
             <ErrorBanner onRetry={load}>{error}</ErrorBanner>
             {notice && <div className='mb-4'><Notice tone='success'>{notice}</Notice></div>}
             {!methods && !error && <Loading />}
 
             {methods && (
-                <div className='grid grid-cols-1 gap-5 lg:grid-cols-2'>
-                    <MethodList title='Bank accounts (ACH)' subtitle='No fee · clears in 1–2 business days' items={banks} removing={removing} onRemove={remove}
-                        empty={<Empty title='No bank account' action={<Button onClick={() => setAdding('us_bank_account')}>Add bank account</Button>}>The cheapest way to fund payments.</Empty>} />
-                    <MethodList title='Cards' subtitle='2.9% surcharge · funds at once' items={cards} removing={removing} onRemove={remove}
-                        empty={<Empty title='No card' action={<Button variant='secondary' onClick={() => setAdding('card')}>Add card</Button>}>For payments that cannot wait for ACH.</Empty>} />
+                <div className='flex flex-col gap-8'>
+                    <MethodGroup
+                        title='Bank accounts'
+                        note='No fee. Clears in 1 to 2 business days.'
+                        items={banks}
+                        removing={removing}
+                        onRemove={remove}
+                        addLabel='Add bank account'
+                        addNote='The cheapest way to pay carriers.'
+                        onAdd={() => setAdding('us_bank_account')}
+                        canAdd={!!config?.configured}
+                    />
+                    <MethodGroup
+                        title='Cards'
+                        note='2.9% surcharge. Funds the moment you pay.'
+                        items={cards}
+                        removing={removing}
+                        onRemove={remove}
+                        addLabel='Add card'
+                        addNote='For payments that cannot wait for a bank transfer.'
+                        onAdd={() => setAdding('card')}
+                        canAdd={!!config?.configured}
+                    />
                 </div>
             )}
 
@@ -72,23 +86,63 @@ export default function FundingMethods() {
     );
 }
 
-function MethodList({ title, subtitle, items, removing, onRemove, empty }) {
+function MethodGroup({ title, note, items, removing, onRemove, addLabel, addNote, onAdd, canAdd }) {
     return (
-        <Card title={title} subtitle={subtitle} padded={false}>
-            {items.length === 0 ? empty : (
-                <ul className='m-0 list-none p-0'>
-                    {items.map((m) => (
-                        <li key={m.id} className='flex items-center justify-between gap-3 border-b border-[#F2F4F7] px-5 py-3.5 last:border-0'>
-                            <div>
-                                <p className='m-0 text-[14px] font-semibold text-[#101828]'>{m.label}</p>
-                                <p className='m-0 text-[12px] text-[#667085]'>{m.type === 'card' ? `Expires ${m.exp || '—'}` : 'Verified bank account'}</p>
-                            </div>
-                            <Button variant='ghost' loading={removing === m.id} onClick={() => onRemove(m.id)}>Remove</Button>
-                        </li>
-                    ))}
-                </ul>
-            )}
-        </Card>
+        <section>
+            <div className='mb-3 flex items-baseline gap-3'>
+                <h2 className='m-0 text-[17px] font-bold text-[#101828]'>{title}</h2>
+                <p className='m-0 text-[13.5px] text-[#667085]'>{note}</p>
+            </div>
+            <ul className='m-0 grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-2 xl:grid-cols-3'>
+                {items.map((m) => (
+                    <li key={m.id}><Instrument m={m} removing={removing === m.id} onRemove={() => onRemove(m.id)} /></li>
+                ))}
+                <li>
+                    <button
+                        type='button'
+                        onClick={onAdd}
+                        disabled={!canAdd}
+                        className='flex h-full min-h-[148px] w-full flex-col items-center justify-center rounded-[16px] border-2 border-dashed border-[#D0D5DD] bg-white/60 px-5 text-center transition-colors hover:border-[#2953E4] hover:bg-white disabled:cursor-not-allowed disabled:opacity-50'
+                    >
+                        <span className='flex h-[32px] w-[32px] items-center justify-center rounded-full bg-[#EEF2FF] text-[20px] leading-none text-[#2953E4]' aria-hidden='true'>+</span>
+                        <span className='mt-2 text-[14px] font-semibold text-[#101828]'>{addLabel}</span>
+                        {items.length === 0 && <span className='mt-0.5 text-[12.5px] text-[#667085]'>{addNote}</span>}
+                    </button>
+                </li>
+            </ul>
+        </section>
+    );
+}
+
+/* A saved card or bank account, drawn as the thing itself. */
+function Instrument({ m, removing, onRemove }) {
+    const bank = m.type === 'us_bank_account';
+
+    return (
+        <div
+            className={`relative flex min-h-[148px] flex-col justify-between overflow-hidden rounded-[16px] p-5 ${bank ? 'border border-[#E9EAEC] bg-white' : 'text-white'}`}
+            style={bank ? { boxShadow: '0 1px 2px rgba(16,24,40,0.04)' } : { background: 'linear-gradient(150deg, #1D2939 0%, #101828 100%)', boxShadow: '0 8px 20px rgba(16,24,40,0.18)' }}
+        >
+            <div className='flex items-start justify-between gap-3'>
+                <span className={`text-[13px] font-bold ${bank ? 'text-[#067647]' : 'text-white/90'}`}>{bank ? (m.bank || 'Bank account') : (m.brand ? m.brand[0].toUpperCase() + m.brand.slice(1) : 'Card')}</span>
+                <button
+                    type='button'
+                    onClick={onRemove}
+                    disabled={removing}
+                    className={`rounded-[8px] px-2 py-1 text-[12.5px] font-semibold transition-colors disabled:opacity-50 ${bank ? 'text-[#667085] hover:bg-[#FEF3F2] hover:text-[#B42318]' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+                >
+                    {removing ? 'Removing' : 'Remove'}
+                </button>
+            </div>
+            <div>
+                <p className={`m-0 text-[19px] font-semibold tracking-[0.08em] ${bank ? 'text-[#101828]' : 'text-white'}`} style={{ fontFeatureSettings: '"tnum" 1' }}>
+                    <span aria-hidden='true'>{bank ? '••••' : '•••• ••••'} </span>{m.last4}
+                </p>
+                <p className={`m-0 mt-1 text-[12.5px] ${bank ? 'text-[#667085]' : 'text-white/65'}`}>
+                    {bank ? 'Verified bank account' : `Expires ${m.exp || '—'}`}
+                </p>
+            </div>
+        </div>
     );
 }
 
@@ -103,9 +157,9 @@ export function AddMethodModal({ type, publishableKey, onClose, onSaved }) {
     return (
         <Modal open title={type === 'card' ? 'Add a card' : 'Add a bank account'} onClose={onClose}>
             <ErrorBanner>{error}</ErrorBanner>
-            {!secret && !error && <Loading label='Opening secure form…' />}
+            {!secret && !error && <Loading label='Opening the secure form' />}
             {secret && (
-                <Elements stripe={stripeFor(publishableKey)} options={{ clientSecret: secret, appearance: { theme: 'stripe' } }}>
+                <Elements stripe={stripeFor(publishableKey)} options={{ clientSecret: secret, appearance: { theme: 'stripe', variables: { colorPrimary: '#2953E4', colorText: '#101828', borderRadius: '10px' } } }}>
                     <SetupForm type={type} onSaved={onSaved} onCancel={onClose} />
                 </Elements>
             )}
@@ -140,7 +194,7 @@ function SetupForm({ type, onSaved, onCancel }) {
         }
 
         if (setupIntent?.status === 'requires_action' && setupIntent.next_action?.type === 'verify_with_microdeposits') {
-            onSaved('Bank account added. Stripe will send two small deposits in 1–2 business days; confirm them from the link in your email to finish verifying.');
+            onSaved('Bank account added. Stripe will send two small deposits in 1 to 2 business days. Confirm them from the link in your email to finish verifying.');
             return;
         }
 

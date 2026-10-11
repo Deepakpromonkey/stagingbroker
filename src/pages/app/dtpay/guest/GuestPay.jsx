@@ -5,7 +5,7 @@ import { guestPay } from '../api';
 import { parseAmount } from '../format';
 import { stripeFor } from '../stripe';
 import { CarrierPicker } from '../parts';
-import { Breakdown, Button, Card, ErrorBanner, Field, Loading, inputClass } from '../ui';
+import { Breakdown, Button, ErrorBanner, Field, Loading, Panel, inputClass } from '../ui';
 import GuestShell from './GuestShell';
 
 /*
@@ -22,12 +22,12 @@ export default function GuestPay() {
     return (
         <GuestShell
             title={token ? 'Pay the carrier' : 'Pay a carrier'}
-            subtitle='No account needed. Funds are held until you confirm delivery.'
+            subtitle='No account needed. DollarTraq holds your money until the load is delivered and you release it to the carrier.'
             testMode={config && !config.livemode}
         >
             <ErrorBanner>{error}</ErrorBanner>
             {!config && !error && <Loading />}
-            {config && !config.configured && <ErrorBanner>Guest Pay is not available right now.</ErrorBanner>}
+            {config && !config.configured && <ErrorBanner>Guest Pay is not available right now. Try again later.</ErrorBanner>}
             {config?.configured && (token ? <PayStep token={token} config={config} /> : <Details config={config} />)}
         </GuestShell>
     );
@@ -68,15 +68,24 @@ function Details({ config }) {
 
     return (
         <>
-            <div className='mb-5 flex justify-center gap-2'>
-                {tabs.map((t, i) => (
-                    <span key={t} className={`rounded-full px-3 py-1 text-[12px] font-semibold ${i + 1 < step ? 'bg-[#ECFDF3] text-[#067647]' : i + 1 === step ? 'bg-[#175CD3] text-white' : 'bg-[#F2F4F7] text-[#98A2B3]'}`}>
-                        {i + 1 < step ? '✓ ' : ''}{t}
-                    </span>
-                ))}
-            </div>
+            <ol className='m-0 mb-5 flex list-none flex-wrap items-center gap-x-2 gap-y-2 p-0'>
+                {tabs.map((t, i) => {
+                    const n = i + 1;
+                    const state = n < step ? 'done' : n === step ? 'now' : 'next';
 
-            <Card>
+                    return (
+                        <li key={t} className='flex items-center gap-2'>
+                            <span className={`flex items-center gap-2 rounded-full py-1 pl-1 pr-3 text-[13.5px] font-semibold ${state === 'now' ? 'bg-white text-[#101828] shadow-[0_1px_2px_rgba(16,24,40,0.08)]' : state === 'done' ? 'text-[#2953E4]' : 'text-[#98A2B3]'}`}>
+                                <span className={`flex h-[24px] w-[24px] items-center justify-center rounded-full text-[12px] ${state === 'next' ? 'bg-[#F2F4F7] text-[#98A2B3]' : 'bg-[#2953E4] text-white'}`}>{state === 'done' ? '✓' : n}</span>
+                                {t}
+                            </span>
+                            {n < tabs.length && <span className='h-px w-4 bg-[#D0D5DD]' aria-hidden='true' />}
+                        </li>
+                    );
+                })}
+            </ol>
+
+            <Panel>
                 <ErrorBanner>{error}</ErrorBanner>
 
                 {step === 1 && (
@@ -88,19 +97,19 @@ function Details({ config }) {
 
                 {step === 2 && (
                     <>
-                        <div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
+                        <div className='grid grid-cols-1 gap-5 sm:grid-cols-2'>
                             <div className='sm:col-span-2'>
-                                <Field label='Amount the carrier receives' required hint={`A ${config.fees.platform_pct}% pay-per-use fee is added on top${' '}(cards add ${config.fees.card_pct}%).`}>
-                                    <div className='relative'>
-                                        <span className='pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[14px] text-[#667085]'>$</span>
-                                        <input className={`${inputClass} pl-7`} inputMode='decimal' value={load.amount} onChange={setL('amount')} placeholder='0.00' />
+                                <Field label='Amount the carrier receives' required hint={`A ${config.fees.platform_pct}% fee is added on top. Cards add ${config.fees.card_pct}%.`}>
+                                    <div className='relative max-w-[280px]'>
+                                        <span className='pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[18px] font-semibold text-[#667085]'>$</span>
+                                        <input className={`${inputClass} py-3 pl-9 text-[20px] font-bold`} style={{ fontFeatureSettings: '"tnum" 1' }} inputMode='decimal' value={load.amount} onChange={setL('amount')} placeholder='0.00' />
                                     </div>
                                 </Field>
                             </div>
-                            <Field label='Load / BOL #'><input className={inputClass} value={load.load_number} onChange={setL('load_number')} /></Field>
-                            <Field label='Rate confirmation' hint='Optional · PDF or image'><input type='file' accept='.pdf,.jpg,.jpeg,.png,.doc,.docx' className={inputClass} onChange={setL('rate_confirmation')} /></Field>
-                            <Field label='Origin'><input className={inputClass} value={load.origin} onChange={setL('origin')} placeholder='City, ST' /></Field>
-                            <Field label='Destination'><input className={inputClass} value={load.destination} onChange={setL('destination')} placeholder='City, ST' /></Field>
+                            <Field label='Load or BOL number'><input className={inputClass} value={load.load_number} onChange={setL('load_number')} /></Field>
+                            <Field label='Rate confirmation' hint='Optional. PDF, image or Word document.'><input type='file' accept='.pdf,.jpg,.jpeg,.png,.doc,.docx' className={`${inputClass} py-2 file:mr-3 file:rounded-[8px] file:border-0 file:bg-[#F2F4F7] file:px-3 file:py-1 file:text-[13px] file:font-semibold file:text-[#344054]`} onChange={setL('rate_confirmation')} /></Field>
+                            <Field label='Picked up in'><input className={inputClass} value={load.origin} onChange={setL('origin')} placeholder='City, ST' /></Field>
+                            <Field label='Delivered to'><input className={inputClass} value={load.destination} onChange={setL('destination')} placeholder='City, ST' /></Field>
                             <Field label='Pickup date'><input type='date' className={inputClass} value={load.pickup_date} onChange={setL('pickup_date')} /></Field>
                             <Field label='Delivery date'><input type='date' className={inputClass} value={load.delivery_date} onChange={setL('delivery_date')} /></Field>
                         </div>
@@ -113,7 +122,7 @@ function Details({ config }) {
 
                 {step === 3 && (
                     <>
-                        <div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
+                        <div className='grid grid-cols-1 gap-5 sm:grid-cols-2'>
                             <Field label='Your name' required><input className={inputClass} value={you.payer_name} onChange={setY('payer_name')} /></Field>
                             <Field label='Company'><input className={inputClass} value={you.payer_company} onChange={setY('payer_company')} /></Field>
                             <Field label='Email' required hint='Your receipt and tracking link go here.'><input type='email' className={inputClass} value={you.payer_email} onChange={setY('payer_email')} /></Field>
@@ -125,7 +134,7 @@ function Details({ config }) {
                         </div>
                     </>
                 )}
-            </Card>
+            </Panel>
         </>
     );
 }
@@ -156,32 +165,46 @@ function PayStep({ token, config }) {
 
     return (
         <div className='flex flex-col gap-5'>
-            <Card title={`${payment.carrier.name || 'Carrier'} · DOT ${payment.carrier.dot}`} subtitle={payment.load_number ? `Load ${payment.load_number}` : undefined}>
-                <Breakdown b={payment.breakdown} guest />
-            </Card>
+            <Panel>
+                <div className='flex flex-wrap items-baseline justify-between gap-3'>
+                    <div className='min-w-0'>
+                        <p className='m-0 text-[13px] text-[#667085]'>Paying</p>
+                        <p className='m-0 mt-0.5 text-[17px] font-bold text-[#101828]'>{payment.carrier.name || 'Carrier'}</p>
+                        <p className='m-0 mt-0.5 text-[13px] text-[#667085]'>DOT {payment.carrier.dot}{payment.load_number ? `, load ${payment.load_number}` : ''}</p>
+                    </div>
+                </div>
+                <div className='mt-4 rounded-[14px] bg-[#F9FAFB] px-4 py-4'>
+                    <Breakdown b={payment.breakdown} guest compact />
+                </div>
+            </Panel>
 
-            <Card title='How do you want to pay?'>
-                <div className='mb-4 grid grid-cols-2 gap-2'>
-                    {[['us_bank_account', 'Bank (ACH)', 'No extra fee'], ['card', 'Card', `+${config.fees.card_pct}%`]].map(([key, label, sub]) => (
-                        <button key={key} onClick={() => setType(key)}
-                            className={`rounded-[10px] border px-4 py-3 text-left ${type === key ? 'border-[#175CD3] bg-[#EFF8FF]' : 'border-[#EAECF0] hover:bg-[#F9FAFB]'}`}>
-                            <span className='block text-[14px] font-semibold text-[#101828]'>{label}</span>
-                            <span className='block text-[12px] text-[#667085]'>{sub}</span>
+            <Panel title='Pay with'>
+                <div className='mb-5 grid grid-cols-2 gap-3'>
+                    {[['us_bank_account', 'Bank account', 'No extra fee'], ['card', 'Card', `${config.fees.card_pct}% surcharge`]].map(([key, label, sub]) => (
+                        <button key={key} type='button' onClick={() => setType(key)} aria-pressed={type === key}
+                            className={`rounded-[14px] border-2 px-4 py-3 text-left transition-colors ${type === key ? 'border-[#2953E4] bg-[#F5F8FF]' : 'border-[#EAECF0] bg-white hover:border-[#D0D5DD]'}`}>
+                            <span className='block text-[14.5px] font-semibold text-[#101828]'>{label}</span>
+                            <span className='block text-[12.5px] text-[#667085]'>{sub}</span>
                         </button>
                     ))}
                 </div>
 
                 <ErrorBanner>{error}</ErrorBanner>
-                {!secret && !error && <Loading label='Opening secure payment form…' />}
+                {!secret && !error && <Loading label='Opening the secure payment form' />}
                 {secret && (
-                    <Elements key={secret} stripe={stripeFor(config.publishable_key)} options={{ clientSecret: secret, appearance: { theme: 'stripe' } }}>
+                    <Elements key={secret} stripe={stripeFor(config.publishable_key)} options={{ clientSecret: secret, appearance: STRIPE_APPEARANCE }}>
                         <PayForm token={token} total={payment.breakdown.total.formatted} onDone={() => navigate(`/guest-pay/track/${token}`)} />
                     </Elements>
                 )}
-            </Card>
+            </Panel>
         </div>
     );
 }
+
+const STRIPE_APPEARANCE = {
+    theme: 'stripe',
+    variables: { colorPrimary: '#2953E4', colorText: '#101828', borderRadius: '10px', fontFamily: 'Inter, system-ui, sans-serif' },
+};
 
 function PayForm({ token, total, onDone }) {
     const stripe = useStripe();
@@ -216,7 +239,7 @@ function PayForm({ token, total, onDone }) {
         <form onSubmit={submit}>
             <PaymentElement />
             <ErrorBanner>{error}</ErrorBanner>
-            <Button type='submit' className='mt-4 w-full' loading={busy} disabled={!stripe}>Pay {total}</Button>
+            <Button type='submit' size='lg' className='mt-5 w-full' loading={busy} disabled={!stripe}>Pay {total}</Button>
         </form>
     );
 }

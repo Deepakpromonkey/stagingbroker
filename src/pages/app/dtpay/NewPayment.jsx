@@ -4,13 +4,14 @@ import { dtpay } from './api';
 import { date, parseAmount, usd } from './format';
 import { stripeFor } from './stripe';
 import { AddMethodModal } from './FundingMethods';
-import { Breakdown, Button, Card, Empty, ErrorBanner, Field, Loading, Notice, Page, inputClass } from './ui';
+import { Amount, Breakdown, Button, Empty, ErrorBanner, Field, Loading, Notice, Page, Panel, inputClass } from './ui';
 import { CarrierPicker, PayoutStatus } from './parts';
 
 /*
- * /dt-pay/new — three steps: what is being paid for, how much and with
- * what, then review and pay. ?pay=<id> resumes paying an unpaid payment;
- * ?mode=manual opens straight on manual entry.
+ * /dt-pay/new — what you are paying for, then how much and with what, then
+ * pay. The payment order on the right fills in as you go and holds the Pay
+ * button at the end. ?pay=<id> resumes paying an unpaid payment; ?mode=manual
+ * opens on entering a load by hand.
  */
 export default function NewPayment() {
     const navigate = useNavigate();
@@ -20,14 +21,31 @@ export default function NewPayment() {
     const [config, setConfig] = useState(null);
     const [step, setStep] = useState(1);
     const [mode, setMode] = useState(params.get('mode') === 'manual' ? 'manual' : 'shipment');
-    const [existing, setExisting] = useState(null);     // a resumed payment
+    const [existing, setExisting] = useState(null);
     const [shipment, setShipment] = useState(null);
     const [manual, setManual] = useState({ carrier: null, load_number: '', origin: '', destination: '', pickup_date: '', delivery_date: '', memo: '', rate_confirmation: null });
     const [amount, setAmount] = useState('');
+    const [methods, setMethods] = useState(null);
     const [methodId, setMethodId] = useState('');
+    const [adding, setAdding] = useState(null);
+    const [agree, setAgree] = useState(false);
+    const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
 
     useEffect(() => { dtpay.config().then(setConfig).catch((e) => setError(e.message)); }, []);
+
+    const loadMethods = useCallback((selectNewest = false) => {
+        dtpay.methods().then((r) => {
+            setMethods(r.methods);
+            setMethodId((current) => {
+                if (selectNewest && r.methods.length) return r.methods[r.methods.length - 1].id;
+                if (current && r.methods.some((m) => m.id === current)) return current;
+                return (r.methods.find((m) => m.type === 'us_bank_account') || r.methods[0])?.id || '';
+            });
+        }).catch((e) => setError(e.message));
+    }, []);
+
+    useEffect(() => { loadMethods(); }, [loadMethods]);
 
     useEffect(() => {
         if (!resumeId) return;
@@ -40,75 +58,251 @@ export default function NewPayment() {
     }, [resumeId, navigate]);
 
     const carrier = existing ? existing.carrier : mode === 'shipment' ? shipment?.carrier : manual.carrier;
+    const load = useMemo(() => {
+        if (existing) return { number: existing.load_number, from: existing.origin, to: existing.destination };
+        if (mode === 'shipment') return shipment ? { number: shipment.pro_number || shipment.shipment_no, from: shipment.origin, to: shipment.destination } : null;
+        return manual.carrier ? { number: manual.load_number, from: manual.origin, to: manual.destination } : null;
+    }, [existing, mode, shipment, manual]);
 
-    const step1Done = existing || (mode === 'shipment' ? !!shipment : !!manual.carrier?.dot);
-    const amountValue = parseAmount(amount);
-    const amountOk = existing || (amountValue >= (config?.limits?.min ?? 1) && amountValue <= (config?.limits?.max ?? 250000));
+    const amountValue = existing ? existing.amount.cents / 100 : parseAmount(amount);
+    const method = methods?.find((m) => m.id === methodId);
+    const quote = useQuote(amountValue, method?.type);
+
+    const step1Done = !!existing || (mode === 'shipment' ? !!shipment : !!manual.carrier?.dot);
+    const amountOk = !!existing || (amountValue >= (config?.limits?.min ?? 1) && amountValue <= (config?.limits?.max ?? 250000));
+    const isAch = method?.type === 'us_bank_account';
+    const canPay = step === 3 && !!quote && (!isAch || agree);
+
+    const pay = async () => {
+        setBusy(true);
+        setError('');
+
+        let paymentId = existing?.id;
+
+        try {
+            if (!paymentId) {
+                const fields = mode === 'shipment'
+                    ? { source: 'shipment', shipment_id: shipment.id, amount: amountValue }
+                    : {
+                        source: 'manual', amount: amountValue,
+                        carrier_dot: manual.carrier.dot, carrier_name: manual.carrier.name, carrier_mc: manual.carrier.mc,
+                        load_number: manual.load_number, origin: manual.origin, destination: manual.destination,
+                        pickup_date: manual.pickup_date, delivery_date: manual.delivery_date, memo: manual.memo,
+                        rate_confirmation: manual.rate_confirmation,
+                    };
+
+                paymentId = (await dtpay.create(fields)).payment.id;
+            }
+
+            const result = await dtpay.pay(paymentId, methodId);
+
+            if (result.client_secret) {
+                // The card asks for 3-D Secure: finish it here, then read the outcome back.
+                const stripe = await stripeFor(config.publishable_key);
+                const { error: err } = await stripe.handleNextAction({ clientSecret: result.client_secret });
+                await dtpay.sync(paymentId);
+                if (err) throw new Error(err.message);
+            }
+
+            navigate(`/dt-pay/transactions/view/${paymentId}`);
+        } catch (e) {
+            setBusy(false);
+            setError(e.message);
+            // The payment exists even when paying failed: open it, so it can be paid again.
+            if (paymentId && !existing) setTimeout(() => navigate(`/dt-pay/transactions/view/${paymentId}`), 1800);
+        }
+    };
 
     return (
         <Page
-            title={existing ? `Pay ${existing.reference}` : 'New payment'}
-            subtitle='The carrier receives the full load amount. Your money is held until you release it.'
+            title={existing ? `Pay ${existing.reference}` : 'Pay a carrier'}
+            intro='The carrier receives the full amount. Your money is held by DollarTraq until you release it.'
             back={{ to: existing ? `/dt-pay/transactions/view/${existing.id}` : '/dt-pay', label: existing ? existing.reference : 'DT Pay' }}
             testMode={config && !config.livemode}
         >
-            <Steps step={step} />
             <ErrorBanner>{error}</ErrorBanner>
-            {config && !config.configured && <div className='mb-4'><Notice tone='warn'>DT Pay is not configured on this server yet.</Notice></div>}
+            {config && !config.configured && <div className='mb-5'><Notice tone='warn'>DT Pay is not set up on this server yet.</Notice></div>}
 
-            {step === 1 && !existing && (
-                <StepWhat
-                    mode={mode} setMode={setMode}
-                    shipment={shipment} setShipment={setShipment}
-                    manual={manual} setManual={setManual}
-                    onNext={() => setStep(2)} canNext={step1Done}
-                />
-            )}
+            <div className='grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px] lg:items-start'>
+                <div className='min-w-0'>
+                    <Steps step={step} existing={!!existing} onJump={(n) => setStep(n)} />
 
-            {step === 2 && (
-                <StepAmount
-                    config={config}
+                    {step === 1 && !existing && (
+                        <Panel>
+                            <Segmented value={mode} onChange={setMode} options={[['shipment', 'One of my loads'], ['manual', 'Enter a load by hand']]} />
+                            <div className='mt-6'>
+                                {mode === 'shipment'
+                                    ? <ShipmentPicker value={shipment} onChange={setShipment} />
+                                    : <ManualLoad value={manual} onChange={setManual} />}
+                            </div>
+                            <div className='mt-7 flex justify-end'>
+                                <Button onClick={() => setStep(2)} disabled={!step1Done}>Continue</Button>
+                            </div>
+                        </Panel>
+                    )}
+
+                    {step === 2 && (
+                        <div className='flex flex-col gap-6'>
+                            <Panel title='How much'>
+                                <Field label='Amount the carrier receives' required>
+                                    <div className='relative max-w-[320px]'>
+                                        <span className='pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[18px] font-semibold text-[#667085]'>$</span>
+                                        <input
+                                            className={`${inputClass} py-3 pl-9 text-[20px] font-bold`}
+                                            style={{ fontFeatureSettings: '"tnum" 1' }}
+                                            inputMode='decimal'
+                                            value={amount}
+                                            disabled={!!existing}
+                                            onChange={(e) => setAmount(e.target.value)}
+                                            placeholder='0.00'
+                                            autoFocus={!existing}
+                                        />
+                                    </div>
+                                </Field>
+                            </Panel>
+
+                            <Panel title='Pay with' subtitle='Bank transfers have no fee. Cards add a 2.9% surcharge.'>
+                                {!methods && <Loading />}
+                                {methods && methods.length === 0 && (
+                                    <Notice tone='warn' title='No funding method yet'>Add a bank account (no fee) or a card to pay.</Notice>
+                                )}
+                                {methods && methods.length > 0 && (
+                                    <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
+                                        {methods.map((m) => (
+                                            <MethodTile key={m.id} m={m} selected={methodId === m.id} onSelect={() => { setMethodId(m.id); setAgree(false); }} />
+                                        ))}
+                                    </div>
+                                )}
+                                <div className='mt-4 flex flex-wrap gap-2'>
+                                    <Button variant='secondary' size='sm' onClick={() => setAdding('us_bank_account')} disabled={!config?.configured}>Add bank account</Button>
+                                    <Button variant='ghost' size='sm' onClick={() => setAdding('card')} disabled={!config?.configured}>Add card</Button>
+                                </div>
+                            </Panel>
+
+                            {carrier?.dot && <PayoutStatus key={carrier.dot} dot={carrier.dot} name={carrier.name} />}
+
+                            <div className='flex justify-between'>
+                                {existing ? <span /> : <Button variant='secondary' onClick={() => setStep(1)}>Back</Button>}
+                                <Button onClick={() => setStep(3)} disabled={!amountOk || !methodId}>Review</Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {step === 3 && (
+                        <Panel title='Before you pay'>
+                            <ul className='m-0 flex list-none flex-col gap-3 p-0 text-[14px] leading-6 text-[#344054]'>
+                                <li className='flex gap-3'><Dot />{isAch ? `Your bank is debited ${quote?.total?.formatted || ''}. It clears in 1 to 2 business days.` : `Your card is charged ${quote?.total?.formatted || ''} now.`}</li>
+                                <li className='flex gap-3'><Dot />DollarTraq holds the money. The carrier is not paid until you release it.</li>
+                                <li className='flex gap-3'><Dot />Until then you can put it on hold, raise a dispute, or refund it.</li>
+                            </ul>
+
+                            {isAch && (
+                                <label className='mt-5 flex items-start gap-3 rounded-[12px] border border-[#E4E7EC] bg-[#F9FAFB] px-4 py-3 text-[13.5px] leading-[1.5] text-[#344054]'>
+                                    <input type='checkbox' className='mt-[3px] h-[16px] w-[16px] accent-[#2953E4]' checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+                                    <span>I authorise DollarTraq to debit {method.label} for {quote?.total?.formatted || 'the total'} for this payment.</span>
+                                </label>
+                            )}
+
+                            <div className='mt-6'>
+                                <Button variant='secondary' onClick={() => setStep(2)} disabled={busy}>Back</Button>
+                            </div>
+                        </Panel>
+                    )}
+                </div>
+
+                <PaymentOrder
                     carrier={carrier}
-                    amount={amount} setAmount={setAmount} locked={!!existing}
-                    methodId={methodId} setMethodId={setMethodId}
-                    onBack={existing ? null : () => setStep(1)}
-                    onNext={() => setStep(3)}
-                    canNext={amountOk && !!methodId}
+                    load={load}
+                    amount={amountValue}
+                    method={method}
+                    quote={quote}
+                    step={step}
+                    canPay={canPay}
+                    busy={busy}
+                    onPay={pay}
                 />
-            )}
+            </div>
 
-            {step === 3 && (
-                <StepReview
-                    config={config}
-                    existing={existing}
-                    mode={mode} shipment={shipment} manual={manual}
-                    carrier={carrier}
-                    amount={existing ? existing.amount.cents / 100 : amountValue}
-                    methodId={methodId}
-                    onBack={() => setStep(2)}
-                    onDone={(id) => navigate(`/dt-pay/transactions/view/${id}`)}
-                />
+            {adding && config && (
+                <AddMethodModal type={adding} publishableKey={config.publishable_key} onClose={() => setAdding(null)}
+                    onSaved={() => { setAdding(null); loadMethods(true); }} />
             )}
         </Page>
     );
 }
 
-function Steps({ step }) {
-    const labels = ['What you are paying for', 'Amount & funding', 'Review & pay'];
+function Dot() {
+    return <span className='mt-[9px] h-[6px] w-[6px] shrink-0 rounded-full bg-[#2953E4]' aria-hidden='true' />;
+}
+
+/* The order, filled in as you go: a payment receipt in waiting. */
+function PaymentOrder({ carrier, load, amount, method, quote, step, canPay, busy, onPay }) {
+    const line = (label, value, placeholder) => (
+        <div className='flex items-baseline justify-between gap-4 py-2'>
+            <span className='shrink-0 text-[13px] text-[#667085]'>{label}</span>
+            <span className={`truncate text-right text-[14px] ${value ? 'font-medium text-[#101828]' : 'text-[#98A2B3]'}`}>{value || placeholder}</span>
+        </div>
+    );
 
     return (
-        <ol className='mb-6 flex flex-wrap items-center gap-2 p-0'>
+        <aside className='lg:sticky lg:top-6'>
+            <div className='overflow-hidden rounded-[18px] border border-[#E9EAEC] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]'>
+                <div className='h-[5px] bg-[#2953E4]' />
+                <div className='px-6 pb-6 pt-5'>
+                    <h2 className='m-0 text-[16px] font-bold text-[#101828]'>Payment order</h2>
+
+                    <div className='mt-3 divide-y divide-dashed divide-[#EAECF0]'>
+                        {line('Carrier', carrier?.dot ? (carrier.name || `DOT ${carrier.dot}`) : null, 'Choose a carrier')}
+                        {line('DOT', carrier?.dot, '—')}
+                        {line('Load', load?.number, '—')}
+                        {line('Route', load && (load.from || load.to) ? `${load.from || '?'} to ${load.to || '?'}` : null, '—')}
+                        {line('Pay with', method?.label, step >= 2 ? 'Choose a method' : '—')}
+                    </div>
+
+                    <div className='mt-4 rounded-[14px] bg-[#F9FAFB] px-4 py-4'>
+                        {quote ? <Breakdown b={quote} compact /> : (
+                            <div className='flex items-baseline justify-between'>
+                                <span className='text-[14px] text-[#667085]'>Carrier receives</span>
+                                <Amount value={amount > 0 ? usd(Math.round(amount * 100)) : '$0.00'} className='text-[22px] font-extrabold text-[#101828]' />
+                            </div>
+                        )}
+                    </div>
+
+                    {step === 3 && (
+                        <Button size='lg' className='mt-5 w-full' disabled={!canPay} loading={busy} onClick={onPay}>
+                            Pay {quote?.total?.formatted || ''}
+                        </Button>
+                    )}
+                    <p className='m-0 mt-4 text-center text-[12px] text-[#98A2B3]'>Processed securely by Stripe</p>
+                </div>
+            </div>
+        </aside>
+    );
+}
+
+function Steps({ step, existing, onJump }) {
+    const labels = existing ? ['How much', 'Pay'] : ['What you are paying for', 'How much', 'Pay'];
+    const current = existing ? step - 1 : step;
+
+    return (
+        <ol className='m-0 mb-5 flex list-none flex-wrap items-center gap-x-2 gap-y-2 p-0'>
             {labels.map((l, i) => {
                 const n = i + 1;
-                const state = n < step ? 'done' : n === step ? 'now' : 'next';
+                const state = n < current ? 'done' : n === current ? 'now' : 'next';
+                const target = existing ? n + 1 : n;
 
                 return (
                     <li key={l} className='flex items-center gap-2'>
-                        <span className={`flex h-[24px] w-[24px] items-center justify-center rounded-full text-[12px] font-bold ${state === 'next' ? 'bg-[#F2F4F7] text-[#98A2B3]' : 'bg-[#175CD3] text-white'}`}>
-                            {state === 'done' ? '✓' : n}
-                        </span>
-                        <span className={`text-[13px] font-semibold ${state === 'next' ? 'text-[#98A2B3]' : 'text-[#101828]'}`}>{l}</span>
-                        {n < labels.length && <span className='mx-1 h-px w-6 bg-[#EAECF0]' />}
+                        <button
+                            type='button'
+                            disabled={state !== 'done'}
+                            onClick={() => onJump(target)}
+                            className={`flex items-center gap-2 rounded-full py-1 pl-1 pr-3 text-[13.5px] font-semibold ${state === 'now' ? 'bg-white text-[#101828] shadow-[0_1px_2px_rgba(16,24,40,0.08)]' : state === 'done' ? 'text-[#2953E4] hover:bg-white' : 'text-[#98A2B3]'}`}
+                        >
+                            <span className={`flex h-[24px] w-[24px] items-center justify-center rounded-full text-[12px] ${state === 'next' ? 'bg-[#F2F4F7] text-[#98A2B3]' : 'bg-[#2953E4] text-white'}`}>{state === 'done' ? '✓' : n}</span>
+                            {l}
+                        </button>
+                        {n < labels.length && <span className='h-px w-5 bg-[#D0D5DD]' aria-hidden='true' />}
                     </li>
                 );
             })}
@@ -116,31 +310,40 @@ function Steps({ step }) {
     );
 }
 
-/* ---------------------------------------------------------------- step 1 */
-
-function StepWhat({ mode, setMode, shipment, setShipment, manual, setManual, onNext, canNext }) {
+function Segmented({ value, onChange, options }) {
     return (
-        <Card>
-            <div className='mb-5 inline-flex rounded-[10px] border border-[#EAECF0] bg-[#F9FAFB] p-1'>
-                {[['shipment', 'From my loads'], ['manual', 'Enter manually']].map(([key, label]) => (
-                    <button
-                        key={key}
-                        onClick={() => setMode(key)}
-                        className={`rounded-[8px] px-4 py-1.5 text-[13px] font-semibold ${mode === key ? 'bg-white text-[#101828] shadow-sm' : 'text-[#667085]'}`}
-                    >
-                        {label}
-                    </button>
-                ))}
-            </div>
+        <div className='inline-flex rounded-[12px] bg-[#F2F4F7] p-1'>
+            {options.map(([key, label]) => (
+                <button
+                    key={key}
+                    type='button'
+                    onClick={() => onChange(key)}
+                    className={`rounded-[9px] px-4 py-2 text-[13.5px] font-semibold transition-colors ${value === key ? 'bg-white text-[#101828] shadow-[0_1px_2px_rgba(16,24,40,0.1)]' : 'text-[#667085] hover:text-[#344054]'}`}
+                >
+                    {label}
+                </button>
+            ))}
+        </div>
+    );
+}
 
-            {mode === 'shipment'
-                ? <ShipmentPicker value={shipment} onChange={setShipment} />
-                : <ManualLoad value={manual} onChange={setManual} />}
+export function MethodTile({ m, selected, onSelect }) {
+    const bank = m.type === 'us_bank_account';
 
-            <div className='mt-6 flex justify-end'>
-                <Button onClick={onNext} disabled={!canNext}>Continue</Button>
-            </div>
-        </Card>
+    return (
+        <button
+            type='button'
+            onClick={onSelect}
+            className={`flex items-center gap-3.5 rounded-[14px] border-2 px-4 py-3.5 text-left transition-colors ${selected ? 'border-[#2953E4] bg-[#F5F8FF]' : 'border-[#EAECF0] bg-white hover:border-[#D0D5DD]'}`}
+        >
+            <span className={`flex h-[40px] w-[52px] shrink-0 items-center justify-center rounded-[8px] text-[11px] font-extrabold tracking-[0.02em] ${bank ? 'bg-[#ECFDF3] text-[#067647]' : 'bg-[#101828] text-white'}`}>
+                {bank ? 'BANK' : (m.brand || 'CARD').slice(0, 4)}
+            </span>
+            <span className='min-w-0'>
+                <span className='block truncate text-[14.5px] font-semibold text-[#101828]'>{bank ? (m.bank || 'Bank account') : `Card ending ${m.last4}`}</span>
+                <span className='block text-[12.5px] text-[#667085]'>{bank ? `Account ending ${m.last4}, no fee` : `Expires ${m.exp || '—'}, 2.9% surcharge`}</span>
+            </span>
+        </button>
     );
 }
 
@@ -151,37 +354,39 @@ function ShipmentPicker({ value, onChange }) {
 
     useEffect(() => {
         const t = setTimeout(() => {
-            setError('');
-            dtpay.shipments({ q, per_page: 25 }).then(setResult).catch((e) => setError(e.message));
+            dtpay.shipments({ q, per_page: 25 }).then((r) => { setError(''); setResult(r); }).catch((e) => setError(e.message));
         }, 250);
         return () => clearTimeout(t);
     }, [q]);
 
     return (
         <div>
-            <input className={`${inputClass} mb-3`} placeholder='Search shipment #, PRO #, carrier or DOT' value={q} onChange={(e) => setQ(e.target.value)} />
+            <input className={`${inputClass} mb-4`} placeholder='Search by shipment #, PRO #, carrier or DOT' value={q} onChange={(e) => setQ(e.target.value)} />
             <ErrorBanner>{error}</ErrorBanner>
             {!result && !error && <Loading />}
             {result && result.data.length === 0 && (
-                <Empty title='No loads to pay'>Only loads with a carrier assigned that have not been paid yet appear here. You can enter a load manually instead.</Empty>
+                <Empty title='No loads to pay'>Loads appear here once a carrier is assigned, until they are paid. You can enter a load by hand instead.</Empty>
             )}
             {result && result.data.length > 0 && (
-                <ul className='m-0 max-h-[420px] list-none overflow-auto rounded-[10px] border border-[#EAECF0] p-0'>
+                <ul className='m-0 grid max-h-[460px] list-none grid-cols-1 gap-2 overflow-auto p-0'>
                     {result.data.map((s) => {
                         const selected = value?.id === s.id;
 
                         return (
                             <li key={s.id}>
                                 <button
+                                    type='button'
                                     onClick={() => onChange(s)}
-                                    className={`flex w-full items-center justify-between gap-3 border-b border-[#F2F4F7] px-4 py-3 text-left last:border-0 ${selected ? 'bg-[#EFF8FF]' : 'hover:bg-[#F9FAFB]'}`}
+                                    className={`flex w-full items-center justify-between gap-4 rounded-[14px] border-2 px-4 py-3.5 text-left transition-colors ${selected ? 'border-[#2953E4] bg-[#F5F8FF]' : 'border-[#EAECF0] bg-white hover:border-[#D0D5DD]'}`}
                                 >
                                     <div className='min-w-0'>
-                                        <p className='m-0 text-[14px] font-semibold text-[#101828]'>{s.shipment_no}{s.pro_number ? ` · PRO ${s.pro_number}` : ''}</p>
-                                        <p className='m-0 text-[12.5px] text-[#667085]'>{s.carrier.name || 'Carrier'} · DOT {s.carrier.dot}</p>
-                                        <p className='m-0 text-[12px] text-[#98A2B3]'>{s.origin || '?'} → {s.destination || '?'}{s.delivery_date ? ` · delivery ${date(s.delivery_date)}` : ''}</p>
+                                        <p className='m-0 text-[14.5px] font-semibold text-[#101828]'>{s.origin || '?'} to {s.destination || '?'}</p>
+                                        <p className='m-0 mt-0.5 text-[13px] text-[#475467]'>{s.carrier.name || 'Carrier'}, DOT {s.carrier.dot}</p>
+                                        <p className='m-0 mt-0.5 text-[12.5px] text-[#98A2B3]'>{s.shipment_no}{s.pro_number ? `, PRO ${s.pro_number}` : ''}{s.delivery_date ? `, delivers ${date(s.delivery_date)}` : ''}</p>
                                     </div>
-                                    <span className={`h-[18px] w-[18px] shrink-0 rounded-full border-2 ${selected ? 'border-[#175CD3] bg-[#175CD3]' : 'border-[#D0D5DD]'}`} />
+                                    <span className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border-2 ${selected ? 'border-[#2953E4] bg-[#2953E4] text-white' : 'border-[#D0D5DD]'}`}>
+                                        {selected && <span className='text-[12px] leading-none'>✓</span>}
+                                    </span>
                                 </button>
                             </li>
                         );
@@ -196,99 +401,21 @@ function ManualLoad({ value, onChange }) {
     const set = (k) => (e) => onChange({ ...value, [k]: e.target.type === 'file' ? e.target.files?.[0] || null : e.target.value });
 
     return (
-        <div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
+        <div className='grid grid-cols-1 gap-5 sm:grid-cols-2'>
             <div className='sm:col-span-2'>
                 <CarrierPicker value={value.carrier} onChange={(carrier) => onChange({ ...value, carrier })} search={dtpay.carriers} />
             </div>
-            <Field label='Load / reference #'><input className={inputClass} value={value.load_number} onChange={set('load_number')} placeholder='e.g. LD-5521' /></Field>
-            <Field label='Rate confirmation' hint='PDF, image or Word, up to 10 MB'>
-                <input type='file' accept='.pdf,.jpg,.jpeg,.png,.doc,.docx' className={inputClass} onChange={set('rate_confirmation')} />
+            <Field label='Load or reference number'><input className={inputClass} value={value.load_number} onChange={set('load_number')} placeholder='LD-5521' /></Field>
+            <Field label='Rate confirmation' hint='PDF, image or Word document, up to 10 MB'>
+                <input type='file' accept='.pdf,.jpg,.jpeg,.png,.doc,.docx' className={`${inputClass} py-2 file:mr-3 file:rounded-[8px] file:border-0 file:bg-[#F2F4F7] file:px-3 file:py-1 file:text-[13px] file:font-semibold file:text-[#344054]`} onChange={set('rate_confirmation')} />
             </Field>
-            <Field label='Origin'><input className={inputClass} value={value.origin} onChange={set('origin')} placeholder='City, ST' /></Field>
-            <Field label='Destination'><input className={inputClass} value={value.destination} onChange={set('destination')} placeholder='City, ST' /></Field>
+            <Field label='Picked up in'><input className={inputClass} value={value.origin} onChange={set('origin')} placeholder='Dallas, TX' /></Field>
+            <Field label='Delivered to'><input className={inputClass} value={value.destination} onChange={set('destination')} placeholder='Memphis, TN' /></Field>
             <Field label='Pickup date'><input type='date' className={inputClass} value={value.pickup_date} onChange={set('pickup_date')} /></Field>
             <Field label='Delivery date'><input type='date' className={inputClass} value={value.delivery_date} onChange={set('delivery_date')} /></Field>
             <div className='sm:col-span-2'>
-                <Field label='Note'><textarea rows={2} className={inputClass} value={value.memo} onChange={set('memo')} placeholder='Optional' /></Field>
+                <Field label='Note for your records'><textarea rows={2} className={inputClass} value={value.memo} onChange={set('memo')} /></Field>
             </div>
-        </div>
-    );
-}
-
-/* ---------------------------------------------------------------- step 2 */
-
-function StepAmount({ config, carrier, amount, setAmount, locked, methodId, setMethodId, onBack, onNext, canNext }) {
-    const [methods, setMethods] = useState(null);
-    const [adding, setAdding] = useState(null);
-    const [error, setError] = useState('');
-
-    const loadMethods = useCallback(() => {
-        dtpay.methods().then((r) => {
-            setMethods(r.methods);
-            if (!methodId && r.methods.length) setMethodId((r.methods.find((m) => m.type === 'us_bank_account') || r.methods[0]).id);
-        }).catch((e) => setError(e.message));
-    }, [methodId, setMethodId]);
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    useEffect(loadMethods, []);
-
-    const method = methods?.find((m) => m.id === methodId);
-    const quote = useQuote(parseAmount(amount), method?.type);
-
-    return (
-        <div className='grid grid-cols-1 gap-5 lg:grid-cols-[1fr_360px]'>
-            <Card title='Amount & funding'>
-                <Field label='Load amount (what the carrier receives)' required>
-                    <div className='relative'>
-                        <span className='pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[14px] text-[#667085]'>$</span>
-                        <input className={`${inputClass} pl-7`} inputMode='decimal' value={amount} disabled={locked} onChange={(e) => setAmount(e.target.value)} placeholder='0.00' />
-                    </div>
-                </Field>
-
-                <div className='mt-5'>
-                    <p className='mb-2 text-[12.5px] font-semibold text-[#344054]'>Pay with</p>
-                    <ErrorBanner>{error}</ErrorBanner>
-                    {!methods && !error && <Loading />}
-                    {methods && methods.length === 0 && (
-                        <Notice tone='warn'>No funding method yet. Add a bank account (no fee) or a card (2.9% surcharge).</Notice>
-                    )}
-                    {methods && methods.length > 0 && (
-                        <div className='flex flex-col gap-2'>
-                            {methods.map((m) => (
-                                <label key={m.id} className={`flex cursor-pointer items-center justify-between gap-3 rounded-[10px] border px-4 py-3 ${methodId === m.id ? 'border-[#175CD3] bg-[#EFF8FF]' : 'border-[#EAECF0] hover:bg-[#F9FAFB]'}`}>
-                                    <span className='flex items-center gap-3'>
-                                        <input type='radio' name='method' checked={methodId === m.id} onChange={() => setMethodId(m.id)} />
-                                        <span>
-                                            <span className='block text-[14px] font-semibold text-[#101828]'>{m.label}</span>
-                                            <span className='block text-[12px] text-[#667085]'>{m.type === 'card' ? 'Card · 2.9% surcharge · funds at once' : 'Bank (ACH) · no fee · 1–2 business days'}</span>
-                                        </span>
-                                    </span>
-                                </label>
-                            ))}
-                        </div>
-                    )}
-                    <div className='mt-3 flex gap-2'>
-                        <Button variant='secondary' onClick={() => setAdding('us_bank_account')} disabled={!config?.configured}>Add bank account</Button>
-                        <Button variant='ghost' onClick={() => setAdding('card')} disabled={!config?.configured}>Add card</Button>
-                    </div>
-                </div>
-
-                <div className='mt-6 flex justify-between'>
-                    {onBack ? <Button variant='secondary' onClick={onBack}>Back</Button> : <span />}
-                    <Button onClick={onNext} disabled={!canNext}>Review</Button>
-                </div>
-            </Card>
-
-            <div className='flex flex-col gap-5'>
-                <Card title='Cost'>
-                    {quote ? <Breakdown b={quote} /> : <p className='m-0 text-[13px] text-[#667085]'>Enter an amount and choose how to pay.</p>}
-                </Card>
-                {carrier?.dot && <PayoutStatus key={carrier.dot} dot={carrier.dot} name={carrier.name} />}
-            </div>
-
-            {adding && config && (
-                <AddMethodModal type={adding} publishableKey={config.publishable_key} onClose={() => setAdding(null)} onSaved={() => { setAdding(null); setMethods(null); loadMethods(); }} />
-            )}
         </div>
     );
 }
@@ -308,116 +435,5 @@ function useQuote(amount, methodType) {
         return () => clearTimeout(t);
     }, [amount, methodType, usable, key]);
 
-    // A quote for other inputs is not shown.
     return usable && quote?.key === key ? quote : null;
-}
-
-/* ---------------------------------------------------------------- step 3 */
-
-function StepReview({ config, existing, mode, shipment, manual, carrier, amount, methodId, onBack, onDone }) {
-    const [methods, setMethods] = useState(null);
-    const [agree, setAgree] = useState(false);
-    const [busy, setBusy] = useState(false);
-    const [error, setError] = useState('');
-
-    useEffect(() => { dtpay.methods().then((r) => setMethods(r.methods)).catch((e) => setError(e.message)); }, []);
-
-    const method = methods?.find((m) => m.id === methodId);
-    const quote = useQuote(amount, method?.type);
-    const isAch = method?.type === 'us_bank_account';
-
-    const details = useMemo(() => {
-        if (existing) return { load: existing.load_number, route: [existing.origin, existing.destination] };
-        if (mode === 'shipment') return { load: shipment?.pro_number || shipment?.shipment_no, route: [shipment?.origin, shipment?.destination] };
-        return { load: manual.load_number, route: [manual.origin, manual.destination] };
-    }, [existing, mode, shipment, manual]);
-
-    const submit = async () => {
-        setBusy(true);
-        setError('');
-
-        let paymentId = existing?.id;
-
-        try {
-            if (!paymentId) {
-                const fields = mode === 'shipment'
-                    ? { source: 'shipment', shipment_id: shipment.id, amount }
-                    : {
-                        source: 'manual', amount,
-                        carrier_dot: manual.carrier.dot, carrier_name: manual.carrier.name, carrier_mc: manual.carrier.mc,
-                        load_number: manual.load_number, origin: manual.origin, destination: manual.destination,
-                        pickup_date: manual.pickup_date, delivery_date: manual.delivery_date, memo: manual.memo,
-                        rate_confirmation: manual.rate_confirmation,
-                    };
-
-                paymentId = (await dtpay.create(fields)).payment.id;
-            }
-
-            const result = await dtpay.pay(paymentId, methodId);
-
-            if (result.client_secret) {
-                // Card asks for 3-D Secure: finish it in the browser, then read the outcome back.
-                const stripe = await stripeFor(config.publishable_key);
-                const { error: err } = await stripe.handleNextAction({ clientSecret: result.client_secret });
-                await dtpay.sync(paymentId);
-                if (err) throw new Error(err.message);
-            }
-
-            onDone(paymentId);
-        } catch (e) {
-            setBusy(false);
-            setError(e.message);
-
-            // The payment exists even when paying failed: show it, so it can be retried.
-            if (paymentId && !existing) setTimeout(() => onDone(paymentId), 1800);
-        }
-    };
-
-    return (
-        <div className='grid grid-cols-1 gap-5 lg:grid-cols-[1fr_360px]'>
-            <Card title='Review'>
-                <dl className='m-0 grid grid-cols-1 gap-4 sm:grid-cols-2'>
-                    <Item k='Carrier' v={`${carrier?.name || '—'} · DOT ${carrier?.dot}`} />
-                    <Item k='Load' v={details.load || '—'} />
-                    <Item k='Route' v={details.route.some(Boolean) ? `${details.route[0] || '?'} → ${details.route[1] || '?'}` : '—'} />
-                    <Item k='Pay with' v={method?.label || '—'} />
-                    <Item k='Carrier receives' v={usd(Math.round(amount * 100))} />
-                    <Item k='When' v={isAch ? 'Debit clears in 1–2 business days, then held' : 'Charged now, then held'} />
-                </dl>
-
-                <div className='mt-5'>
-                    <Notice tone='info'>
-                        The money is held by DollarTraq and paid to the carrier only when you release it — after delivery and POD. Until then you can hold it, dispute it, or refund it.
-                    </Notice>
-                </div>
-
-                {isAch && (
-                    <label className='mt-4 flex items-start gap-2 text-[13px] text-[#344054]'>
-                        <input type='checkbox' className='mt-1' checked={agree} onChange={(e) => setAgree(e.target.checked)} />
-                        <span>I authorise DollarTraq to debit {method.label} for {quote?.total?.formatted || 'the total shown'} for this payment.</span>
-                    </label>
-                )}
-
-                <ErrorBanner>{error}</ErrorBanner>
-
-                <div className='mt-6 flex justify-between'>
-                    <Button variant='secondary' onClick={onBack} disabled={busy}>Back</Button>
-                    <Button onClick={submit} loading={busy} disabled={!quote || (isAch && !agree)}>
-                        Pay {quote?.total?.formatted || ''}
-                    </Button>
-                </div>
-            </Card>
-
-            <Card title='Cost'>{quote ? <Breakdown b={quote} /> : <Loading />}</Card>
-        </div>
-    );
-}
-
-function Item({ k, v }) {
-    return (
-        <div>
-            <dt className='text-[12px] font-semibold uppercase tracking-[0.04em] text-[#98A2B3]'>{k}</dt>
-            <dd className='m-0 mt-0.5 text-[14px] text-[#101828]'>{v}</dd>
-        </div>
-    );
 }

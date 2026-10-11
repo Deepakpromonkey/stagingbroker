@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { dtpay } from './api';
-import { Button, Card, Field, Notice, Spinner, inputClass } from './ui';
+import { Button, Field, Notice, Panel, Spinner, inputClass } from './ui';
 
 /*
  * Pick the carrier being paid: search the carrier directory by DOT or the
@@ -30,12 +30,12 @@ export function CarrierPicker({ value, onChange, search }) {
     if (value?.dot && !manual) {
         return (
             <Field label='Carrier' required>
-                <div className='flex items-center justify-between gap-3 rounded-[10px] border border-[#B2DDFF] bg-[#EFF8FF] px-4 py-3'>
+                <div className='flex items-center justify-between gap-3 rounded-[14px] border-2 border-[#2953E4] bg-[#F5F8FF] px-4 py-3.5'>
                     <div>
-                        <p className='m-0 text-[14px] font-semibold text-[#101828]'>{value.name || 'Carrier'}</p>
-                        <p className='m-0 text-[12.5px] text-[#475467]'>DOT {value.dot}{value.mc ? ` · MC ${value.mc}` : ''}{value.location ? ` · ${value.location}` : ''}</p>
+                        <p className='m-0 text-[14.5px] font-semibold text-[#101828]'>{value.name || 'Carrier'}</p>
+                        <p className='m-0 text-[12.5px] text-[#475467]'>DOT {value.dot}{value.mc ? `, MC ${value.mc}` : ''}{value.location ? `, ${value.location}` : ''}</p>
                     </div>
-                    <Button variant='ghost' onClick={() => { onChange(null); setQ(''); }}>Change</Button>
+                    <Button variant='ghost' size='sm' onClick={() => { onChange(null); setQ(''); }}>Change</Button>
                 </div>
             </Field>
         );
@@ -50,26 +50,26 @@ export function CarrierPicker({ value, onChange, search }) {
                 <Field label='Carrier DOT #' required><input className={inputClass} value={v.dot} onChange={set('dot')} inputMode='numeric' /></Field>
                 <Field label='Carrier name'><input className={inputClass} value={v.name} onChange={set('name')} /></Field>
                 <Field label='MC #'><input className={inputClass} value={v.mc} onChange={set('mc')} /></Field>
-                <button type='button' className='text-left text-[12.5px] font-semibold text-[#175CD3] sm:col-span-3' onClick={() => { setManual(false); onChange(null); }}>
-                    ← Search the carrier directory instead
+                <button type='button' className='text-left text-[12.5px] font-semibold text-[#2953E4] sm:col-span-3' onClick={() => { setManual(false); onChange(null); }}>
+                    Search the carrier directory instead
                 </button>
             </div>
         );
     }
 
     return (
-        <Field label='Carrier' required hint='Search by DOT number or the start of the company name.'>
+        <Field label='Carrier' required>
             <div className='relative'>
-                <input className={inputClass} value={q} onChange={(e) => setQ(e.target.value)} placeholder='e.g. 3577340 or Powell Distributing' />
+                <input className={inputClass} value={q} onChange={(e) => setQ(e.target.value)} placeholder='DOT number or company name' />
                 {loading && <span className='absolute right-3 top-1/2 -translate-y-1/2'><Spinner small /></span>}
             </div>
             {results.length > 0 && (
-                <ul className='m-0 mt-2 max-h-[260px] list-none overflow-auto rounded-[10px] border border-[#EAECF0] p-0'>
+                <ul className='m-0 mt-2 max-h-[260px] list-none overflow-auto rounded-[12px] border border-[#EAECF0] bg-white p-0 shadow-[0_8px_20px_rgba(16,24,40,0.08)]'>
                     {results.map((c) => (
                         <li key={c.dot}>
                             <button type='button' onClick={() => onChange(c)} className='w-full border-b border-[#F2F4F7] px-4 py-2.5 text-left last:border-0 hover:bg-[#F9FAFB]'>
                                 <span className='block text-[13.5px] font-semibold text-[#101828]'>{c.name}{c.dba ? ` (${c.dba})` : ''}</span>
-                                <span className='block text-[12px] text-[#667085]'>DOT {c.dot}{c.mc ? ` · MC ${c.mc}` : ''}{c.location ? ` · ${c.location}` : ''}</span>
+                                <span className='block text-[12px] text-[#667085]'>DOT {c.dot}{c.mc ? `, MC ${c.mc}` : ''}{c.location ? `, ${c.location}` : ''}</span>
                             </button>
                         </li>
                     ))}
@@ -78,7 +78,7 @@ export function CarrierPicker({ value, onChange, search }) {
             {searching && !loading && results.length === 0 && (
                 <p className='m-0 mt-2 text-[12.5px] text-[#667085]'>No carrier found.</p>
             )}
-            <button type='button' className='mt-2 text-[12.5px] font-semibold text-[#175CD3]' onClick={() => { setManual(true); onChange({ dot: /^\d+$/.test(q.trim()) ? q.trim() : '', name: /^\d+$/.test(q.trim()) ? '' : q.trim(), mc: '' }); }}>
+            <button type='button' className='mt-2 text-[12.5px] font-semibold text-[#2953E4]' onClick={() => { setManual(true); onChange({ dot: /^\d+$/.test(q.trim()) ? q.trim() : '', name: /^\d+$/.test(q.trim()) ? '' : q.trim(), mc: '' }); }}>
                 Not listed? Enter the carrier manually
             </button>
         </Field>
@@ -121,14 +121,14 @@ export function PayoutStatus({ dot, name, compact = false }) {
 
     const body = (
         <>
-            {!state && !error && <p className='m-0 flex items-center gap-2 text-[13px] text-[#667085]'><Spinner small /> Checking the carrier…</p>}
+            {!state && !error && <p className='m-0 flex items-center gap-2 text-[13px] text-[#667085]'><Spinner small /> Checking the carrier's payout setup</p>}
             {error && <p className='m-0 text-[13px] text-[#B42318]'>{error}</p>}
             {state?.ready && <Notice tone='success'>{name || 'The carrier'} can receive payouts. Release sends the money straight to their bank.</Notice>}
             {state && !state.ready && (
                 <div>
                     <Notice tone='warn'>
                         {state.started ? 'The carrier started payout setup but has not finished it.' : 'The carrier has not set up payouts with DollarTraq yet.'}
-                        {' '}You can fund now; release needs their setup finished.
+                        {' '}You can pay now. Releasing the money needs their setup finished.
                     </Notice>
                     {!link ? (
                         <div className='mt-3 flex flex-col gap-2 sm:flex-row'>
@@ -149,5 +149,5 @@ export function PayoutStatus({ dot, name, compact = false }) {
         </>
     );
 
-    return compact ? body : <Card title='Carrier payouts'>{body}</Card>;
+    return compact ? body : <Panel title='Carrier payouts'>{body}</Panel>;
 }

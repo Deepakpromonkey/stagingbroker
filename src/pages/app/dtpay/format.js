@@ -1,10 +1,32 @@
 /* Formatting and lookup tables shared by the DT Pay screens. */
 
+/* What each status is called on screen: where the money is, in plain words. */
+export const STATUS_LABELS = {
+    draft: 'Not paid yet',
+    processing: 'Clearing',
+    funded: 'Held',
+    releasing: 'Releasing',
+    released: 'Paid to carrier',
+    refunding: 'Refunding',
+    refunded: 'Refunded',
+    failed: 'Payment failed',
+    cancelled: 'Cancelled',
+};
+
+export const statusLabel = (status) => STATUS_LABELS[status] || status;
+
+/* Position on the money route: 0 not paid, 1 clearing, 2 held, 3 with the carrier. */
+export function routeStage(status) {
+    return { processing: 1, funded: 2, releasing: 2, released: 3 }[status] ?? 0;
+}
+
+export const routeStopped = (status) => ['refunded', 'refunding', 'failed', 'cancelled'].includes(status);
+
 export const STATUS_STYLES = {
     draft: { color: '#475467', bg: '#F2F4F7', border: '#E4E7EC' },
     processing: { color: '#B54708', bg: '#FFFAEB', border: '#FEDF89' },
-    funded: { color: '#175CD3', bg: '#EFF8FF', border: '#B2DDFF' },
-    releasing: { color: '#175CD3', bg: '#EFF8FF', border: '#B2DDFF' },
+    funded: { color: '#2953E4', bg: '#EEF4FF', border: '#C7D7FE' },
+    releasing: { color: '#2953E4', bg: '#EEF4FF', border: '#C7D7FE' },
     released: { color: '#067647', bg: '#ECFDF3', border: '#ABEFC6' },
     refunding: { color: '#5925DC', bg: '#F4F3FF', border: '#D9D6FE' },
     refunded: { color: '#5925DC', bg: '#F4F3FF', border: '#D9D6FE' },
@@ -14,11 +36,11 @@ export const STATUS_STYLES = {
 
 export const STATUS_FILTERS = [
     { key: '', label: 'All' },
-    { key: 'draft', label: 'Awaiting payment' },
-    { key: 'processing', label: 'Processing' },
-    { key: 'held', label: 'Funded · held' },
+    { key: 'draft', label: 'Not paid yet' },
+    { key: 'processing', label: 'Clearing' },
+    { key: 'held', label: 'Held' },
     { key: 'disputed', label: 'Disputed' },
-    { key: 'released', label: 'Released' },
+    { key: 'released', label: 'Paid to carrier' },
     { key: 'refunded', label: 'Refunded' },
     { key: 'failed', label: 'Failed' },
     { key: 'cancelled', label: 'Cancelled' },
