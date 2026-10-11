@@ -16,7 +16,7 @@ import TableViewOutlined from '@mui/icons-material/TableViewOutlined';
 import { apiFetch, apiDownload } from '../../../lib/api';
 import { toast } from '../../../components/ui/Toaster';
 
-import { Card, thCls, tdCls } from '../DtPay/components/ui';
+import { Card, thCls, tdCls } from './ui';
 
 import { money, formatDate, formatPeriod, cardBrand } from './format';
 import { StatusPill, btnGhost } from './components';

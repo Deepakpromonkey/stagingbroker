@@ -73,6 +73,7 @@ const PUBLIC_PATH_PREFIXES = [
   "/carrier/invalid-access",
   "/carrier/email-approval",
   '/guest-pay',
+  '/payouts/complete',
 
   // The customer-facing tracking link — opened with no session at all,
   // authorised only by the token in the URL.
@@ -98,6 +99,11 @@ function isPublicPath(pathname) {
 // array (user needs at least one — same "some" semantics as AppHeader's
 // `can()` helper).
 const ROUTE_PERMISSIONS = [
+  {
+    // Any DT Pay permission opens DT Pay; each action re-checks its own.
+    match: (pathname) => pathname.startsWith("/dt-pay"),
+    permission: ["create-fund-payment", "release-conditional-payment-capped", "release-conditional-payment-unlimited", "refund-cancel-payment"],
+  },
   {
     match: (pathname) => pathname.startsWith("/load-search"),
     permission: "book-assign-loads",

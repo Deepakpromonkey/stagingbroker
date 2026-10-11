@@ -3,7 +3,7 @@
 |
 | Everything generic — the page header, the card shell, the KPI tile, the table
 | cell classes — comes from the app's shared kit in
-| pages/app/DtPay/components/ui, so billing does not grow a second look.
+| pages/app/billing/ui, so billing does not grow a second look.
 */
 
 import CheckCircleOutlined from '@mui/icons-material/CheckCircleOutlined';

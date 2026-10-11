@@ -16,7 +16,7 @@ import UpgradeOutlined from '@mui/icons-material/UpgradeOutlined';
 import { apiFetch } from '../../../lib/api';
 import { toast } from '../../../components/ui/Toaster';
 
-import { Card } from '../DtPay/components/ui';
+import { Card } from './ui';
 
 import { money, moneyShort, formatDate, formatPeriod, relativeDays, cardBrand } from './format';
 import { StatusPill, InfoRow, UsageBar, Banner, btnPrimary, btnGhost, btnDanger } from './components';

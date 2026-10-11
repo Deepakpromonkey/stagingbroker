@@ -47,25 +47,16 @@ const EldNotSupported = lazy(() => import('./pages/app/connect/EldNotSupported')
 const EmailApproval = lazy(() => import('./pages/app/connect/EmailApproval'))
 
 /*
-DTPay
+DT Pay (rebuilt): brokers pay carriers, funds held until released.
 */
-const DtPayFundingControl = lazy(() => import('./pages/app/DtPay/profile/DtPayFundingControl'))
-
-const PaymentsDashbaord = lazy(() => import('./pages/app/DtPay/PaymentsDashbaord'))
-const PaymentInit = lazy(() => import('./pages/app/DtPay/payment-flow/PaymentInit'))
-
-const PaymentAuto = lazy(() => import('./pages/app/DtPay/payment-flow/Auto/PaymentAuto'))
-const PaymentManual = lazy(() => import('./pages/app/DtPay/payment-flow/Manual/PaymentManual'))
-
-const DtPayTransactions = lazy(() => import('./pages/app/DtPay/transactions/DtPayTransactions'))
-const DtPayTransactionView = lazy(() => import('./pages/app/DtPay/transactions/DtPayTransactionView'))
-
-const RaiseDispute = lazy(() => import('./pages/app/DtPay/dispute/RaiseDispute'))
-
-/*
-DTPay Guest Pay
-*/
-const DtPayGuestPay = lazy(() => import('./pages/app/DtPayGuestPay'))
+const DtPayDashboard = lazy(() => import('./pages/app/dtpay/Dashboard'))
+const DtPayNewPayment = lazy(() => import('./pages/app/dtpay/NewPayment'))
+const DtPayPayments = lazy(() => import('./pages/app/dtpay/Payments'))
+const DtPayPaymentDetail = lazy(() => import('./pages/app/dtpay/PaymentDetail'))
+const DtPayFundingMethods = lazy(() => import('./pages/app/dtpay/FundingMethods'))
+const DtPayGuestPay = lazy(() => import('./pages/app/dtpay/guest/GuestPay'))
+const DtPayGuestTrack = lazy(() => import('./pages/app/dtpay/guest/GuestTrack'))
+const DtPayPayoutComplete = lazy(() => import('./pages/app/dtpay/PayoutComplete'))
 
 
 const NewPartnerCard = lazy(() => import('./pages/app/new-partner/Card'))
@@ -80,7 +71,7 @@ const CoiRequest = lazy(() => import('./pages/app/coi-request/CoiRequest'))
 // /track/:token is the customer-facing public tracking page — whoever opens
 // it has no broker session and shouldn't see this app's internal nav at all.
 const NO_HEADER_PATHS = ['/subscribe', '/accept-invitation'];
-const NO_HEADER_PREFIXES = ['/track/'];
+const NO_HEADER_PREFIXES = ['/track/', '/guest-pay', '/payouts/complete'];
 
 // Shown for the moment a page's chunk is loading. Plain markup rather than MUI,
 // so it costs nothing in the initial bundle.
@@ -191,40 +182,24 @@ function AppShell() {
           <Route path="/dt-score/how-it-works" element={<DtScoreHowItWorks />} />
 
 
-          {/* DTPay Payments module */}
-          <Route path="/dt-pay/funding-controls" element={<DtPayFundingControl />} />
+          {/* DT Pay */}
+          <Route path="/dt-pay" element={<DtPayDashboard />} />
+          <Route path="/dt-pay/new" element={<DtPayNewPayment />} />
+          <Route path="/dt-pay/transactions" element={<DtPayPayments />} />
+          <Route path="/dt-pay/transactions/view/:transaction_id" element={<DtPayPaymentDetail />} />
+          <Route path="/dt-pay/funding-controls" element={<DtPayFundingMethods />} />
+          {/* Old links into the first DT Pay keep working. */}
+          <Route path="/dt-pay/init" element={<Navigate to="/dt-pay/new" replace />} />
+          <Route path="/dt-pay/payment/auto/*" element={<Navigate to="/dt-pay/new" replace />} />
+          <Route path="/dt-pay/payment/manual/*" element={<Navigate to="/dt-pay/new?mode=manual" replace />} />
+          <Route path="/dt-pay/raise-a-dispute/*" element={<Navigate to="/dt-pay/transactions" replace />} />
 
-          <Route path="/dt-pay" element={<PaymentsDashbaord />} />
-          <Route path="/dt-pay/init" element={<PaymentInit />} />
-
-          <Route path="/dt-pay/payment/auto" element={<PaymentAuto />}>
-            <Route path=":step" element={<PaymentAuto />}>
-              <Route path=":transaction_id" element={<PaymentAuto />} />
-            </Route>
-          </Route>
-
-          <Route path="/dt-pay/payment/manual" element={<PaymentManual />}>
-            <Route path=":step" element={<PaymentManual />}>
-              <Route path=":transaction_id" element={<PaymentManual />} />
-            </Route>
-          </Route>
-
-          <Route path="/dt-pay/transactions" element={<DtPayTransactions />} />
-
-          <Route path="/dt-pay/transactions/view" element={<DtPayTransactionView />}>
-            <Route path=":transaction_id" element={<DtPayTransactionView />} />
-          </Route>
-
-          <Route path="/dt-pay/raise-a-dispute" element={<RaiseDispute />}>
-            <Route path=":transaction_id" element={<RaiseDispute />} />
-          </Route>
-
-          {/* Public — the carrier pays from an emailed link, with no account here. */}
-          <Route path="/guest-pay" element={<DtPayGuestPay />}>
-            <Route path=":step" element={<DtPayGuestPay />}>
-              <Route path=":transaction_id" element={<DtPayGuestPay />} />
-            </Route>
-          </Route>
+          {/* Public — Guest Pay needs no account; carriers land on /payouts/complete after Stripe setup. */}
+          <Route path="/guest-pay" element={<DtPayGuestPay />} />
+          <Route path="/guest-pay/pay/:token" element={<DtPayGuestPay />} />
+          <Route path="/guest-pay/track/:token" element={<DtPayGuestTrack />} />
+          <Route path="/guest-pay/*" element={<Navigate to="/guest-pay" replace />} />
+          <Route path="/payouts/complete" element={<DtPayPayoutComplete />} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

@@ -11,7 +11,7 @@ import InsightsOutlined from '@mui/icons-material/InsightsOutlined';
 import { apiFetch } from '../../../lib/api';
 import { refreshPlanAccess } from '../../../RouteGuard';
 
-import { PH } from '../DtPay/components/ui';
+import { PH } from './ui';
 
 import { btnGhost } from './components';
 import BillingOverview from './BillingOverview';

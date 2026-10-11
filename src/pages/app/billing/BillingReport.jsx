@@ -19,7 +19,7 @@ import TrendingUpOutlined from '@mui/icons-material/TrendingUpOutlined';
 
 import { apiFetch } from '../../../lib/api';
 
-import { Card, Kpi } from '../DtPay/components/ui';
+import { Card, Kpi } from './ui';
 
 import { money, moneyShort, formatDate, formatPeriod } from './format';
 import { InfoRow, UsageBar, StatusPill, btnGhost } from './components';
