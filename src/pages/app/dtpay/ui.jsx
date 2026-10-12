@@ -157,7 +157,7 @@ export function Notice({ tone = 'info', title, children }) {
     );
 }
 
-export function StatusBadge({ status, onHold, large = false }) {
+export function StatusBadge({ status, onHold, refundRequested = false, large = false }) {
     const s = STATUS_STYLES[status] || STATUS_STYLES.draft;
     const size = large ? 'px-3 py-1 text-[12.5px]' : 'px-2.5 py-0.5 text-[11.5px]';
 
@@ -168,6 +168,7 @@ export function StatusBadge({ status, onHold, large = false }) {
                 {statusLabel(status)}
             </span>
             {onHold && <span className={`inline-flex items-center whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 font-semibold text-amber-700 ${size}`}>On hold</span>}
+            {refundRequested && <span className={`inline-flex items-center whitespace-nowrap rounded-full border border-red-200 bg-red-50 font-semibold text-red-700 ${size}`}>Refund requested</span>}
         </span>
     );
 }

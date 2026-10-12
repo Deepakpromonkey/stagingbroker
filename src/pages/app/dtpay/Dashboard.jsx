@@ -141,7 +141,8 @@ function ReleaseQueue({ data }) {
 
             <ul className='m-0 mt-5 flex flex-1 list-none flex-col gap-1 px-3 py-0'>
                 {items.map((p) => {
-                    const state = p.disputed ? ['Disputed', 'bg-amber-300 text-amber-950']
+                    const state = p.refund_requested ? ['Refund requested', 'bg-red-200 text-red-950']
+                        : p.disputed ? ['Disputed', 'bg-amber-300 text-amber-950']
                         : p.on_hold ? ['On hold', 'bg-amber-300 text-amber-950']
                             : p.payout_ready ? ['Ready', 'bg-green-300 text-green-950']
                                 : ['Carrier setup pending', 'bg-white/15 text-white'];

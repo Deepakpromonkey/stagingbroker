@@ -61,7 +61,8 @@ export default function PaymentDetail() {
         can.unhold && <Button key='unhold' variant='secondary' size='sm' loading={busy === 'hold'} onClick={() => run('hold', () => dtpay.hold(p.id, false), 'Hold removed.')}>Remove hold</Button>,
         can.dispute && <Button key='dispute' variant='secondary' size='sm' onClick={() => setDisputeOpen(true)}>Raise a dispute</Button>,
         ['processing', 'failed'].includes(p.status) && <Button key='sync' variant='secondary' size='sm' loading={busy === 'sync'} onClick={() => run('sync', () => dtpay.sync(p.id))}>Check status</Button>,
-        can.refund && <Button key='refund' variant='danger' size='sm' onClick={() => setConfirm('refund')}>Refund {p.total.formatted}</Button>,
+        can.refund && <Button key='refund' variant='danger' size='sm' onClick={() => setConfirm('refund')}>Request refund</Button>,
+        can.withdraw_refund && <Button key='withdraw' variant='secondary' size='sm' loading={busy === 'withdraw'} onClick={() => run('withdraw', () => dtpay.withdrawRefund(p.id), 'Refund request withdrawn. You can release the payment again.')}>Withdraw refund request</Button>,
         can.cancel && <Button key='cancel' variant='danger' size='sm' onClick={() => setConfirm('cancel')}>Cancel payment</Button>,
     ].filter(Boolean);
 
@@ -84,13 +85,15 @@ export default function PaymentDetail() {
             <ErrorBanner>{error}</ErrorBanner>
             {notice && <div className='mb-4'><Notice tone='success'>{notice}</Notice></div>}
 
+            <RefundRequestBanner r={p.refund_request} total={p.total.formatted} />
+
             <section className='mb-5 rounded-2xl border border-[#e8e8e8] bg-white'>
                 <div className='flex flex-col gap-5 px-5 pt-6 sm:px-7 lg:flex-row lg:items-start lg:justify-between'>
                     <div>
                         <Label>{p.status === 'released' ? 'Paid to carrier' : 'Carrier receives'}</Label>
                         <div className='mt-2 flex flex-wrap items-center gap-3'>
                             <Amount value={p.amount.formatted} className='text-[34px] font-extrabold leading-none tracking-[-0.5px] text-[#0f172a] sm:text-[40px]' />
-                            <StatusBadge status={p.status} onHold={p.on_hold} large />
+                            <StatusBadge status={p.status} onHold={p.on_hold} refundRequested={p.refund_requested} large />
                         </div>
                     </div>
                     <div className={`max-w-[440px] rounded-xl border px-4 py-3 ${next[2] === 'warn' ? 'border-amber-200 bg-amber-50' : 'border-[#BFDBFE] bg-[#EFF6FF]'}`}>
@@ -159,7 +162,7 @@ export default function PaymentDetail() {
             </Modal>
 
             <RefundModal open={confirm === 'refund'} p={p} busy={busy === 'refund'} onClose={() => setConfirm(null)}
-                onConfirm={(reason) => run('refund', () => dtpay.refund(p.id, reason), 'Refunded. The money reaches your account in 5 to 10 business days.')} />
+                onConfirm={(reason) => run('refund', () => dtpay.refund(p.id, reason), 'Refund requested. DollarTraq will review it, and the money stays held until they decide.')} />
 
             <Modal
                 open={confirm === 'cancel'}
@@ -183,6 +186,7 @@ export default function PaymentDetail() {
 function nextStep(p, carrier) {
     const can = p.can;
 
+    if (p.refund_requested) return ['Release paused', 'Waiting for DollarTraq to decide on your refund request.', 'warn'];
     if (p.open_dispute) return [`Dispute open: ${p.open_dispute.reason_label}`, 'The money stays held until the dispute is resolved.', 'warn'];
     if (p.status === 'failed') return ['The payment did not go through', `${p.failure_reason || 'It was declined.'} Try another method.`, 'warn'];
     if (can.pay) return ['Not paid yet', 'Pay to hold the money for the carrier.', 'info'];
@@ -215,20 +219,51 @@ function Stat({ label, value, sub, first = false }) {
 
 function RefundModal({ open, p, busy, onClose, onConfirm }) {
     const [reason, setReason] = useState('');
+    const ok = reason.trim().length >= 5;
 
     return (
         <Modal
             open={open}
-            title='Refund this payment?'
+            title='Request a refund'
             onClose={onClose}
             footer={<>
                 <Button variant='secondary' onClick={onClose}>Cancel</Button>
-                <Button variant='danger' loading={busy} onClick={() => onConfirm(reason)}>Refund {p.total.formatted}</Button>
+                <Button variant='danger' loading={busy} disabled={!ok} onClick={() => onConfirm(reason.trim())}>Send request</Button>
             </>}
         >
-            <p className='mb-3 mt-0 text-[13.5px] text-[#334155]'>The full {p.total.formatted} goes back to {p.method_label || 'the original payment method'}. The carrier will not be paid.</p>
-            <Field label='Reason (optional)'><input className={inputClass} value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
+            <p className='m-0 mb-4 text-[13.5px] leading-6 text-[#334155]'>
+                DollarTraq reviews every refund. If approved, {p.total.formatted} goes back to {p.method_label || 'the original payment method'} and the carrier is not paid.
+                Until DollarTraq decides, the money stays held and cannot be released.
+            </p>
+            <Field label='Why do you need a refund?' required hint='DollarTraq reads this before deciding.'>
+                <textarea rows={3} className={inputClass} value={reason} onChange={(e) => setReason(e.target.value)} placeholder='For example: the shipper cancelled the load before pickup.' maxLength={500} />
+            </Field>
         </Modal>
+    );
+}
+
+/* Where the broker's refund request stands. */
+function RefundRequestBanner({ r, total }) {
+    if (!r || r.status === 'withdrawn') return null;
+
+    const tone = {
+        pending: ['border-amber-200 bg-amber-50', 'text-amber-900', 'Refund requested', `DollarTraq is reviewing your request to refund ${total}. Asked ${date(r.created_at, true)}.`],
+        approving: ['border-amber-200 bg-amber-50', 'text-amber-900', 'Refund approved', 'DollarTraq approved it and the refund is being sent.'],
+        approved: ['border-green-200 bg-green-50', 'text-green-900', 'Refund approved by DollarTraq', `Approved ${date(r.decided_at, true)}. The money reaches your account in 5 to 10 business days.`],
+        rejected: ['border-red-200 bg-red-50', 'text-red-900', 'Refund declined by DollarTraq', `Declined ${date(r.decided_at, true)}. The money is still held, and you can release it.`],
+    }[r.status];
+
+    if (!tone) return null;
+
+    return (
+        <div className={`mb-5 rounded-2xl border px-5 py-4 ${tone[0]}`}>
+            <p className={`m-0 text-[14px] font-bold ${tone[1]}`}>{tone[2]}</p>
+            <p className={`m-0 mt-1 text-[13px] ${tone[1]}`}>{tone[3]}</p>
+            <div className={`mt-3 grid grid-cols-1 gap-3 text-[13px] sm:grid-cols-2 ${tone[1]}`}>
+                <div><Label>Your reason</Label><p className='m-0 mt-1'>{r.reason}</p></div>
+                {r.decision_note && <div><Label>DollarTraq's note</Label><p className='m-0 mt-1'>{r.decision_note}</p></div>}
+            </div>
+        </div>
     );
 }
 

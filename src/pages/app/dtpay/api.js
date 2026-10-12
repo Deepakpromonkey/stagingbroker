@@ -47,7 +47,9 @@ export const dtpay = {
     pay: (id, paymentMethodId) => apiFetch(`/dtpay/payments/${id}/pay`, json('POST', { payment_method_id: paymentMethodId })),
     sync: (id) => apiFetch(`/dtpay/payments/${id}/sync`, json('POST', {})),
     release: (id) => apiFetch(`/dtpay/payments/${id}/release`, json('POST', {})),
+    // Asks DollarTraq for a refund; an admin approves or rejects it.
     refund: (id, reason) => apiFetch(`/dtpay/payments/${id}/refund`, json('POST', { reason })),
+    withdrawRefund: (id) => apiFetch(`/dtpay/payments/${id}/refund-request`, { method: 'DELETE' }),
     cancel: (id) => apiFetch(`/dtpay/payments/${id}/cancel`, json('POST', {})),
     hold: (id, hold, note) => apiFetch(`/dtpay/payments/${id}/hold`, json('POST', { hold, note })),
     pod: (id, file) => apiFetch(`/dtpay/payments/${id}/pod`, { method: 'POST', body: form({ file }) }),
