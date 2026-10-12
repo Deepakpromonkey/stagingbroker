@@ -46,7 +46,9 @@ export const dtpay = {
     payment: (id) => apiFetch(`/dtpay/payments/${id}`),
     pay: (id, paymentMethodId) => apiFetch(`/dtpay/payments/${id}/pay`, json('POST', { payment_method_id: paymentMethodId })),
     sync: (id) => apiFetch(`/dtpay/payments/${id}/sync`, json('POST', {})),
-    release: (id) => apiFetch(`/dtpay/payments/${id}/release`, json('POST', {})),
+    // Asks DollarTraq to release to the carrier; an admin releases.
+    release: (id, note) => apiFetch(`/dtpay/payments/${id}/release`, json('POST', { note: note || undefined })),
+    withdrawRelease: (id) => apiFetch(`/dtpay/payments/${id}/release-request`, { method: 'DELETE' }),
     // Asks DollarTraq for a refund; an admin approves or rejects it.
     refund: (id, reason) => apiFetch(`/dtpay/payments/${id}/refund`, json('POST', { reason })),
     withdrawRefund: (id) => apiFetch(`/dtpay/payments/${id}/refund-request`, { method: 'DELETE' }),
@@ -67,5 +69,6 @@ export const guestPay = {
     intent: (token, methodType) => apiFetch(`/dtpay/guest/payments/${token}/intent`, { ...json('POST', { method_type: methodType }), skipAuth: true }),
     sync: (token) => apiFetch(`/dtpay/guest/payments/${token}/sync`, { ...json('POST', {}), skipAuth: true }),
     release: (token) => apiFetch(`/dtpay/guest/payments/${token}/release`, { ...json('POST', {}), skipAuth: true }),
+    withdrawRelease: (token) => apiFetch(`/dtpay/guest/payments/${token}/release-request`, { method: 'DELETE', skipAuth: true }),
     dispute: (token, fields) => apiFetch(`/dtpay/guest/payments/${token}/dispute`, { method: 'POST', body: form(fields), skipAuth: true }),
 };

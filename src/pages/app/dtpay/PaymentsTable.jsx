@@ -25,7 +25,7 @@ export default function PaymentsTable({ rows, loading, empty }) {
             ),
         },
         { key: 'method', label: 'Paid with', render: (p) => <span className='text-[#475569]'>{p.method_label || '—'}</span> },
-        { key: 'status', label: 'Status', render: (p) => <StatusBadge status={p.status} onHold={p.on_hold} refundRequested={p.refund_requested} /> },
+        { key: 'status', label: 'Status', render: (p) => <StatusBadge status={p.status} onHold={p.on_hold} refundRequested={p.refund_requested} releaseRequested={p.release_requested} /> },
         { key: 'amount', label: 'Amount', align: 'right', render: (p) => <Amount value={p.amount.formatted} className='font-bold text-[#0f172a]' /> },
         { key: 'date', label: 'Created', align: 'right', render: (p) => <span className='whitespace-nowrap text-[#6b7280]'>{date(p.created_at)}</span> },
     ];

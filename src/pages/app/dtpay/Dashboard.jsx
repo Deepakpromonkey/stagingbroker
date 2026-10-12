@@ -25,7 +25,7 @@ export default function Dashboard() {
         <Page
             title='DT Pay'
             accent='Overview'
-            intro='Pay carriers through DollarTraq. Money is held until the load delivers and you release it.'
+            intro='Pay carriers through DollarTraq. Money is held until the load delivers, then DollarTraq releases it to the carrier.'
             testMode={config && !config.livemode}
             actions={<>
                 <Button variant='secondary' onClick={() => navigate('/dt-pay/funding-controls')}>Funding methods</Button>
@@ -132,19 +132,20 @@ function ReleaseQueue({ data }) {
     return (
         <Panel tone='deep' padded={false} className='flex flex-col'>
             <div className='px-6 pt-6'>
-                <Label light>Ready to release</Label>
+                <Label light>Held for your carriers</Label>
                 <Amount value={data.held.formatted} className='mt-2 block text-[30px] font-extrabold leading-none tracking-[-0.5px] text-white' />
                 <p className='m-0 mt-2 text-xs text-white/70'>
-                    {items.length ? 'Release each one once its load is delivered.' : 'Nothing is waiting on you.'}
+                    {items.length ? 'Once a load is delivered, ask DollarTraq to release it.' : 'Nothing is waiting on you.'}
                 </p>
             </div>
 
             <ul className='m-0 mt-5 flex flex-1 list-none flex-col gap-1 px-3 py-0'>
                 {items.map((p) => {
-                    const state = p.refund_requested ? ['Refund requested', 'bg-red-200 text-red-950']
+                    const state = p.release_requested ? ['Release requested', 'bg-teal-200 text-teal-950']
+                        : p.refund_requested ? ['Refund requested', 'bg-red-200 text-red-950']
                         : p.disputed ? ['Disputed', 'bg-amber-300 text-amber-950']
                         : p.on_hold ? ['On hold', 'bg-amber-300 text-amber-950']
-                            : p.payout_ready ? ['Ready', 'bg-green-300 text-green-950']
+                            : p.payout_ready ? ['Ready to ask', 'bg-green-300 text-green-950']
                                 : ['Carrier setup pending', 'bg-white/15 text-white'];
 
                     return (
@@ -208,7 +209,7 @@ function PaymentsSection({ counts }) {
                 loading={loading}
                 empty={(
                     <Empty title='No payments yet' action={<Button onClick={() => navigate('/dt-pay/new')}>Pay a carrier</Button>}>
-                        Pick one of your loads or enter one by hand. The carrier is paid when you release the money.
+                        Pick one of your loads or enter one by hand. DollarTraq pays the carrier once the load is delivered.
                     </Empty>
                 )}
             />

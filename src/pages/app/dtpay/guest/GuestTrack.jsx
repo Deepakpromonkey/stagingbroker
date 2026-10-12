@@ -32,10 +32,10 @@ export default function GuestTrack() {
         return () => clearInterval(t);
     }, [p?.status, token]);
 
-    const release = async () => {
+    const act = async (call) => {
         setBusy(true);
         try {
-            setP((await guestPay.release(token)).payment);
+            setP((await call()).payment);
         } catch (e) {
             setError(e.message);
         } finally {
@@ -68,9 +68,9 @@ export default function GuestTrack() {
         : {
             draft: 'Finish paying to send the money to DollarTraq.',
             processing: p.method_type === 'us_bank_account' ? 'Bank payments take 1 to 2 business days to clear. This page updates by itself.' : 'Confirming your payment with your bank.',
-            funded: p.payout.ready
-                ? `Release it to ${carrier} once the load is delivered.`
-                : `${carrier} still has to finish their payout setup with DollarTraq before the money can be sent.`,
+            funded: p.release_requested
+                ? `You asked DollarTraq to release it. DollarTraq checks the load, then pays ${carrier}.`
+                : `Once the load is delivered, ask DollarTraq to release it to ${carrier}.`,
             released: `Released ${date(p.released_at, true)}.`,
             failed: 'The payment did not go through. You can try again.',
         }[p.status];
@@ -89,7 +89,7 @@ export default function GuestTrack() {
                     <div>
                         <div className='flex flex-wrap items-center gap-3'>
                             <Amount value={p.amount.formatted} className='text-[40px] font-extrabold leading-none tracking-[-0.03em] text-[#1a1a1a]' />
-                            <StatusBadge status={p.status} onHold={p.on_hold} large />
+                            <StatusBadge status={p.status} onHold={p.on_hold} releaseRequested={p.release_requested} large />
                         </div>
                         <div className='mt-9'>
                             <MoneyRoute
@@ -106,7 +106,8 @@ export default function GuestTrack() {
                         <p className='m-0 text-[14px] leading-6 text-[#334155]'>{next || 'Nothing to do.'}</p>
                         <div className='mt-4 flex flex-col gap-2'>
                             {p.can.pay && <Link to={`/guest-pay/pay/${token}`}><Button className='w-full'>{p.status === 'failed' ? 'Try again' : 'Finish paying'}</Button></Link>}
-                            {p.status === 'funded' && <Button variant='release' className='w-full' disabled={!p.can.release || !p.payout.ready} onClick={() => setConfirm(true)}>Release {p.amount.formatted}</Button>}
+                            {p.status === 'funded' && !p.release_requested && <Button variant='release' className='w-full' disabled={!p.can.release} onClick={() => setConfirm(true)}>Ask DollarTraq to release</Button>}
+                            {p.can.withdraw_release && <Button variant='secondary' className='w-full' loading={busy} onClick={() => act(() => guestPay.withdrawRelease(token))}>Withdraw release request</Button>}
                             {p.can.dispute && <Button variant='ghost' className='w-full' onClick={() => setDisputeOpen(true)}>Report a problem</Button>}
                         </div>
                     </div>
@@ -129,9 +130,9 @@ export default function GuestTrack() {
                 <Panel title='Cost' className='self-start'><Breakdown b={p.breakdown} guest /></Panel>
             </div>
 
-            <Modal open={confirm} title={`Pay ${p.amount.formatted} to ${carrier}?`} onClose={() => setConfirm(false)}
-                footer={<><Button variant='secondary' onClick={() => setConfirm(false)}>Not yet</Button><Button variant='release' loading={busy} onClick={release}>Release {p.amount.formatted}</Button></>}>
-                <p className='m-0 text-[14px] leading-6 text-[#334155]'>The money leaves DollarTraq and goes to the carrier's bank. Release only after the load was delivered.</p>
+            <Modal open={confirm} title={`Ask DollarTraq to pay ${carrier}?`} onClose={() => setConfirm(false)}
+                footer={<><Button variant='secondary' onClick={() => setConfirm(false)}>Not yet</Button><Button variant='release' loading={busy} onClick={() => act(() => guestPay.release(token))}>Request release of {p.amount.formatted}</Button></>}>
+                <p className='m-0 text-[14px] leading-6 text-[#334155]'>DollarTraq checks the load and then sends {p.amount.formatted} to {carrier}'s bank. Ask only after the load was delivered.</p>
             </Modal>
 
             <DisputeModal open={disputeOpen} onClose={() => setDisputeOpen(false)}
