@@ -4,8 +4,10 @@ import assert from "node:assert/strict";
 
 import {
   hasLocation,
+  isDriverBooked,
   isLatitude,
   isLongitude,
+  loadSchedule,
   newSaveAttempt,
   placeLocation,
   saveTripSheet,
@@ -49,6 +51,50 @@ describe("placeLocation", () => {
 
   it("is null for a pin the driver side couldn't use", () => {
     assert.equal(placeLocation(googlePlace(95, 10)), null);
+  });
+});
+
+describe("loadSchedule", () => {
+  const pickup = { start_date: "2026-10-20", start_time: "09:00", start_timezone: "Central", end_date: "", end_time: "", end_timezone: "" };
+  const intermediate = { start_date: "", start_time: "", start_timezone: "", end_date: "2026-10-21", end_time: "08:00", end_timezone: "Central" };
+  const delivery = { start_date: "", start_time: "", start_timezone: "", end_date: "2026-10-22", end_time: "17:00", end_timezone: "Eastern" };
+
+  it("is the first stop's start window and the last stop's end window", () => {
+    assert.deepEqual(loadSchedule([pickup, intermediate, delivery]), {
+      pickup_date: "2026-10-20",
+      pickup_time: "09:00",
+      pickup_timezone: "Central",
+      delivery_date: "2026-10-22",
+      delivery_time: "17:00",
+      delivery_timezone: "Eastern",
+    });
+  });
+
+  it("sends null, never an empty string, for what was left blank", () => {
+    // The pickup's time and timezone are optional on the form.
+    const schedule = loadSchedule([{ ...pickup, start_time: "", start_timezone: "" }, delivery]);
+
+    assert.equal(schedule.pickup_date, "2026-10-20");
+    assert.equal(schedule.pickup_time, null);
+    assert.equal(schedule.pickup_timezone, null);
+
+    assert.deepEqual(Object.values(loadSchedule([])), [null, null, null, null, null, null]);
+  });
+});
+
+describe("isDriverBooked", () => {
+  const error = (status, errors) => Object.assign(new Error("x"), { status, errors });
+
+  it("is the backend's 422 for a driver already on another load then", () => {
+    assert.equal(isDriverBooked(error(422, { driver_schedule: ["The driver on 5550102020 is already on load SHP-1."] })), true);
+  });
+
+  it("is nothing else", () => {
+    assert.equal(isDriverBooked(error(422, { "stops.1.location": ["Stop 2 (Delivery): choose the address from the suggestions."] })), false);
+    assert.equal(isDriverBooked(error(409, { stops: ["already_saved"] })), false);
+    assert.equal(isDriverBooked(error(500, {})), false);
+    assert.equal(isDriverBooked(new Error("Network error.")), false);
+    assert.equal(isDriverBooked(undefined), false);
   });
 });
 
@@ -154,6 +200,46 @@ describe("saveTripSheet", () => {
     await assert.rejects(saveTripSheet({ apiFetch, step1Payload, stopsPayload: stops, attempt }), /Network error/);
     assert.equal(attempt.uuid, null);
 
+    await saveTripSheet({ apiFetch, step1Payload, stopsPayload: stops, attempt });
+
+    assert.deepEqual(paths(calls), ["/shipments", "/shipments", "/shipments/load-1/stops"]);
+  });
+
+  it("books the load with its pickup and delivery, so a busy driver is refused before it exists", async () => {
+    const { apiFetch, calls } = fakeApi([created, stopsSaved]);
+
+    const dated = [
+      { address: "Dallas", start_date: "2026-10-20", start_time: "09:00", start_timezone: "Central", end_date: "", end_time: "", end_timezone: "" },
+      { address: "Phoenix", start_date: "", start_time: "", start_timezone: "", end_date: "2026-10-22", end_time: "17:00", end_timezone: "Arizona" },
+    ];
+
+    await saveTripSheet({ apiFetch, step1Payload, stopsPayload: dated, attempt: newSaveAttempt() });
+
+    assert.deepEqual(JSON.parse(calls[0].body), {
+      tracking_method: "driver_phone",
+      pickup_date: "2026-10-20",
+      pickup_time: "09:00",
+      pickup_timezone: "Central",
+      delivery_date: "2026-10-22",
+      delivery_time: "17:00",
+      delivery_timezone: "Arizona",
+    });
+  });
+
+  it("shows the backend's 'driver already booked' refusal as it is, with no load made", async () => {
+    const reason = "The driver on 5550102020 is already on load SHP-2026-000059 from Oct 20, 2026 9:00 AM CDT to Oct 22, 2026 5:00 PM EDT.";
+    const booked = Object.assign(failure(reason, 422), { errors: { driver_schedule: [reason] } });
+    const { apiFetch, calls } = fakeApi([booked, created, stopsSaved]);
+    const attempt = newSaveAttempt();
+
+    await assert.rejects(saveTripSheet({ apiFetch, step1Payload, stopsPayload: stops, attempt }), (err) => {
+      assert.equal(err.message, reason);
+      assert.equal(isDriverBooked(err), true);
+      return true;
+    });
+    assert.equal(attempt.uuid, null);
+
+    // Another driver or other dates: the retry books a load of its own.
     await saveTripSheet({ apiFetch, step1Payload, stopsPayload: stops, attempt });
 
     assert.deepEqual(paths(calls), ["/shipments", "/shipments", "/shipments/load-1/stops"]);
