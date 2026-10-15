@@ -1,6 +1,8 @@
 /*
 | The Trip Sheet rules that have to hold however the page looks: every stop
-| has a place on the map, and saving never makes two loads.
+| has a place on the map, saving never makes two loads, and the load goes in
+| with its pickup and delivery so the backend can refuse a driver who is
+| already on another load then.
 |
 | Plain JavaScript on purpose - no React, no imports - so `npm test` can
 | check them directly (tripSheet.test.js).
@@ -46,13 +48,46 @@ export function placeLocation(place) {
   return isLatitude(latitude) && isLongitude(longitude) ? { latitude, longitude } : null;
 }
 
+/**
+ * When the load starts and ends - its first stop's start window and its last
+ * stop's end window - as the pickup / delivery fields POST /shipments takes.
+ * Blank parts are null, never "", so they can't reach a DATE column.
+ *
+ * Sent with the load so the backend can refuse it before it exists when one
+ * of its drivers is already on another load at that time. The backend checks
+ * the stops again when they are saved.
+ */
+export function loadSchedule(stops) {
+  const first = stops[0] || {};
+  const last = stops[stops.length - 1] || {};
+
+  return {
+    pickup_date: first.start_date || null,
+    pickup_time: first.start_time || null,
+    pickup_timezone: first.start_timezone || null,
+    delivery_date: last.end_date || null,
+    delivery_time: last.end_time || null,
+    delivery_timezone: last.end_timezone || null,
+  };
+}
+
+/**
+ * Whether a save was refused because a driver on the load is already on
+ * another load at an overlapping time. The error's message says which load
+ * and when.
+ */
+export function isDriverBooked(err) {
+  return err?.status === 422 && Array.isArray(err?.errors?.driver_schedule);
+}
+
 /** What a page starts a save with - and keeps between retries. */
 export function newSaveAttempt() {
   return { uuid: null, sentStops: [] };
 }
 
 /**
- * Creates the load from step 1, then saves its stops.
+ * Creates the load from step 1 - with its pickup and delivery, see
+ * loadSchedule() - then saves its stops.
  *
  * Two requests, so a save can fail half-way - the load made, its stops not.
  * `attempt` remembers what an earlier try got done:
@@ -71,7 +106,7 @@ export async function saveTripSheet({ apiFetch, step1Payload, stopsPayload, atte
   if (!attempt.uuid) {
     const created = await apiFetch("/shipments", {
       method: "POST",
-      body: JSON.stringify(step1Payload),
+      body: JSON.stringify({ ...step1Payload, ...loadSchedule(stopsPayload) }),
     });
 
     const uuid = created?.data?.uuid || created?.uuid;

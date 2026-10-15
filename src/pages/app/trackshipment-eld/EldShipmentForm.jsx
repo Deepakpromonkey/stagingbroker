@@ -16,6 +16,7 @@ import IconButton from "@mui/material/IconButton";
 
 import { apiFetch } from "../../../lib/api";
 import { toast } from "../../../components/ui/Toaster";
+import { isDriverBooked } from "../trackshipment/tripSheet";
 
 /*
 | The ELD live-tracking booking form.
@@ -709,10 +710,14 @@ export default function EldShipmentForm() {
       toast.success({ title: "Live tracking started", duration: 2500 });
       navigate(`/shipment/eld/${shipmentUuid}`);
     } catch (err) {
+      // A driver already on another load then: the message says which load
+      // and when, and nothing was created.
+      const booked = isDriverBooked(err);
+
       toast.error({
-        title: "Could not start live tracking",
+        title: booked ? "Driver already booked" : "Could not start live tracking",
         message: err?.message || "Please check the form and try again.",
-        duration: 6000,
+        duration: booked ? 12000 : 6000,
       });
     } finally {
       setSubmitting(false);

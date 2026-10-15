@@ -14,6 +14,7 @@ import {
   NOT_ON_THE_MAP,
   PICK_FROM_SUGGESTIONS,
   hasLocation,
+  isDriverBooked,
   newSaveAttempt,
   placeLocation,
   saveTripSheet,
@@ -1185,6 +1186,13 @@ export default function TrackShipmentStep2() {
       resetStep1Draft();
       navigate("/dashboard");
     } catch (err) {
+      if (isDriverBooked(err)) {
+        // Says which load and when - change the dates here, or the driver on
+        // Step 1.
+        toast.error({ title: "Driver already booked", message: err.message, duration: 12000 });
+        return;
+      }
+
       toast.error({ title: "Failed to save data", message: err?.message || "An error occurred." });
     }
   };
