@@ -17,6 +17,13 @@ import {
     Public as PublicIconMui,
     Search as SearchIconMui,
     KeyboardArrowDown as KeyboardArrowDownIconMui,
+    ZoomIn as ZoomInIconMui,
+    ZoomOut as ZoomOutIconMui,
+    ContentCopy as CopyIconMui,
+    Check as CheckIconMui,
+    RestartAlt as ResetIconMui,
+    RotateRight as RotateRightIconMui,
+    AutoAwesome as GenerateIconMui,
 } from '@mui/icons-material';
 import { apiFetch, getToken } from '../../../lib/api';
 import {
@@ -44,9 +51,41 @@ const USER_KEY = 'crm_user';
 
 const MAX_NAME_LENGTH = 50;
 
-// Password length bounds — applies to current / new / confirm password.
 const MIN_PASSWORD_LENGTH = 8;
 const MAX_PASSWORD_LENGTH = 16;
+
+const MAX_PHOTO_SIZE_MB = 5;
+const ALLOWED_PHOTO_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+
+const ZOOM_MIN = 1;
+const ZOOM_MAX = 3;
+const ZOOM_STEP = 0.5;
+
+function generateStrongPassword(length = 14) {
+    const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const lower = 'abcdefghijkmnpqrstuvwxyz';
+    const digits = '23456789';
+    const symbols = '!@#$%^&*';
+    const all = upper + lower + digits + symbols;
+
+    const randomInt = (max) => {
+        const buffer = new Uint32Array(1);
+        window.crypto.getRandomValues(buffer);
+        return buffer[0] % max;
+    };
+    const pick = (set) => set[randomInt(set.length)];
+
+    const chars = [pick(upper), pick(lower), pick(digits), pick(symbols)];
+    while (chars.length < length) chars.push(pick(all));
+
+    // Fisher–Yates shuffle so the guaranteed characters aren't always first.
+    for (let i = chars.length - 1; i > 0; i--) {
+        const j = randomInt(i + 1);
+        [chars[i], chars[j]] = [chars[j], chars[i]];
+    }
+
+    return chars.join('');
+}
 
 // Strips digits/symbols from name fields — letters and spaces only,
 // capped at MAX_NAME_LENGTH.
@@ -108,16 +147,220 @@ const ArrowRightIcon = () => <ArrowRightIconMui sx={{ fontSize: 12 }} />;
 const GlobeIcon = () => <PublicIconMui sx={{ fontSize: 14 }} />;
 const SearchIcon = () => <SearchIconMui sx={{ fontSize: 16 }} />;
 const ChevronDownIcon = () => <KeyboardArrowDownIconMui sx={{ fontSize: 18 }} />;
+const ZoomInIcon = () => <ZoomInIconMui sx={{ fontSize: 20 }} />;
+const ZoomOutIcon = () => <ZoomOutIconMui sx={{ fontSize: 20 }} />;
+const CopyIcon = () => <CopyIconMui sx={{ fontSize: 13 }} />;
+const CheckIcon = () => <CheckIconMui sx={{ fontSize: 13 }} />;
+const ResetIcon = () => <ResetIconMui sx={{ fontSize: 13 }} />;
 
-function DetailRow({ label, value, icon }) {
+/*
+| Full-screen profile photo viewer.
+|
+| - Click the backdrop, press Esc (handled by the parent) or hit the X to close.
+| - Zoom with the +/- buttons, the keyboard (+ / - / 0) or double-click / wheel.
+| - With no photo it shows the initials avatar at full size.
+*/
+function ImageLightbox({ src, name, initials, onClose }) {
+    const [zoom, setZoom] = useState(1);
+    const [rotation, setRotation] = useState(0);
+    const stageRef = useRef(null);
+    const dragRef = useRef(null);
+    const movedRef = useRef(false);
+
+    const zoomIn = () => setZoom((z) => Math.min(ZOOM_MAX, z + ZOOM_STEP));
+    const zoomOut = () => setZoom((z) => Math.max(ZOOM_MIN, z - ZOOM_STEP));
+    const rotate = () => setRotation((r) => (r + 90) % 360);
+    const zoomReset = () => { setZoom(1); setRotation(0); };
+
+    // Click-and-drag to pan around the photo while zoomed in.
+    const startDrag = (e) => {
+        if (zoom <= ZOOM_MIN || !stageRef.current) return;
+        movedRef.current = false;
+        dragRef.current = {
+            x: e.clientX,
+            y: e.clientY,
+            left: stageRef.current.scrollLeft,
+            top: stageRef.current.scrollTop,
+        };
+    };
+    const moveDrag = (e) => {
+        if (!dragRef.current || !stageRef.current) return;
+        const dx = e.clientX - dragRef.current.x;
+        const dy = e.clientY - dragRef.current.y;
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) movedRef.current = true;
+        stageRef.current.scrollLeft = dragRef.current.left - dx;
+        stageRef.current.scrollTop = dragRef.current.top - dy;
+    };
+    const endDrag = () => { dragRef.current = null; };
+
+    // Lock page scroll while the viewer is open.
+    useEffect(() => {
+        const previous = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => { document.body.style.overflow = previous; };
+    }, []);
+
+    // Keyboard zoom shortcuts.
+    useEffect(() => {
+        function handler(e) {
+            if (e.key === '+' || e.key === '=') zoomIn();
+            else if (e.key === '-' || e.key === '_') zoomOut();
+            else if (e.key === '0') zoomReset();
+            else if (e.key === 'r' || e.key === 'R') rotate();
+        }
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+    }, []);
+
+    const handleWheel = (e) => {
+        if (!src) return;
+        if (e.deltaY < 0) zoomIn();
+        else zoomOut();
+    };
+
+    const controlBtn =
+        'w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:hover:bg-white/10 flex items-center justify-center text-white transition-colors';
+
+    return (
+        <div
+            className="fixed inset-0 z-[60] flex flex-col bg-black/85 backdrop-blur-md"
+            style={{ animation: 'pfLightboxFade 180ms ease-out' }}
+            onClick={onClose}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Profile photo"
+        >
+            <style>{`
+                @keyframes pfLightboxFade { from { opacity: 0; } to { opacity: 1; } }
+                @keyframes pfLightboxPop { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
+            `}</style>
+
+            {/* Top bar */}
+            <div
+                className="flex items-center justify-between gap-3 px-4 py-3 sm:px-6 flex-shrink-0"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="min-w-0">
+                    <p className="text-white font-semibold text-sm sm:text-base truncate m-0">
+                        {name || 'Profile photo'}
+                    </p>
+                    <p className="text-white/50 text-[11px] m-0">
+                        {src
+                            ? `${Math.round(zoom * 100)}% · ${zoom > ZOOM_MIN ? 'Drag to move · ' : ''}Scroll or double-click to zoom · R to rotate`
+                            : 'No photo uploaded yet'}
+                    </p>
+                </div>
+
+                <div className="flex items-center gap-2 flex-shrink-0">
+                    {src && (
+                        <>
+                            <button type="button" className={controlBtn} onClick={zoomOut} disabled={zoom <= ZOOM_MIN} title="Zoom out (-)">
+                                <ZoomOutIcon />
+                            </button>
+                            <button type="button" className={controlBtn} onClick={zoomIn} disabled={zoom >= ZOOM_MAX} title="Zoom in (+)">
+                                <ZoomInIcon />
+                            </button>
+                            <button type="button" className={controlBtn} onClick={rotate} title="Rotate (R)">
+                                <RotateRightIconMui sx={{ fontSize: 20 }} />
+                            </button>
+                            <button type="button" className={controlBtn} onClick={zoomReset} disabled={zoom === ZOOM_MIN && rotation === 0} title="Reset (0)">
+                                <ResetIconMui sx={{ fontSize: 20 }} />
+                            </button>
+                        </>
+                    )}
+                    <button type="button" className={controlBtn} onClick={onClose} title="Close (Esc)">
+                        <CloseIconMui sx={{ fontSize: 20 }} />
+                    </button>
+                </div>
+            </div>
+
+            {/* Stage */}
+            <div
+                ref={stageRef}
+                className="flex-1 min-h-0 overflow-auto flex px-4 pb-6"
+                onWheel={handleWheel}
+                onMouseDown={startDrag}
+                onMouseMove={moveDrag}
+                onMouseUp={endDrag}
+                onMouseLeave={endDrag}
+                onClick={(e) => {
+                    // A drag that ends on the backdrop shouldn't close the viewer.
+                    if (movedRef.current) {
+                        e.stopPropagation();
+                        movedRef.current = false;
+                    }
+                }}
+            >
+                {src ? (
+                    <img
+                        src={src}
+                        alt={name || 'Profile'}
+                        onClick={(e) => e.stopPropagation()}
+                        onDoubleClick={() => setZoom((z) => (z >= ZOOM_MAX ? ZOOM_MIN : Math.min(ZOOM_MAX, z + ZOOM_STEP * 2)))}
+                        draggable={false}
+                        className="m-auto rounded-2xl object-contain shadow-2xl select-none"
+                        style={{
+                            maxHeight: `${78 * zoom}vh`,
+                            maxWidth: `${100 * zoom}%`,
+                            cursor: zoom > ZOOM_MIN ? 'grab' : 'zoom-in',
+                            transform: `rotate(${rotation}deg)`,
+                            animation: 'pfLightboxPop 220ms ease-out',
+                            transition: 'max-height 160ms ease, max-width 160ms ease, transform 200ms ease',
+                        }}
+                    />
+                ) : (
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="m-auto w-56 h-56 sm:w-72 sm:h-72 rounded-full flex items-center justify-center shadow-2xl border-4 border-white/20"
+                        style={{
+                            background: `linear-gradient(135deg, ${NAVY}, ${NAVY_LIGHT})`,
+                            animation: 'pfLightboxPop 220ms ease-out',
+                        }}
+                    >
+                        <span className="text-6xl sm:text-7xl font-bold text-white">{initials}</span>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function DetailRow({ label, value, icon, copyText }) {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = async () => {
+        if (!copyText) return;
+        try {
+            await navigator.clipboard.writeText(copyText);
+            setCopied(true);
+            toast.success(`${label} copied.`);
+            setTimeout(() => setCopied(false), 1600);
+        } catch {
+            toast.error('Could not copy to clipboard.');
+        }
+    };
+
     return (
         <div className="flex items-center justify-between gap-4 py-3.5 border-b border-[#EEF0F3] last:border-0">
             <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-gray-400 flex-shrink-0">
                 <span style={{ color: INDIGO }}>{icon}</span>
                 {label}
             </span>
-            <span className="text-[14px] sm:text-[15px] font-semibold text-gray-900 text-right break-all">
-                {value || '—'}
+            <span className="flex items-center justify-end gap-2 min-w-0">
+                <span className="text-[14px] sm:text-[15px] font-semibold text-gray-900 text-right break-all">
+                    {value || '—'}
+                </span>
+                {copyText && (
+                    <button
+                        type="button"
+                        onClick={handleCopy}
+                        title={`Copy ${label}`}
+                        className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-colors hover:bg-[#EEF2FF]"
+                        style={{ color: copied ? '#059669' : '#9CA3AF' }}
+                    >
+                        {copied ? <CheckIcon /> : <CopyIcon />}
+                    </button>
+                )}
             </span>
         </div>
     );
@@ -298,6 +541,7 @@ const STRENGTH_META = [
 function PasswordField({ label, value, onChange, error, show, onToggle, placeholder, name, autoComplete, meter, maxLength }) {
     const strength = meter ? getPasswordStrength(value) : 0;
     const [focused, setFocused] = useState(false);
+    const [capsOn, setCapsOn] = useState(false);
     const borderColor = error ? '#D92D20' : focused ? INDIGO : value ? '#D7DCE3' : '#E3E7EC';
     const chipColor = error ? '#D92D20' : focused ? INDIGO : '#9CA3AF';
     const chipBg = error ? '#FEF3F2' : focused ? '#EEF2FF' : '#F7F8FA';
@@ -334,7 +578,9 @@ function PasswordField({ label, value, onChange, error, show, onToggle, placehol
                         value={value}
                         onChange={(e) => onChange(e.target.value)}
                         onFocus={() => setFocused(true)}
-                        onBlur={() => setFocused(false)}
+                        onBlur={() => { setFocused(false); setCapsOn(false); }}
+                        onKeyDown={(e) => setCapsOn(Boolean(e.getModifierState && e.getModifierState('CapsLock')))}
+                        onKeyUp={(e) => setCapsOn(Boolean(e.getModifierState && e.getModifierState('CapsLock')))}
                         placeholder={placeholder}
                         name={name}
                         autoComplete={autoComplete}
@@ -362,6 +608,12 @@ function PasswordField({ label, value, onChange, error, show, onToggle, placehol
                     </div>
                 )}
 
+                {capsOn && (
+                    <p className="text-[11.5px] font-medium mt-1.5 mb-0" style={{ color: '#D97706' }}>
+                        Caps Lock is on
+                    </p>
+                )}
+
                 {error && <p className="text-[11.5px] font-medium text-red-600 mt-1.5 mb-0">{error}</p>}
             </div>
         </div>
@@ -378,6 +630,10 @@ const ProfileUpdate = () => {
 
     const [pictureVersion, setPictureVersion] = useState(0);
 
+    const [lightboxOpen, setLightboxOpen] = useState(false);
+    const [lightboxSrc, setLightboxSrc] = useState('');
+    const fileInputRef = useRef(null);
+
     const [formData, setFormData] = useState({
         first_name: '',
         last_name: '',
@@ -387,6 +643,7 @@ const ProfileUpdate = () => {
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [avatarError, setAvatarError] = useState(false);
+    const [photoDragging, setPhotoDragging] = useState(false);
 
     const [firstNameError, setFirstNameError] = useState('');
     const [lastNameError, setLastNameError] = useState('');
@@ -465,18 +722,6 @@ const ProfileUpdate = () => {
         return () => window.removeEventListener('storage', loadData);
     }, []);
 
-    /*
-    | Refresh the cached profile from the API.
-    |
-    | `crm_user` is written once at login and then only ever patched locally,
-    | so an account signed in before a field existed never gains it — which is
-    | how "Onboarding Date" and "Last Updated" came to render blank. Pulling
-    | /me on mount closes that gap without forcing a re-login.
-    |
-    | Only the profile fields are merged: `role` was normalised to a slug
-    | string at login and the rest of the app reads it that way, so copying the
-    | API's object over it would change a shape other screens depend on.
-    */
     useEffect(() => {
         let cancelled = false;
 
@@ -545,6 +790,40 @@ const ProfileUpdate = () => {
         }
     }, [editOpen, user]);
 
+    // Unsaved-changes guard for the edit drawer.
+    const isFormDirty =
+        editOpen &&
+        (
+            formData.first_name !== (user.first_name || '') ||
+            formData.last_name !== (user.last_name || '') ||
+            String(formData.contact || '') !== String(user.phone ?? user.contact ?? '') ||
+            formData.country_code !== resolveCountryCode(user.country_code) ||
+            Boolean(formData.profile_pic_file)
+        );
+
+    const requestCloseEdit = () => {
+        if (isFormDirty && !window.confirm('You have unsaved changes. Discard them?')) return;
+        setEditOpen(false);
+    };
+
+    // Esc closes the top-most layer: photo viewer first, then the drawer / dialog.
+    useEffect(() => {
+        function handleEscape(e) {
+            if (e.key !== 'Escape') return;
+
+            if (lightboxOpen) {
+                setLightboxOpen(false);
+            } else if (passwordOpen && !passwordSubmitting) {
+                setPasswordOpen(false);
+            } else if (editOpen && !isSubmitting) {
+                requestCloseEdit();
+            }
+        }
+
+        window.addEventListener('keydown', handleEscape);
+        return () => window.removeEventListener('keydown', handleEscape);
+    }, [lightboxOpen, passwordOpen, passwordSubmitting, editOpen, isSubmitting, formData, user]);
+
     const onboardingDateLabel = formatAccountDate(
         user.added_on_formatted,
         user.added_on,
@@ -575,6 +854,26 @@ const ProfileUpdate = () => {
             ? (currentRole.name || currentRole.label || currentRole.role || '')
             : String(currentRole);
     };
+
+    // Open the photo viewer with a given image (or none → initials avatar).
+    const openPhotoViewer = (src) => {
+        setLightboxSrc(src || '');
+        setLightboxOpen(true);
+    };
+
+    // Profile completeness — a small nudge to fill in the missing details.
+    const completenessChecks = [
+        Boolean(user.first_name),
+        Boolean(user.last_name),
+        Boolean(user.email),
+        Boolean(user.phone ?? user.contact),
+        Boolean(user.profile_pic_url) && !avatarError,
+    ];
+    const completenessPercent = Math.round(
+        (completenessChecks.filter(Boolean).length / completenessChecks.length) * 100
+    );
+    const completenessColor =
+        completenessPercent === 100 ? '#059669' : completenessPercent >= 60 ? INDIGO : '#D97706';
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -610,6 +909,23 @@ const ProfileUpdate = () => {
     const handleFileChange = (e) => {
         const file = e.target.files[0];
         if (file) {
+            // Reject unsupported types / oversized files before previewing.
+            if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
+                toast.error('Please choose a PNG, JPG or WEBP image.');
+                e.target.value = '';
+                return;
+            }
+            if (file.size > MAX_PHOTO_SIZE_MB * 1024 * 1024) {
+                toast.error(`Image must be ${MAX_PHOTO_SIZE_MB}MB or smaller.`);
+                e.target.value = '';
+                return;
+            }
+
+            // Free the previous temporary preview, if any.
+            if (formData.profile_pic_file && formData.profile_pic_url?.startsWith('blob:')) {
+                URL.revokeObjectURL(formData.profile_pic_url);
+            }
+
             // Temporary URL for immediate frontend preview.
             const previewUrl = URL.createObjectURL(file);
 
@@ -619,6 +935,29 @@ const ProfileUpdate = () => {
                 profile_pic_file: file
             }));
         }
+    };
+
+    // Drag & drop an image onto the photo area — same checks as the file picker.
+    const handlePhotoDrop = (e) => {
+        e.preventDefault();
+        setPhotoDragging(false);
+        const files = e.dataTransfer?.files;
+        if (files && files.length > 0) {
+            handleFileChange({ target: { files, value: '' } });
+        }
+    };
+
+    // Discard a newly picked (unsaved) photo and go back to the saved one.
+    const handleRevertPhoto = () => {
+        if (formData.profile_pic_url?.startsWith('blob:')) {
+            URL.revokeObjectURL(formData.profile_pic_url);
+        }
+        if (fileInputRef.current) fileInputRef.current.value = '';
+
+        setFormData(prev => {
+            const { profile_pic_file, ...rest } = prev;
+            return { ...rest, profile_pic_url: user.profile_pic_url || '' };
+        });
     };
 
 
@@ -754,6 +1093,24 @@ const ProfileUpdate = () => {
         setShowConfirm(false);
     };
 
+    const handleGeneratePassword = async () => {
+        const generated = generateStrongPassword();
+
+        setNewPassword(generated);
+        setConfirmPassword(generated);
+        setNewPasswordError('');
+        setConfirmPasswordError('');
+        setShowNew(true);
+        setShowConfirm(true);
+
+        try {
+            await navigator.clipboard.writeText(generated);
+            toast.success('Strong password generated and copied.');
+        } catch {
+            toast.success('Strong password generated.');
+        }
+    };
+
     const handlePasswordSubmit = async (e) => {
         e.preventDefault();
 
@@ -822,6 +1179,12 @@ const ProfileUpdate = () => {
         }
     };
 
+    const fullDisplayName = `${user.first_name || ''} ${user.last_name || ''}`.trim();
+    const savedPhotoSrc =
+        user.profile_pic_url && !avatarError
+            ? withCacheBust(user.profile_pic_url, pictureVersion)
+            : '';
+
     return (
         <div className="min-h-screen px-4 py-5 sm:px-6 md:px-8 lg:px-14" style={{ background: PAGE_BG }}>
 
@@ -841,21 +1204,36 @@ const ProfileUpdate = () => {
                     style={{ boxShadow: '0 8px 30px rgba(15,27,51,0.06)' }}
                 >
                     <div className="relative mb-4">
-                        <div className="p-[3px] rounded-full" style={{ background: `linear-gradient(135deg, ${INDIGO}, #38BDF8)` }}>
-                            {user.profile_pic_url && !avatarError ? (
-                                <img
-                                    src={withCacheBust(user.profile_pic_url, pictureVersion)}
-                                    alt="Profile"
-                                    onError={() => setAvatarError(true)}
-                                    className="w-24 h-24 rounded-full object-cover border-[3px] border-white"
-                                />
-                            ) : (
-                                <div className="w-24 h-24 rounded-full border-[3px] border-white flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${NAVY}, ${NAVY_LIGHT})` }}>
-                                    <span className="text-2xl font-bold text-white">{getInitials()}</span>
-                                </div>
-                            )}
-                        </div>
-                        <div className="absolute bottom-1 right-1 w-4 h-4 rounded-full bg-emerald-400 border-[3px] border-white" />
+                        {/* Click the avatar to open the photo viewer popup */}
+                        <button
+                            type="button"
+                            onClick={() => openPhotoViewer(savedPhotoSrc)}
+                            title="View profile photo"
+                            aria-label="View profile photo"
+                            className="group relative block rounded-full cursor-zoom-in focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-200"
+                        >
+                            <div className="p-[3px] rounded-full" style={{ background: `linear-gradient(135deg, ${INDIGO}, #38BDF8)` }}>
+                                {user.profile_pic_url && !avatarError ? (
+                                    <img
+                                        src={withCacheBust(user.profile_pic_url, pictureVersion)}
+                                        alt="Profile"
+                                        onError={() => setAvatarError(true)}
+                                        className="w-24 h-24 rounded-full object-cover border-[3px] border-white"
+                                    />
+                                ) : (
+                                    <div className="w-24 h-24 rounded-full border-[3px] border-white flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${NAVY}, ${NAVY_LIGHT})` }}>
+                                        <span className="text-2xl font-bold text-white">{getInitials()}</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Hover hint */}
+                            <div className="absolute inset-[3px] rounded-full bg-black/45 flex flex-col items-center justify-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity pointer-events-none">
+                                <ZoomInIconMui sx={{ fontSize: 22, color: '#fff' }} />
+                                <span className="text-[9.5px] font-bold uppercase tracking-wider text-white">View</span>
+                            </div>
+                        </button>
+                        <div className="absolute bottom-1 right-1 w-4 h-4 rounded-full bg-emerald-400 border-[3px] border-white pointer-events-none" />
                     </div>
 
                     <h2 className="font-bold text-lg text-slate-900 tracking-tight truncate max-w-full">
@@ -879,6 +1257,31 @@ const ProfileUpdate = () => {
                                     {getRoleLabel()}
                                 </span>
                             </div>
+                        )}
+                    </div>
+
+                    {/* Profile completeness */}
+                    <div className="w-full mt-5 text-left">
+                        <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[10.5px] font-bold uppercase tracking-wider text-gray-400">
+                                Profile strength
+                            </span>
+                            <span className="text-[11px] font-bold" style={{ color: completenessColor }}>
+                                {completenessPercent}%
+                            </span>
+                        </div>
+                        <div className="h-1.5 w-full rounded-full overflow-hidden" style={{ background: '#E3E7EC' }}>
+                            <div
+                                className="h-full rounded-full transition-all duration-500"
+                                style={{ width: `${completenessPercent}%`, background: completenessColor }}
+                            />
+                        </div>
+                        {completenessPercent < 100 && (
+                            <p className="text-[11px] text-gray-400 mt-1.5 mb-0">
+                                {avatarError || !user.profile_pic_url
+                                    ? 'Add a profile photo to complete your profile.'
+                                    : 'Fill in your remaining details to complete your profile.'}
+                            </p>
                         )}
                     </div>
 
@@ -910,12 +1313,17 @@ const ProfileUpdate = () => {
                         <p className="text-[12.5px] text-gray-400 mb-2">Information on record for your account.</p>
 
                         <div className="mt-2">
-                            <DetailRow label="Display Name" value={`${user.first_name || ''} ${user.last_name || ''}`.trim()} icon={<UserIcon />} />
-                            <DetailRow label="Corporate Email" value={user.email} icon={<MailIcon />} />
+                            <DetailRow label="Display Name" value={`${user.first_name || ''} ${user.last_name || ''}`.trim()} copyText={`${user.first_name || ''} ${user.last_name || ''}`.trim()} icon={<UserIcon />} />
+                            <DetailRow label="Corporate Email" value={user.email} icon={<MailIcon />} copyText={user.email} />
                             <DetailRow label="Access Level" value={getRoleLabel() || '—'} icon={<BadgeIcon />} />
                             <DetailRow
                                 label="Mobile Contact"
                                 value={
+                                    user.phone ?? user.contact
+                                        ? `${dialFor(user.country_code, '')} ${user.phone ?? user.contact}`.trim()
+                                        : ''
+                                }
+                                copyText={
                                     user.phone ?? user.contact
                                         ? `${dialFor(user.country_code, '')} ${user.phone ?? user.contact}`.trim()
                                         : ''
@@ -957,14 +1365,13 @@ const ProfileUpdate = () => {
                 <div className="fixed inset-0 z-50 overflow-hidden">
                     <div
                         className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
-                        onClick={() => setEditOpen(false)}
+                        onClick={requestCloseEdit}
                     />
 
                     <div className="absolute inset-0 flex items-center justify-center p-4 sm:inset-y-0 sm:right-0 sm:left-auto sm:top-0 sm:bottom-0 sm:p-0 sm:items-stretch sm:justify-end sm:max-w-full">
                         <div className="w-full max-w-md max-h-[90vh] rounded-[24px] overflow-hidden sm:w-screen sm:max-w-lg sm:max-h-full sm:h-full sm:rounded-none bg-white shadow-2xl flex flex-col">
                             <form onSubmit={handleSubmit} className="flex flex-col h-full overflow-y-auto">
 
-                                {/* ---- Gradient header with overlapping avatar ---- */}
                                 <div
                                     className="relative px-5 pt-6 pb-14 sm:px-8 sm:pt-7 sm:pb-16 flex-shrink-0 overflow-hidden"
                                     style={{ background: `linear-gradient(120deg, ${NAVY} 0%, ${NAVY_LIGHT} 55%, ${INDIGO} 140%)` }}
@@ -973,7 +1380,7 @@ const ProfileUpdate = () => {
 
                                     <button
                                         type="button"
-                                        onClick={() => setEditOpen(false)}
+                                        onClick={requestCloseEdit}
                                         className="absolute top-4 right-5 sm:top-5 sm:right-6 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
                                     >
                                         <CloseIcon />
@@ -990,27 +1397,51 @@ const ProfileUpdate = () => {
                                             Last updated {lastUpdatedLabel}
                                         </p>
                                     )}
+                                    {isFormDirty && (
+                                        <span className="inline-flex items-center gap-1.5 mt-2 rounded-full bg-amber-400/20 px-2.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-amber-200">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-amber-300" />
+                                            Unsaved changes
+                                        </span>
+                                    )}
                                 </div>
 
                                 <div className="flex-1 px-5 sm:px-8">
 
-                                    <div className="-mt-10 sm:-mt-12 mb-6 sm:mb-8 flex flex-col items-center">
+                                    <div
+                                        className="-mt-10 sm:-mt-12 mb-6 sm:mb-8 flex flex-col items-center"
+                                        onDragOver={(e) => { e.preventDefault(); setPhotoDragging(true); }}
+                                        onDragLeave={() => setPhotoDragging(false)}
+                                        onDrop={handlePhotoDrop}
+                                        style={photoDragging ? { outline: `2px dashed ${INDIGO}`, outlineOffset: 6, borderRadius: 16 } : undefined}
+                                    >
                                         <div className="relative">
-                                            <div className="p-[3px] rounded-full" style={{ background: `linear-gradient(135deg, ${INDIGO}, #38BDF8)` }}>
-                                                {formData.profile_pic_url ? (
-                                                    <img
-                                                        src={formData.profile_pic_url}
-                                                        alt="Preview"
-                                                        className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] border-white shadow-lg"
-                                                    />
-                                                ) : (
-                                                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#EEF2FF] border-[3px] border-white shadow-lg flex items-center justify-center">
-                                                        <span className="text-lg sm:text-xl font-bold text-[#4F46E5]">{getInitials()}</span>
-                                                    </div>
-                                                )}
-                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => openPhotoViewer(formData.profile_pic_url)}
+                                                title="Preview photo"
+                                                aria-label="Preview photo"
+                                                className="group relative block rounded-full cursor-zoom-in focus:outline-none"
+                                            >
+                                                <div className="p-[3px] rounded-full" style={{ background: `linear-gradient(135deg, ${INDIGO}, #38BDF8)` }}>
+                                                    {formData.profile_pic_url ? (
+                                                        <img
+                                                            src={formData.profile_pic_url}
+                                                            alt="Preview"
+                                                            className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] border-white shadow-lg"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#EEF2FF] border-[3px] border-white shadow-lg flex items-center justify-center">
+                                                            <span className="text-lg sm:text-xl font-bold text-[#4F46E5]">{getInitials()}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="absolute inset-[3px] rounded-full bg-black/45 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                                                    <ZoomInIconMui sx={{ fontSize: 22, color: '#fff' }} />
+                                                </div>
+                                            </button>
 
                                             <input
+                                                ref={fileInputRef}
                                                 type="file"
                                                 id="drawer-avatar-input"
                                                 accept="image/png, image/jpeg, image/webp"
@@ -1028,7 +1459,21 @@ const ProfileUpdate = () => {
                                                 <PencilIcon />
                                             </label>
                                         </div>
-                                        <p className="text-[11px] text-gray-400 mt-3">PNG or JPG, up to 5MB</p>
+                                        <p className="text-[11px] text-gray-400 mt-3">
+                                            {photoDragging ? 'Drop image to use it' : 'PNG or JPG, up to 5MB · or drop an image here'}
+                                        </p>
+
+                                        {formData.profile_pic_file && (
+                                            <button
+                                                type="button"
+                                                onClick={handleRevertPhoto}
+                                                className="mt-2 inline-flex items-center gap-1.5 text-[11.5px] font-semibold px-3 py-1 rounded-full transition-colors hover:bg-[#EEF2FF]"
+                                                style={{ color: INDIGO }}
+                                            >
+                                                <ResetIcon />
+                                                Undo new photo
+                                            </button>
+                                        )}
                                     </div>
 
                                     <div className="pb-8">
@@ -1093,7 +1538,7 @@ const ProfileUpdate = () => {
                                 <div className="border-t border-gray-100 bg-white px-5 py-4 sm:px-8 flex gap-3 items-center flex-shrink-0">
                                     <button
                                         type="button"
-                                        onClick={() => setEditOpen(false)}
+                                        onClick={requestCloseEdit}
                                         className="px-5 sm:px-6 py-2.5 border border-gray-200 text-xs font-bold text-gray-500 rounded-full hover:bg-gray-50 transition-colors uppercase tracking-wider"
                                     >
                                         Cancel
@@ -1195,6 +1640,16 @@ const ProfileUpdate = () => {
                                 maxLength={MAX_PASSWORD_LENGTH}
                             />
 
+                            <button
+                                type="button"
+                                onClick={handleGeneratePassword}
+                                className="self-start inline-flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1.5 rounded-full transition-colors hover:bg-[#EEF2FF]"
+                                style={{ color: INDIGO, border: '1px solid #E0E7FF' }}
+                            >
+                                <GenerateIconMui sx={{ fontSize: 14 }} />
+                                Suggest a strong password
+                            </button>
+
                             <div className="flex flex-col gap-2 bg-[#FAFBFC] border border-gray-100 rounded-xl px-4 py-3.5">
                                 <RequirementRow met={lengthMet}>8–16 characters</RequirementRow>
                                 <RequirementRow met={matchMet}>Confirmation matches</RequirementRow>
@@ -1221,6 +1676,15 @@ const ProfileUpdate = () => {
                         </form>
                     </div>
                 </div>
+            )}
+
+            {lightboxOpen && (
+                <ImageLightbox
+                    src={lightboxSrc}
+                    name={fullDisplayName}
+                    initials={getInitials()}
+                    onClose={() => setLightboxOpen(false)}
+                />
             )}
         </div>
     );
